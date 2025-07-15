@@ -43,3 +43,9 @@ config :flixir, :tmdb,
   image_base_url: "https://image.tmdb.org/t/p/w500",
   timeout: 1_000,
   max_retries: 1
+
+# Search cache configuration for testing (shorter TTL for faster tests)
+config :flixir, :search_cache,
+  ttl_seconds: 5,  # 5 seconds for testing
+  max_entries: 100,
+  cleanup_interval: 1_000  # 1 second

@@ -12,6 +12,8 @@ defmodule Flixir.Application do
       Flixir.Repo,
       {DNSCluster, query: Application.get_env(:flixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Flixir.PubSub},
+      # Start the search cache
+      {Flixir.Media.Cache, Application.get_env(:flixir, :search_cache, [])},
       # Start a worker by calling: Flixir.Worker.start_link(arg)
       # {Flixir.Worker, arg},
       # Start to serve requests, typically the last entry
