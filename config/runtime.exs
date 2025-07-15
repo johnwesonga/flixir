@@ -125,3 +125,9 @@ config :flixir, :tmdb,
   image_base_url: System.get_env("TMDB_IMAGE_BASE_URL") || "https://image.tmdb.org/t/p/w500",
   timeout: String.to_integer(System.get_env("TMDB_TIMEOUT") || "5000"),
   max_retries: String.to_integer(System.get_env("TMDB_MAX_RETRIES") || "3")
+
+# Search cache configuration
+config :flixir, :search_cache,
+  ttl_seconds: String.to_integer(System.get_env("SEARCH_CACHE_TTL") || "300"),
+  max_entries: String.to_integer(System.get_env("SEARCH_CACHE_MAX_ENTRIES") || "1000"),
+  cleanup_interval: String.to_integer(System.get_env("SEARCH_CACHE_CLEANUP_INTERVAL") || "60000")
