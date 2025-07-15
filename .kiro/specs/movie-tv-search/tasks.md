@@ -7,19 +7,18 @@
   - Write unit tests for API client configuration and basic connectivity
   - _Requirements: 1.2, 3.3_
 
-- [ ] 2. Implement core data structures and validation
+- [x] 2. Implement core data structures and validation
   - Create SearchResult struct with all required fields (id, title, media_type, etc.)
   - Create SearchParams struct for query parameters and validation
   - Implement validation functions for search inputs and parameters
-  - Write unit tests for data structure validation and transformation
+  - Write comprehensive unit tests for data structure validation and transformation
   - _Requirements: 1.5, 2.1_
 
-- [ ] 3. Build TMDB API integration functions
-  - Implement search_multi function to query TMDB search endpoint
-  - Add functions for fetching detailed movie and TV show information
-  - Implement response parsing and error handling for API calls
-  - Add timeout handling and retry logic for failed requests
-  - Write unit tests for API integration with mocked responses
+- [ ] 3. Complete TMDB API integration testing
+  - Add comprehensive unit tests for search_multi function with mocked HTTP responses
+  - Add unit tests for get_movie_details and get_tv_details functions with mocked responses
+  - Test error handling scenarios (timeout, rate limiting, API errors) with mocked failures
+  - Add integration tests with actual API responses (if API key available)
   - _Requirements: 1.2, 3.3, 3.4_
 
 - [ ] 4. Create caching system for search results
