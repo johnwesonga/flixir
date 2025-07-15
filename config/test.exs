@@ -35,3 +35,11 @@ config :phoenix, :plug_init_mode, :runtime
 # Enable helpful, but potentially expensive runtime checks
 config :phoenix_live_view,
   enable_expensive_runtime_checks: true
+
+# TMDB API configuration for testing
+config :flixir, :tmdb,
+  api_key: "test_api_key",
+  base_url: "https://api.themoviedb.org/3",
+  image_base_url: "https://image.tmdb.org/t/p/w500",
+  timeout: 1_000,
+  max_retries: 1

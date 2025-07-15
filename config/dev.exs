@@ -85,3 +85,11 @@ config :phoenix_live_view,
 
 # Disable swoosh api client as it is only required for production adapters.
 config :swoosh, :api_client, false
+
+# TMDB API configuration for development
+config :flixir, :tmdb,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: "https://api.themoviedb.org/3",
+  image_base_url: "https://image.tmdb.org/t/p/w500",
+  timeout: 5_000,
+  max_retries: 3

@@ -117,3 +117,11 @@ if config_env() == :prod do
   #
   # See https://hexdocs.pm/swoosh/Swoosh.html#module-installation for details.
 end
+
+# TMDB API configuration
+config :flixir, :tmdb,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
+  image_base_url: System.get_env("TMDB_IMAGE_BASE_URL") || "https://image.tmdb.org/t/p/w500",
+  timeout: String.to_integer(System.get_env("TMDB_TIMEOUT") || "5000"),
+  max_retries: String.to_integer(System.get_env("TMDB_MAX_RETRIES") || "3")
