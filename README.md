@@ -1,5 +1,7 @@
 # Flixir
 
+A Liveview web app that queries the TMDB API. Built using kiro https://kiro.dev/blog/introducing-kiro/ 
+
 To start your Phoenix server:
 
 * Run `mix setup` to install and setup dependencies
