@@ -36,7 +36,7 @@ defmodule FlixirWeb.SearchLiveTest do
       {:ok, _view, html} = live(conn, ~p"/search")
 
       assert html =~ "Search Movies &amp; TV Shows"
-      assert html =~ "Start your search"
+      assert html =~ "Discover Movies &amp; TV Shows"
     end
   end
 
@@ -49,8 +49,8 @@ defmodule FlixirWeb.SearchLiveTest do
         |> form("#search-form", search: %{query: "batman"})
         |> render_submit()
 
-        assert has_element?(view, "[data-testid='search-result']", "The Dark Knight")
-        assert has_element?(view, "[data-testid='search-result']", "Breaking Bad")
+        assert has_element?(view, "[data-testid='search-result-card']", "The Dark Knight")
+        assert has_element?(view, "[data-testid='search-result-card']", "Breaking Bad")
         assert called(Media.search_content("batman", :_))
       end
     end
@@ -62,10 +62,10 @@ defmodule FlixirWeb.SearchLiveTest do
       |> form("#search-form", search: %{query: ""})
       |> render_submit()
 
-      refute has_element?(view, "[data-testid='search-result']")
+      refute has_element?(view, "[data-testid='search-result-card']")
 
       # Check for the text in the rendered HTML
-      assert html =~ "Start your search"
+      assert html =~ "Discover Movies &amp; TV Shows"
     end
 
     test "displays error message for search failures", %{conn: conn} do
@@ -163,7 +163,7 @@ defmodule FlixirWeb.SearchLiveTest do
         |> render_click()
 
         # Should clear the search
-        refute has_element?(view, "[data-testid='search-result']")
+        refute has_element?(view, "[data-testid='search-result-card']")
         assert has_element?(view, "input[value='']")
       end
     end
@@ -175,14 +175,14 @@ defmodule FlixirWeb.SearchLiveTest do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         # Check movie result
-        assert has_element?(view, "[data-testid='search-result']", "The Dark Knight")
+        assert has_element?(view, "[data-testid='search-result-card']", "The Dark Knight")
         assert has_element?(view, ".bg-blue-100", "Movie")
         assert has_element?(view, "span", "2008")
         assert has_element?(view, "span", "9.0")
 
         # Check TV result
-        assert has_element?(view, "[data-testid='search-result']", "Breaking Bad")
-        assert has_element?(view, ".bg-green-100", "TV")
+        assert has_element?(view, "[data-testid='search-result-card']", "Breaking Bad")
+        assert has_element?(view, ".bg-green-100", "TV Show")
         assert has_element?(view, "span", "9.5")
       end
     end

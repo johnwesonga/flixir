@@ -7,6 +7,7 @@ defmodule FlixirWeb.SearchLive do
   """
 
   use FlixirWeb, :live_view
+  import FlixirWeb.SearchComponents
   alias Flixir.Media
   require Logger
 
@@ -262,34 +263,5 @@ defmodule FlixirWeb.SearchLive do
     end
   end
 
-  defp media_type_label(:all), do: "All"
-  defp media_type_label(:movie), do: "Movies"
-  defp media_type_label(:tv), do: "TV Shows"
 
-
-
-  defp format_release_date(nil), do: "Unknown"
-  defp format_release_date(%Date{} = date) do
-    Calendar.strftime(date, "%Y")
-  end
-  defp format_release_date(date_string) when is_binary(date_string) do
-    case Date.from_iso8601(date_string) do
-      {:ok, parsed_date} -> Calendar.strftime(parsed_date, "%Y")
-      _ -> "Unknown"
-    end
-  end
-  defp format_release_date(_), do: "Unknown"
-
-  defp poster_url(nil), do: "/images/no-poster.png"
-  defp poster_url(poster_path) do
-    "https://image.tmdb.org/t/p/w300#{poster_path}"
-  end
-
-  defp truncate_text(text, max_length) do
-    if String.length(text) <= max_length do
-      text
-    else
-      String.slice(text, 0, max_length) <> "..."
-    end
-  end
 end
