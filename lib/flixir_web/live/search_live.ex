@@ -27,6 +27,7 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:search_performed, false)
       |> assign(:debounce_timer, nil)
       |> assign(:has_more_results, false)
+      |> assign(:page_title, "Search")
 
     {:ok, socket}
   end
@@ -45,6 +46,16 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:sort_by, sort_by)
       |> assign(:page, page)
       |> assign(:validation_error, nil)
+
+    # Set dynamic page title based on search query
+    page_title =
+      if String.trim(query) != "" do
+        "Search: #{query}"
+      else
+        "Search"
+      end
+
+    socket = assign(socket, :page_title, page_title)
 
     # Perform search if query is present and valid
     socket =
