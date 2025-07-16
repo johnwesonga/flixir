@@ -42,7 +42,7 @@ defmodule FlixirWeb.SearchLiveTest do
 
   describe "search functionality" do
     test "performs search when form is submitted", %{conn: conn} do
-      with_mock Media, [search_content: fn("batman", _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
         view
@@ -58,9 +58,10 @@ defmodule FlixirWeb.SearchLiveTest do
     test "handles empty search query", %{conn: conn} do
       {:ok, view, _html} = live(conn, ~p"/search")
 
-      html = view
-      |> form("#search-form", search: %{query: ""})
-      |> render_submit()
+      html =
+        view
+        |> form("#search-form", search: %{query: ""})
+        |> render_submit()
 
       refute has_element?(view, "[data-testid='search-result-card']")
 
@@ -69,9 +70,10 @@ defmodule FlixirWeb.SearchLiveTest do
     end
 
     test "displays error message for search failures", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) ->
-        {:error, {:timeout, "Search request timed out. Please try again."}}
-      end] do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:timeout, "Search request timed out. Please try again."}}
+        end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
         view
@@ -84,7 +86,7 @@ defmodule FlixirWeb.SearchLiveTest do
     end
 
     test "displays no results message when search returns empty", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) -> {:ok, []} end] do
+      with_mock Media, search_content: fn _query, _opts -> {:ok, []} end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
         view
@@ -99,59 +101,196 @@ defmodule FlixirWeb.SearchLiveTest do
 
   describe "filtering functionality" do
     test "filters by movie type", %{conn: conn} do
-      with_mock Media, [search_content: fn("batman", _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         view
-        |> element("select[name='media_type']")
-        |> render_change(%{media_type: "movie"})
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
 
-        assert has_element?(view, "select[name='media_type'] option[value='movie'][selected]")
+        assert has_element?(view, "select[name='filters[media_type]'] option[value='movie'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :movie, sort_by: :relevance, page: 1)
+               )
       end
     end
 
     test "filters by TV show type", %{conn: conn} do
-      with_mock Media, [search_content: fn("batman", _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         view
-        |> element("select[name='media_type']")
-        |> render_change(%{media_type: "tv"})
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "tv"}})
 
-        assert has_element?(view, "select[name='media_type'] option[value='tv'][selected]")
+        assert has_element?(view, "select[name='filters[media_type]'] option[value='tv'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :tv, sort_by: :relevance, page: 1)
+               )
       end
+    end
+
+    test "shows active filter badge when media type is not 'all'", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        # Initially no active filter badge
+        refute has_element?(view, "[data-testid='active-filter-badge']")
+
+        # Filter by movies
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
+
+        # Should show active filter badge
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
+
+        # Filter should have visual styling
+        assert has_element?(view, "select[data-testid='media-type-filter'].border-blue-500")
+      end
+    end
+
+    test "can clear individual filter using badge button", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman&type=movie")
+
+        # Should show active filter badge
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
+
+        # Click the clear button in the badge
+        view
+        |> element("[data-testid='active-filter-badge'] button")
+        |> render_click()
+
+        # Should clear the filter
+        refute has_element?(view, "[data-testid='active-filter-badge']")
+        assert has_element?(view, "select[name='filters[media_type]'] option[value='all'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :all, sort_by: :relevance, page: 1)
+               )
+      end
+    end
+
+    test "shows filter controls when filter is applied via URL", %{conn: conn} do
+      # Start with a filter in URL - this should show the filter controls
+      {:ok, view, _html} = live(conn, ~p"/search?type=movie")
+
+      # Filter controls should be visible because media_type != :all
+      assert has_element?(view, "select[name='filters[media_type]']")
+      assert has_element?(view, "select[name='filters[media_type]'] option[value='movie'][selected]")
+
+      # Should show active filter badge
+      assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
     end
   end
 
   describe "sorting functionality" do
     test "sorts by popularity", %{conn: conn} do
-      with_mock Media, [search_content: fn("batman", _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         view
-        |> element("select[name='sort_by']")
-        |> render_change(%{sort_by: "popularity"})
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "popularity"}})
 
-        assert has_element?(view, "select[name='sort_by'] option[value='popularity'][selected]")
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='popularity'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :all, sort_by: :popularity, page: 1)
+               )
       end
     end
 
     test "sorts by title", %{conn: conn} do
-      with_mock Media, [search_content: fn("batman", _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         view
-        |> element("select[name='sort_by']")
-        |> render_change(%{sort_by: "title"})
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "title"}})
 
-        assert has_element?(view, "select[name='sort_by'] option[value='title'][selected]")
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='title'][selected]")
+        assert called(Media.search_content("batman", media_type: :all, sort_by: :title, page: 1))
       end
+    end
+
+    test "sorts by release date", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "release_date"}})
+
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='release_date'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :all, sort_by: :release_date, page: 1)
+               )
+      end
+    end
+
+    test "shows active sort badge when sort is not 'relevance'", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        # Initially no active sort badge
+        refute has_element?(view, "[data-testid='active-sort-badge']")
+
+        # Sort by popularity
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "popularity"}})
+
+        # Should show active sort badge
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+
+        # Sort should have visual styling
+        assert has_element?(view, "select[data-testid='sort-by-filter'].border-green-500")
+      end
+    end
+
+    test "can clear individual sort using badge button", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman&sort=popularity")
+
+        # Should show active sort badge
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+
+        # Click the clear button in the badge
+        view
+        |> element("[data-testid='active-sort-badge'] button")
+        |> render_click()
+
+        # Should clear the sort
+        refute has_element?(view, "[data-testid='active-sort-badge']")
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='relevance'][selected]")
+
+        assert called(
+                 Media.search_content("batman", media_type: :all, sort_by: :relevance, page: 1)
+               )
+      end
+    end
+
+    test "shows sort controls when sort is applied via URL", %{conn: conn} do
+      # Start with a sort in URL - this should show the sort controls
+      {:ok, view, _html} = live(conn, ~p"/search?sort=popularity")
+
+      # Sort controls should be visible because sort_by != :relevance
+      assert has_element?(view, "select[name='filters[sort_by]']")
+      assert has_element?(view, "select[name='filters[sort_by]'] option[value='popularity'][selected]")
+
+      # Should show active sort badge
+      assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
     end
   end
 
   describe "clear search functionality" do
     test "clears search when clear button is clicked", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn _query, _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         # Should show clear search button
@@ -171,7 +310,7 @@ defmodule FlixirWeb.SearchLiveTest do
 
   describe "result display" do
     test "displays search results with correct information", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn _query, _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         # Check movie result
@@ -188,7 +327,7 @@ defmodule FlixirWeb.SearchLiveTest do
     end
 
     test "displays results count", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) -> {:ok, @sample_results} end] do
+      with_mock Media, search_content: fn _query, _opts -> {:ok, @sample_results} end do
         {:ok, view, _html} = live(conn, ~p"/search?q=batman")
 
         assert has_element?(view, "div", "2 results found")
@@ -196,32 +335,327 @@ defmodule FlixirWeb.SearchLiveTest do
     end
   end
 
+  describe "combined filtering and sorting" do
+    test "can apply both filter and sort simultaneously", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        # Apply filter
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
+
+        # Apply sort
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "popularity"}})
+
+        # Should show both active indicators
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+
+        # Should show clear all filters button
+        assert has_element?(view, "[data-testid='clear-all-filters']", "Clear all filters")
+
+        # Should call search with both options
+        assert called(
+                 Media.search_content("batman", media_type: :movie, sort_by: :popularity, page: 1)
+               )
+      end
+    end
+
+    test "can clear all filters at once", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman&type=movie&sort=popularity")
+
+        # Should show both active indicators and clear all button
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+        assert has_element?(view, "[data-testid='clear-all-filters']", "Clear all filters")
+
+        # Click clear all filters
+        view
+        |> element("[data-testid='clear-all-filters']")
+        |> render_click()
+
+        # Should clear both filter and sort
+        refute has_element?(view, "[data-testid='active-filter-badge']")
+        refute has_element?(view, "[data-testid='active-sort-badge']")
+        refute has_element?(view, "[data-testid='clear-all-filters']")
+
+        # Should reset to defaults
+        assert has_element?(view, "select[name='filters[media_type]'] option[value='all'][selected]")
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='relevance'][selected]")
+
+        # Should call search with defaults
+        assert called(
+                 Media.search_content("batman", media_type: :all, sort_by: :relevance, page: 1)
+               )
+      end
+    end
+
+    test "clear all filters button only shows when filters are active", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        # Initially no clear all button
+        refute has_element?(view, "[data-testid='clear-all-filters']")
+
+        # Apply only filter
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
+
+        # Should show clear all button
+        assert has_element?(view, "[data-testid='clear-all-filters']")
+
+        # Clear filter
+        view
+        |> element("[data-testid='active-filter-badge'] button")
+        |> render_click()
+
+        # Should hide clear all button again
+        refute has_element?(view, "[data-testid='clear-all-filters']")
+      end
+    end
+
+    test "preserves search query when clearing filters", %{conn: conn} do
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman&type=movie&sort=popularity")
+
+        # Clear all filters
+        view
+        |> element("[data-testid='clear-all-filters']")
+        |> render_click()
+
+        # Should preserve search query in URL
+        assert_patch(view, ~p"/search?q=batman")
+
+        # Should still have search query in input
+        assert has_element?(view, "input[value='batman']")
+      end
+    end
+  end
+
+  describe "real-time filtering without API calls" do
+    test "filters existing results without new API call when changing filter", %{conn: conn} do
+      # Mock to return mixed results
+      mixed_results = [
+        %SearchResult{
+          id: 1,
+          title: "Batman Movie",
+          media_type: :movie,
+          release_date: ~D[2008-07-18],
+          overview: "A movie about Batman",
+          poster_path: "/movie.jpg",
+          genre_ids: [28],
+          vote_average: 8.0,
+          popularity: 100.0
+        },
+        %SearchResult{
+          id: 2,
+          title: "Batman TV Show",
+          media_type: :tv,
+          release_date: ~D[2008-01-20],
+          overview: "A TV show about Batman",
+          poster_path: "/tv.jpg",
+          genre_ids: [18],
+          vote_average: 7.5,
+          popularity: 80.0
+        }
+      ]
+
+      with_mock Media, search_content: fn "batman", _opts -> {:ok, mixed_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search?q=batman")
+
+        # Should show both results initially
+        assert has_element?(view, "[data-testid='search-result-card']", "Batman Movie")
+        assert has_element?(view, "[data-testid='search-result-card']", "Batman TV Show")
+
+        # Filter by movies - this should trigger a new search call
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
+
+        # Should call search with movie filter
+        assert called(
+                 Media.search_content("batman", media_type: :movie, sort_by: :relevance, page: 1)
+               )
+      end
+    end
+  end
+
+  describe "comprehensive filtering and sorting integration" do
+    test "complete filtering and sorting workflow", %{conn: conn} do
+      # Mock search results with different types and properties for sorting
+      mixed_results = [
+        %SearchResult{
+          id: 1,
+          title: "Avatar",
+          media_type: :movie,
+          release_date: ~D[2009-12-18],
+          overview: "A movie about blue aliens",
+          poster_path: "/avatar.jpg",
+          genre_ids: [28, 12],
+          vote_average: 7.8,
+          popularity: 150.0
+        },
+        %SearchResult{
+          id: 2,
+          title: "Breaking Bad",
+          media_type: :tv,
+          release_date: ~D[2008-01-20],
+          overview: "A TV show about chemistry",
+          poster_path: "/bb.jpg",
+          genre_ids: [18, 80],
+          vote_average: 9.5,
+          popularity: 200.0
+        },
+        %SearchResult{
+          id: 3,
+          title: "Batman Begins",
+          media_type: :movie,
+          release_date: ~D[2005-06-15],
+          overview: "Batman origin story",
+          poster_path: "/batman.jpg",
+          genre_ids: [28, 80],
+          vote_average: 8.2,
+          popularity: 120.0
+        }
+      ]
+
+      with_mock Media, search_content: fn _query, _opts -> {:ok, mixed_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        # 1. Perform initial search
+        view
+        |> form("#search-form", search: %{query: "test"})
+        |> render_submit()
+
+        # Should show all results initially
+        assert has_element?(view, "[data-testid='search-result-card']", "Avatar")
+        assert has_element?(view, "[data-testid='search-result-card']", "Breaking Bad")
+        assert has_element?(view, "[data-testid='search-result-card']", "Batman Begins")
+        assert has_element?(view, "[data-testid='results-count']", "3 results found")
+
+        # 2. Filter by movies only
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "movie"}})
+
+        # Should show active filter badge
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Movie")
+        assert has_element?(view, "select[data-testid='media-type-filter'].border-blue-500")
+
+        # 3. Sort by popularity
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{sort_by: "popularity"}})
+
+        # Should show active sort badge
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+        assert has_element?(view, "select[data-testid='sort-by-filter'].border-green-500")
+
+        # Should show clear all filters button
+        assert has_element?(view, "[data-testid='clear-all-filters']", "Clear all filters")
+
+        # 4. Clear individual filter
+        view
+        |> element("[data-testid='active-filter-badge'] button")
+        |> render_click()
+
+        # Filter badge should be gone, but sort badge should remain
+        refute has_element?(view, "[data-testid='active-filter-badge']")
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+
+        # 5. Apply filter again and then clear all
+        view
+        |> form("form[phx-change='update_filters']")
+        |> render_change(%{filters: %{media_type: "tv"}})
+
+        # Both badges should be present
+        assert has_element?(view, "[data-testid='active-filter-badge']", "Tv")
+        assert has_element?(view, "[data-testid='active-sort-badge']", "Popularity")
+
+        # Clear all filters
+        view
+        |> element("[data-testid='clear-all-filters']")
+        |> render_click()
+
+        # All badges should be gone
+        refute has_element?(view, "[data-testid='active-filter-badge']")
+        refute has_element?(view, "[data-testid='active-sort-badge']")
+        refute has_element?(view, "[data-testid='clear-all-filters']")
+
+        # Should be back to defaults
+        assert has_element?(view, "select[name='filters[media_type]'] option[value='all'][selected]")
+        assert has_element?(view, "select[name='filters[sort_by]'] option[value='relevance'][selected]")
+
+        # Verify all search calls were made with correct parameters
+        assert called(
+                 Media.search_content("test", media_type: :all, sort_by: :relevance, page: 1)
+               )
+
+        assert called(
+                 Media.search_content("test", media_type: :movie, sort_by: :relevance, page: 1)
+               )
+
+        assert called(
+                 Media.search_content("test", media_type: :movie, sort_by: :popularity, page: 1)
+               )
+
+        assert called(
+                 Media.search_content("test", media_type: :all, sort_by: :popularity, page: 1)
+               )
+
+        assert called(
+                 Media.search_content("test", media_type: :tv, sort_by: :popularity, page: 1)
+               )
+
+        assert called(
+                 Media.search_content("test", media_type: :all, sort_by: :relevance, page: 1)
+               )
+      end
+    end
+  end
+
   describe "error handling" do
     test "handles network errors gracefully", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) ->
-        {:error, {:network_error, "Network error occurred. Please check your connection and try again."}}
-      end] do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error,
+           {:network_error, "Network error occurred. Please check your connection and try again."}}
+        end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
         view
         |> form("#search-form", search: %{query: "batman"})
         |> render_submit()
 
-        assert has_element?(view, ".bg-red-50", "Network error occurred. Please check your connection and try again.")
+        assert has_element?(
+                 view,
+                 ".bg-red-50",
+                 "Network error occurred. Please check your connection and try again."
+               )
       end
     end
 
     test "handles rate limiting errors", %{conn: conn} do
-      with_mock Media, [search_content: fn(_query, _opts) ->
-        {:error, {:rate_limited, "Too many requests. Please wait a moment and try again."}}
-      end] do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:rate_limited, "Too many requests. Please wait a moment and try again."}}
+        end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
         view
         |> form("#search-form", search: %{query: "batman"})
         |> render_submit()
 
-        assert has_element?(view, ".bg-red-50", "Too many requests. Please wait a moment and try again.")
+        assert has_element?(
+                 view,
+                 ".bg-red-50",
+                 "Too many requests. Please wait a moment and try again."
+               )
       end
     end
   end

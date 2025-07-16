@@ -154,6 +154,51 @@ defmodule FlixirWeb.SearchLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("clear_filters", _params, socket) do
+    socket =
+      socket
+      |> assign(:media_type, :all)
+      |> assign(:sort_by, :relevance)
+      |> assign(:page, 1)
+
+    socket =
+      if socket.assigns.query != "" do
+        socket
+        |> assign(:loading, true)
+        |> perform_search()
+        |> update_url()
+      else
+        socket |> update_url()
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("update_filters", %{"filters" => filters}, socket) do
+    media_type = parse_media_type(Map.get(filters, "media_type", "all"))
+    sort_by = parse_sort_by(Map.get(filters, "sort_by", "relevance"))
+
+    socket =
+      socket
+      |> assign(:media_type, media_type)
+      |> assign(:sort_by, sort_by)
+      |> assign(:page, 1)
+
+    socket =
+      if socket.assigns.query != "" do
+        socket
+        |> assign(:loading, true)
+        |> perform_search()
+        |> update_url()
+      else
+        socket |> update_url()
+      end
+
+    {:noreply, socket}
+  end
+
   # Private Functions
 
   defp perform_search(socket, opts \\ []) do
@@ -263,5 +308,8 @@ defmodule FlixirWeb.SearchLive do
     end
   end
 
-
+  defp format_sort_label(:relevance), do: "Relevance"
+  defp format_sort_label(:popularity), do: "Popularity"
+  defp format_sort_label(:release_date), do: "Release Date"
+  defp format_sort_label(:title), do: "Title"
 end
