@@ -25,27 +25,38 @@ defmodule Flixir.Media do
     - :media_type - :all, :movie, or :tv (default: :all)
     - :sort_by - :relevance, :release_date, :title, or :popularity (default: :relevance)
     - :page - Page number for pagination (default: 1)
+    - :return_format - :list (legacy format, default) or :map (new format with pagination)
 
   ## Returns
-  - {:ok, results} - List of SearchResult structs
+  - {:ok, results} - List of SearchResult structs (legacy format)
+  - {:ok, %{results: results, has_more: boolean}} - Map with results and pagination info (new format)
   - {:error, reason} - Error tuple with reason
 
   ## Examples
       iex> Flixir.Media.search_content("batman")
       {:ok, [%Flixir.Media.SearchResult{}, ...]}
 
-      iex> Flixir.Media.search_content("batman", media_type: :movie, sort_by: :release_date)
-      {:ok, [%Flixir.Media.SearchResult{}, ...]}
+      iex> Flixir.Media.search_content("batman", return_format: :map)
+      {:ok, %{results: [%Flixir.Media.SearchResult{}, ...], has_more: true}}
   """
-  @spec search_content(String.t(), keyword()) :: {:ok, [SearchResult.t()]} | {:error, term()}
+  @spec search_content(String.t(), keyword()) :: {:ok, [SearchResult.t()] | %{results: [SearchResult.t()], has_more: boolean()}} | {:error, term()}
   def search_content(query, opts \\ []) do
+    return_format = Keyword.get(opts, :return_format, :list)
+
     with {:ok, search_params} <- build_search_params(query, opts),
-         {:ok, results} <- get_search_results(search_params) do
+         {:ok, %{results: results, has_more: has_more}} <- get_search_results(search_params) do
 
       filtered_results = filter_results(results, search_params.media_type)
       sorted_results = sort_results(filtered_results, search_params.sort_by)
 
-      {:ok, sorted_results}
+      # Limit to 20 results per page for performance
+      page_results = Enum.take(sorted_results, 20)
+      actual_has_more = has_more or length(sorted_results) > 20
+
+      case return_format do
+        :map -> {:ok, %{results: page_results, has_more: actual_has_more}}
+        :list -> {:ok, page_results}
+      end
     else
       {:error, reason} -> {:error, reason}
     end
@@ -145,12 +156,12 @@ defmodule Flixir.Media do
 
     case TMDBClient.search_multi(api_params["query"], api_params["page"]) do
       {:ok, response} ->
-        case transform_api_response(response) do
-          {:ok, results} ->
+        case transform_api_response(response, search_params.page) do
+          {:ok, result_data} ->
             # Cache successful results for 5 minutes
-            Cache.put(cache_key, results, 300)
+            Cache.put(cache_key, result_data, 300)
             Logger.info("Cached search results for query: #{search_params.query}")
-            {:ok, results}
+            {:ok, result_data}
 
           {:error, reason} ->
             Logger.error("Failed to transform API response: #{inspect(reason)}")
@@ -182,7 +193,7 @@ defmodule Flixir.Media do
     end
   end
 
-  defp transform_api_response(%{"results" => results}) when is_list(results) do
+  defp transform_api_response(%{"results" => results, "total_pages" => total_pages, "page" => current_page}, current_page) when is_list(results) do
     transformed_results =
       results
       |> Enum.map(&SearchResult.from_tmdb_data/1)
@@ -192,12 +203,33 @@ defmodule Flixir.Media do
       end)
 
     case transformed_results do
-      {:ok, results_list} -> {:ok, Enum.reverse(results_list)}
+      {:ok, results_list} ->
+        has_more = current_page < total_pages
+        {:ok, %{results: Enum.reverse(results_list), has_more: has_more}}
       {:error, reason} -> {:error, reason}
     end
   end
 
-  defp transform_api_response(response) do
+  defp transform_api_response(%{"results" => results}, _current_page) when is_list(results) do
+    # Fallback for responses without pagination info
+    transformed_results =
+      results
+      |> Enum.map(&SearchResult.from_tmdb_data/1)
+      |> Enum.reduce_while({:ok, []}, fn
+        {:ok, result}, {:ok, acc} -> {:cont, {:ok, [result | acc]}}
+        {:error, reason}, _acc -> {:halt, {:error, reason}}
+      end)
+
+    case transformed_results do
+      {:ok, results_list} ->
+        # Assume there might be more results if we got 20 results
+        has_more = length(results_list) >= 20
+        {:ok, %{results: Enum.reverse(results_list), has_more: has_more}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp transform_api_response(response, _current_page) do
     Logger.warning("Unexpected API response format: #{inspect(response)}")
     {:error, "Invalid API response format"}
   end

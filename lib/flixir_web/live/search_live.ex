@@ -25,6 +25,8 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:page, 1)
       |> assign(:total_results, 0)
       |> assign(:search_performed, false)
+      |> assign(:debounce_timer, nil)
+      |> assign(:has_more_results, false)
 
     {:ok, socket}
   end
@@ -227,17 +229,40 @@ defmodule FlixirWeb.SearchLive do
 
   @impl true
   def handle_event("validate_search", %{"search" => %{"query" => query}}, socket) do
-    socket =
-      socket
-      |> assign(:query, String.trim(query))
+    # Cancel existing timer if present
+    socket = cancel_debounce_timer(socket)
+
+    query = String.trim(query)
+    socket = assign(socket, :query, query)
 
     socket =
       case validate_search_query(query) do
-        {:ok, _validated_query} ->
-          socket |> assign(:validation_error, nil)
+        {:ok, validated_query} ->
+          socket = assign(socket, :validation_error, nil)
+
+          if validated_query == "" do
+            # Clear results immediately for empty query
+            socket
+            |> assign(:results, [])
+            |> assign(:search_performed, false)
+            |> assign(:total_results, 0)
+            |> assign(:loading, false)
+            |> assign(:has_more_results, false)
+            |> push_patch(to: ~p"/search")
+          else
+            # Start debounced search
+            timer_ref = Process.send_after(self(), {:debounced_search, validated_query}, 300)
+            assign(socket, :debounce_timer, timer_ref)
+          end
 
         {:error, validation_message} ->
-          socket |> assign(:validation_error, validation_message)
+          socket
+          |> assign(:validation_error, validation_message)
+          |> assign(:results, [])
+          |> assign(:search_performed, false)
+          |> assign(:total_results, 0)
+          |> assign(:loading, false)
+          |> assign(:has_more_results, false)
       end
 
     {:noreply, socket}
@@ -303,8 +328,8 @@ defmodule FlixirWeb.SearchLive do
         page: page
       ]
 
-      case Media.search_content(query, search_opts) do
-        {:ok, results} ->
+      case Media.search_content(query, search_opts ++ [return_format: :map]) do
+        {:ok, %{results: results, has_more: has_more}} ->
           existing_results = if append, do: socket.assigns.results, else: []
           all_results = existing_results ++ results
 
@@ -314,6 +339,20 @@ defmodule FlixirWeb.SearchLive do
           |> assign(:error, nil)
           |> assign(:search_performed, true)
           |> assign(:total_results, length(all_results))
+          |> assign(:has_more_results, has_more)
+
+        {:ok, results} when is_list(results) ->
+          # Fallback for backward compatibility
+          existing_results = if append, do: socket.assigns.results, else: []
+          all_results = existing_results ++ results
+
+          socket
+          |> assign(:results, all_results)
+          |> assign(:loading, false)
+          |> assign(:error, nil)
+          |> assign(:search_performed, true)
+          |> assign(:total_results, length(all_results))
+          |> assign(:has_more_results, length(results) >= 20)
 
         {:error, {:timeout, message}} ->
           Logger.warning("Search timeout for query: #{query}")
@@ -444,4 +483,34 @@ defmodule FlixirWeb.SearchLive do
   end
 
   defp validate_search_query(_), do: {:error, "Search query must be a string"}
+
+  # Handle debounced search message
+  @impl true
+  def handle_info({:debounced_search, query}, socket) do
+    # Clear the timer reference since it has fired
+    socket = assign(socket, :debounce_timer, nil)
+
+    # Only perform search if the query still matches current state
+    if socket.assigns.query == query do
+      socket =
+        socket
+        |> assign(:loading, true)
+        |> assign(:page, 1)
+        |> perform_search()
+        |> update_url()
+
+      {:noreply, socket}
+    else
+      {:noreply, socket}
+    end
+  end
+
+  defp cancel_debounce_timer(socket) do
+    case socket.assigns.debounce_timer do
+      nil -> socket
+      timer_ref ->
+        Process.cancel_timer(timer_ref)
+        assign(socket, :debounce_timer, nil)
+    end
+  end
 end

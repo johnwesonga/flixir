@@ -30,10 +30,13 @@ defmodule FlixirWeb.SearchComponents do
       <!-- Poster Image -->
       <div class="aspect-[2/3] bg-gray-200 relative overflow-hidden">
         <img
-          src={poster_url(@result.poster_path)}
+          src={poster_url(@result.poster_path, :small)}
+          srcset={poster_srcset(@result.poster_path)}
+          sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
           alt={"#{@result.title} poster"}
           class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
           loading="lazy"
+          decoding="async"
           onerror="this.src='/images/no-poster.svg'"
         />
         <!-- Media Type Badge -->
@@ -337,9 +340,31 @@ defmodule FlixirWeb.SearchComponents do
   # Private helper functions
 
   defp poster_url(nil), do: "/images/no-poster.svg"
-
   defp poster_url(poster_path) do
     "https://image.tmdb.org/t/p/w300#{poster_path}"
+  end
+
+  defp poster_url(nil, _size), do: "/images/no-poster.svg"
+  defp poster_url(poster_path, :small) do
+    "https://image.tmdb.org/t/p/w185#{poster_path}"
+  end
+
+  defp poster_url(poster_path, :medium) do
+    "https://image.tmdb.org/t/p/w300#{poster_path}"
+  end
+
+  defp poster_url(poster_path, :large) do
+    "https://image.tmdb.org/t/p/w500#{poster_path}"
+  end
+
+  defp poster_srcset(nil), do: ""
+  defp poster_srcset(poster_path) do
+    [
+      "#{poster_url(poster_path, :small)} 185w",
+      "#{poster_url(poster_path, :medium)} 300w",
+      "#{poster_url(poster_path, :large)} 500w"
+    ]
+    |> Enum.join(", ")
   end
 
   defp format_release_date(nil), do: "Unknown"

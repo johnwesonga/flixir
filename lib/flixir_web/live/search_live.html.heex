@@ -30,7 +30,7 @@
                 else: "border-gray-300 focus:ring-blue-500"
               )
             ]}
-            phx-debounce="300"
+            phx-change="validate_search"
             data-testid="search-input"
           />
           <!-- Validation Error Message -->
@@ -311,11 +311,12 @@
       <.search_results_grid results={@results} loading={@loading and @page > 1} />
       
 <!-- Load More Button -->
-      <%= if length(@results) >= 20 and not @loading do %>
+      <%= if @has_more_results and not @loading do %>
         <div class="text-center mt-8">
           <button
             phx-click="load_more"
             class="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-medium"
+            data-testid="load-more-button"
           >
             Load More Results
           </button>
