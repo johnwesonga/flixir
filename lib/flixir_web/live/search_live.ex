@@ -19,6 +19,7 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:results, [])
       |> assign(:loading, false)
       |> assign(:error, nil)
+      |> assign(:validation_error, nil)
       |> assign(:media_type, :all)
       |> assign(:sort_by, :relevance)
       |> assign(:page, 1)
@@ -41,11 +42,23 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:media_type, media_type)
       |> assign(:sort_by, sort_by)
       |> assign(:page, page)
+      |> assign(:validation_error, nil)
 
-    # Perform search if query is present
+    # Perform search if query is present and valid
     socket =
       if String.trim(query) != "" do
-        perform_search(socket)
+        case validate_search_query(query) do
+          {:ok, _validated_query} ->
+            perform_search(socket)
+
+          {:error, validation_message} ->
+            socket
+            |> assign(:validation_error, validation_message)
+            |> assign(:results, [])
+            |> assign(:search_performed, false)
+            |> assign(:total_results, 0)
+            |> assign(:loading, false)
+        end
       else
         socket
       end
@@ -62,20 +75,32 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:query, query)
       |> assign(:page, 1)
       |> assign(:error, nil)
+      |> assign(:validation_error, nil)
 
     socket =
-      if query == "" do
-        socket
-        |> assign(:results, [])
-        |> assign(:search_performed, false)
-        |> assign(:total_results, 0)
-        |> assign(:loading, false)
-        |> push_patch(to: ~p"/search")
-      else
-        socket
-        |> assign(:loading, true)
-        |> perform_search()
-        |> update_url()
+      case validate_search_query(query) do
+        {:ok, validated_query} ->
+          if validated_query == "" do
+            socket
+            |> assign(:results, [])
+            |> assign(:search_performed, false)
+            |> assign(:total_results, 0)
+            |> assign(:loading, false)
+            |> push_patch(to: ~p"/search")
+          else
+            socket
+            |> assign(:loading, true)
+            |> perform_search()
+            |> update_url()
+          end
+
+        {:error, validation_message} ->
+          socket
+          |> assign(:validation_error, validation_message)
+          |> assign(:results, [])
+          |> assign(:search_performed, false)
+          |> assign(:total_results, 0)
+          |> assign(:loading, false)
       end
 
     {:noreply, socket}
@@ -148,6 +173,7 @@ defmodule FlixirWeb.SearchLive do
       |> assign(:search_performed, false)
       |> assign(:total_results, 0)
       |> assign(:error, nil)
+      |> assign(:validation_error, nil)
       |> assign(:page, 1)
       |> push_patch(to: ~p"/search")
 
@@ -199,6 +225,61 @@ defmodule FlixirWeb.SearchLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("validate_search", %{"search" => %{"query" => query}}, socket) do
+    socket =
+      socket
+      |> assign(:query, String.trim(query))
+
+    socket =
+      case validate_search_query(query) do
+        {:ok, _validated_query} ->
+          socket |> assign(:validation_error, nil)
+
+        {:error, validation_message} ->
+          socket |> assign(:validation_error, validation_message)
+      end
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("retry_search", _params, socket) do
+    query = socket.assigns.query
+
+    socket =
+      socket
+      |> assign(:error, nil)
+      |> assign(:validation_error, nil)
+
+    socket =
+      case validate_search_query(query) do
+        {:ok, _validated_query} ->
+          if query == "" do
+            socket
+            |> assign(:results, [])
+            |> assign(:search_performed, false)
+            |> assign(:total_results, 0)
+            |> assign(:loading, false)
+          else
+            socket
+            |> assign(:loading, true)
+            |> perform_search()
+            |> update_url()
+          end
+
+        {:error, validation_message} ->
+          socket
+          |> assign(:validation_error, validation_message)
+          |> assign(:results, [])
+          |> assign(:search_performed, false)
+          |> assign(:total_results, 0)
+          |> assign(:loading, false)
+      end
+
+    {:noreply, socket}
+  end
+
   # Private Functions
 
   defp perform_search(socket, opts \\ []) do
@@ -235,25 +316,53 @@ defmodule FlixirWeb.SearchLive do
           |> assign(:total_results, length(all_results))
 
         {:error, {:timeout, message}} ->
+          Logger.warning("Search timeout for query: #{query}")
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
+          |> assign(:search_performed, true)
 
         {:error, {:rate_limited, message}} ->
+          Logger.warning("Rate limited for query: #{query}")
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
+          |> assign(:search_performed, true)
 
         {:error, {:network_error, message}} ->
+          Logger.warning("Network error for query: #{query}")
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
+          |> assign(:search_performed, true)
 
-        {:error, reason} ->
-          Logger.error("Search failed: #{inspect(reason)}")
+        {:error, {:unauthorized, message}} ->
+          Logger.error("API authentication failed for query: #{query}")
           socket
           |> assign(:loading, false)
-          |> assign(:error, "Search failed. Please try again.")
+          |> assign(:error, message)
+          |> assign(:search_performed, true)
+
+        {:error, {:api_error, message}} ->
+          Logger.error("API error for query: #{query}")
+          socket
+          |> assign(:loading, false)
+          |> assign(:error, message)
+          |> assign(:search_performed, true)
+
+        {:error, {:transformation_error, reason}} ->
+          Logger.error("Data transformation error for query: #{query}: #{inspect(reason)}")
+          socket
+          |> assign(:loading, false)
+          |> assign(:error, "Unable to process search results. Please try again.")
+          |> assign(:search_performed, true)
+
+        {:error, reason} ->
+          Logger.error("Unexpected search error for query: #{query}: #{inspect(reason)}")
+          socket
+          |> assign(:loading, false)
+          |> assign(:error, "An unexpected error occurred. Please try again.")
+          |> assign(:search_performed, true)
       end
     end
   end
@@ -312,4 +421,27 @@ defmodule FlixirWeb.SearchLive do
   defp format_sort_label(:popularity), do: "Popularity"
   defp format_sort_label(:release_date), do: "Release Date"
   defp format_sort_label(:title), do: "Title"
+
+  defp validate_search_query(query) when is_binary(query) do
+    trimmed = String.trim(query)
+
+    cond do
+      query != "" and trimmed == "" ->
+        {:error, "Search query cannot contain only whitespace"}
+
+      trimmed == "" ->
+        {:ok, ""}
+
+      String.length(trimmed) > 200 ->
+        {:error, "Search query is too long (maximum 200 characters)"}
+
+      String.length(trimmed) < 2 ->
+        {:error, "Search query must be at least 2 characters long"}
+
+      true ->
+        {:ok, trimmed}
+    end
+  end
+
+  defp validate_search_query(_), do: {:error, "Search query must be a string"}
 end

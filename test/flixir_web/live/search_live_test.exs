@@ -619,6 +619,124 @@ defmodule FlixirWeb.SearchLiveTest do
     end
   end
 
+  describe "input validation" do
+    test "shows validation error for queries that are too short", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      # Type a single character
+      view
+      |> form("#search-form", search: %{query: "a"})
+      |> render_change()
+
+      assert has_element?(view, "[data-testid='validation-error']", "Search query must be at least 2 characters long")
+      assert has_element?(view, "[data-testid='search-input'].border-red-300")
+      assert has_element?(view, "[data-testid='search-button'][disabled]")
+    end
+
+    test "shows validation error for queries that are too long", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      long_query = String.duplicate("a", 201)
+
+      view
+      |> form("#search-form", search: %{query: long_query})
+      |> render_change()
+
+      assert has_element?(view, "[data-testid='validation-error']", "Search query is too long (maximum 200 characters)")
+      assert has_element?(view, "[data-testid='search-input'].border-red-300")
+      assert has_element?(view, "[data-testid='search-button'][disabled]")
+    end
+
+    test "shows validation error for whitespace-only queries", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      view
+      |> form("#search-form", search: %{query: "   "})
+      |> render_change()
+
+      assert has_element?(view, "[data-testid='validation-error']", "Search query cannot contain only whitespace")
+      assert has_element?(view, "[data-testid='search-input'].border-red-300")
+      assert has_element?(view, "[data-testid='search-button'][disabled]")
+    end
+
+    test "clears validation error when valid query is entered", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      # First enter invalid query
+      view
+      |> form("#search-form", search: %{query: "a"})
+      |> render_change()
+
+      assert has_element?(view, "[data-testid='validation-error']")
+
+      # Then enter valid query
+      view
+      |> form("#search-form", search: %{query: "batman"})
+      |> render_change()
+
+      refute has_element?(view, "[data-testid='validation-error']")
+      refute has_element?(view, "[data-testid='search-input'].border-red-300")
+      refute has_element?(view, "[data-testid='search-button'][disabled]")
+    end
+
+    test "allows empty query without validation error", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      view
+      |> form("#search-form", search: %{query: ""})
+      |> render_change()
+
+      refute has_element?(view, "[data-testid='validation-error']")
+      refute has_element?(view, "[data-testid='search-input'].border-red-300")
+    end
+
+    test "prevents search submission with validation errors", %{conn: conn} do
+      with_mock Media, search_content: fn _query, _opts -> {:ok, @sample_results} end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        # Enter invalid query
+        view
+        |> form("#search-form", search: %{query: "a"})
+        |> render_change()
+
+        # Try to submit
+        view
+        |> form("#search-form", search: %{query: "a"})
+        |> render_submit()
+
+        # Should not call search API
+        refute called(Media.search_content(:_, :_))
+        assert has_element?(view, "[data-testid='validation-error']")
+      end
+    end
+
+    test "clears validation error when search is cleared", %{conn: conn} do
+      {:ok, view, _html} = live(conn, ~p"/search")
+
+      # Enter invalid query
+      view
+      |> form("#search-form", search: %{query: "a"})
+      |> render_change()
+
+      assert has_element?(view, "[data-testid='validation-error']")
+
+      # Clear search
+      view
+      |> element("[data-testid='clear-search-button']")
+      |> render_click()
+
+      refute has_element?(view, "[data-testid='validation-error']")
+    end
+
+    test "handles validation error in URL parameters", %{conn: conn} do
+      # Navigate to URL with invalid query
+      {:ok, view, _html} = live(conn, ~p"/search?q=a")
+
+      assert has_element?(view, "[data-testid='validation-error']", "Search query must be at least 2 characters long")
+      refute has_element?(view, "[data-testid='search-result-card']")
+    end
+  end
+
   describe "error handling" do
     test "handles network errors gracefully", %{conn: conn} do
       with_mock Media,
@@ -632,11 +750,31 @@ defmodule FlixirWeb.SearchLiveTest do
         |> form("#search-form", search: %{query: "batman"})
         |> render_submit()
 
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(view, ".text-red-700", "Search Error")
         assert has_element?(
                  view,
-                 ".bg-red-50",
+                 ".text-red-600",
                  "Network error occurred. Please check your connection and try again."
                )
+        assert has_element?(view, "[data-testid='retry-search-button']", "Try again")
+      end
+    end
+
+    test "handles timeout errors with retry button", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:timeout, "Search request timed out. Please try again."}}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(view, ".text-red-600", "Search request timed out. Please try again.")
+        assert has_element?(view, "[data-testid='retry-search-button']", "Try again")
       end
     end
 
@@ -651,11 +789,145 @@ defmodule FlixirWeb.SearchLiveTest do
         |> form("#search-form", search: %{query: "batman"})
         |> render_submit()
 
+        assert has_element?(view, "[data-testid='api-error']")
         assert has_element?(
                  view,
-                 ".bg-red-50",
+                 ".text-red-600",
                  "Too many requests. Please wait a moment and try again."
                )
+        # Rate limiting errors should not show retry button
+        refute has_element?(view, "[data-testid='retry-search-button']")
+      end
+    end
+
+    test "handles API authentication errors", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:unauthorized, "API authentication failed. Please check configuration."}}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(
+                 view,
+                 ".text-red-600",
+                 "API authentication failed. Please check configuration."
+               )
+      end
+    end
+
+    test "handles API service errors", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:api_error, "Search service temporarily unavailable. Please try again later."}}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(
+                 view,
+                 ".text-red-600",
+                 "Search service temporarily unavailable. Please try again later."
+               )
+        assert has_element?(view, "[data-testid='retry-search-button']", "Try again")
+      end
+    end
+
+    test "handles data transformation errors", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:transformation_error, "invalid data format"}}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(
+                 view,
+                 ".text-red-600",
+                 "Unable to process search results. Please try again."
+               )
+      end
+    end
+
+    test "handles unexpected errors", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, :some_unexpected_error}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+        assert has_element?(
+                 view,
+                 ".text-red-600",
+                 "An unexpected error occurred. Please try again."
+               )
+      end
+    end
+
+    test "retry button triggers new search", %{conn: conn} do
+      with_mock Media,
+        search_content: fn _query, _opts ->
+          {:error, {:timeout, "Search request timed out. Please try again."}}
+        end do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        # Initial search that fails
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='retry-search-button']")
+
+        # Click retry button
+        view
+        |> element("[data-testid='retry-search-button']")
+        |> render_click()
+
+        # Should call search again (called twice total)
+        assert called(Media.search_content("batman", :_))
+      end
+    end
+
+    test "clears errors when new search is performed", %{conn: conn} do
+      with_mock Media, [
+        search_content: fn
+          "fail", _opts -> {:error, {:timeout, "Search request timed out. Please try again."}}
+          "batman", _opts -> {:ok, @sample_results}
+        end
+      ] do
+        {:ok, view, _html} = live(conn, ~p"/search")
+
+        # Search that fails
+        view
+        |> form("#search-form", search: %{query: "fail"})
+        |> render_submit()
+
+        assert has_element?(view, "[data-testid='api-error']")
+
+        # Search that succeeds
+        view
+        |> form("#search-form", search: %{query: "batman"})
+        |> render_submit()
+
+        refute has_element?(view, "[data-testid='api-error']")
+        assert has_element?(view, "[data-testid='search-result-card']")
       end
     end
   end
