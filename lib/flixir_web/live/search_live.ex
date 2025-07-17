@@ -365,60 +365,39 @@ defmodule FlixirWeb.SearchLive do
           |> assign(:total_results, length(all_results))
           |> assign(:has_more_results, length(results) >= 20)
 
-        {:error, {:timeout, _message}} ->
+        {:error, {:timeout, message}} ->
           Logger.warning("Search timeout for query: #{query}")
           socket
           |> assign(:loading, false)
-          |> assign(:error, "Search request timed out. Please try again.")
+          |> assign(:error, message)
           |> assign(:search_performed, true)
 
-        {:error, {:rate_limited, _message, _data}} ->
+        {:error, {:rate_limited, message}} ->
           Logger.warning("Rate limited for query: #{query}")
           socket
           |> assign(:loading, false)
-          |> assign(:error, "Too many requests. Please wait a moment and try again.")
+          |> assign(:error, message)
           |> assign(:search_performed, true)
 
-        {:error, {:request_failed, %Req.TransportError{reason: :timeout}}} ->
-          Logger.warning("Network error for query: #{query}")
-          socket
-          |> assign(:loading, false)
-          |> assign(:error, "Network error occurred. Please check your connection and try again.")
-          |> assign(:search_performed, true)
-
-        {:error, {:request_failed, %Req.TransportError{reason: :econnrefused}}} ->
-          Logger.warning("Network error for query: #{query}")
-          socket
-          |> assign(:loading, false)
-          |> assign(:error, "Network error occurred. Please check your connection and try again.")
-          |> assign(:search_performed, true)
-
-        {:error, {:request_failed, %Req.TransportError{reason: :nxdomain}}} ->
-          Logger.warning("Network error for query: #{query}")
-          socket
-          |> assign(:loading, false)
-          |> assign(:error, "Network error occurred. Please check your connection and try again.")
-          |> assign(:search_performed, true)
-
-        {:error, {:request_failed, {:tls_alert, _}}} ->
-          Logger.warning("Network error for query: #{query}")
-          socket
-          |> assign(:loading, false)
-          |> assign(:error, "Network error occurred. Please check your connection and try again.")
-          |> assign(:search_performed, true)
-
-        {:error, {:unauthorized, _message, _data}} ->
+        {:error, {:unauthorized, message}} ->
           Logger.error("API authentication failed for query: #{query}")
           socket
           |> assign(:loading, false)
-          |> assign(:error, "API authentication failed. Please check configuration.")
+          |> assign(:error, message)
           |> assign(:search_performed, true)
 
-        {:error, {:api_error, _status, _data}} ->
+        {:error, {:api_error, message}} ->
           Logger.error("API error for query: #{query}")
           socket
           |> assign(:loading, false)
-          |> assign(:error, "Search service temporarily unavailable. Please try again later.")
+          |> assign(:error, message)
+          |> assign(:search_performed, true)
+
+        {:error, {:network_error, message}} ->
+          Logger.warning("Network error for query: #{query}")
+          socket
+          |> assign(:loading, false)
+          |> assign(:error, message)
           |> assign(:search_performed, true)
 
         {:error, {:transformation_error, reason}} ->
@@ -426,6 +405,13 @@ defmodule FlixirWeb.SearchLive do
           socket
           |> assign(:loading, false)
           |> assign(:error, "Unable to process search results. Please try again.")
+          |> assign(:search_performed, true)
+
+        {:error, {:unknown_error, message}} ->
+          Logger.error("Unknown error for query: #{query}: #{inspect(message)}")
+          socket
+          |> assign(:loading, false)
+          |> assign(:error, message)
           |> assign(:search_performed, true)
 
         {:error, reason} ->

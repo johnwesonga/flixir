@@ -334,7 +334,7 @@
           <p class="text-red-700 font-medium">Search Error</p>
           <p class="text-red-600 text-sm mt-1">{@error}</p>
           <!-- Retry button for network/timeout errors -->
-          <%= if String.contains?(@error, "timed out") or String.contains?(@error, "timeout") or String.contains?(@error, "Network error") or String.contains?(@error, "temporarily unavailable") do %>
+          <%= if String.contains?(@error, "timed out") or String.contains?(@error, "timeout") or String.contains?(@error, "Network error") or String.contains?(@error, "temporarily unavailable") or String.contains?(@error, "Unable to process search results") do %>
             <button
               phx-click="retry_search"
               class="mt-2 text-sm text-red-600 hover:text-red-800 underline font-medium"
