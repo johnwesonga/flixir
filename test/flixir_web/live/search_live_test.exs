@@ -707,7 +707,7 @@ defmodule FlixirWeb.SearchLiveTest do
       with_mock Media,
         search_content: fn _query, _opts ->
           {:error,
-           {:network_error, "Network error occurred. Please check your connection and try again."}}
+           {:request_failed, %Req.TransportError{reason: :timeout}}}
         end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
@@ -746,7 +746,7 @@ defmodule FlixirWeb.SearchLiveTest do
     test "handles rate limiting errors", %{conn: conn} do
       with_mock Media,
         search_content: fn _query, _opts ->
-          {:error, {:rate_limited, "Too many requests. Please wait a moment and try again."}}
+          {:error, {:rate_limited, "Too many requests. Please wait a moment and try again.", nil}}
         end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
@@ -768,7 +768,7 @@ defmodule FlixirWeb.SearchLiveTest do
     test "handles API authentication errors", %{conn: conn} do
       with_mock Media,
         search_content: fn _query, _opts ->
-          {:error, {:unauthorized, "API authentication failed. Please check configuration."}}
+          {:error, {:unauthorized, "API authentication failed. Please check configuration.", nil}}
         end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
@@ -788,7 +788,7 @@ defmodule FlixirWeb.SearchLiveTest do
     test "handles API service errors", %{conn: conn} do
       with_mock Media,
         search_content: fn _query, _opts ->
-          {:error, {:api_error, "Search service temporarily unavailable. Please try again later."}}
+          {:error, {:api_error, 503, "Search service temporarily unavailable. Please try again later."}}
         end do
         {:ok, view, _html} = live(conn, ~p"/search")
 
