@@ -301,7 +301,11 @@
             <% end %>
             <%= if @search_performed and @total_results > 0 do %>
               <div class="text-sm text-gray-600" data-testid="results-count">
-                {@total_results} results found
+                <%= if @total_results == 1 do %>
+                  1 result found
+                <% else %>
+                  {@total_results} results found
+                <% end %>
               </div>
             <% end %>
           </div>

@@ -44,7 +44,13 @@ defmodule Flixir.Media do
     return_format = Keyword.get(opts, :return_format, :list)
 
     with {:ok, search_params} <- build_search_params(query, opts),
-         {:ok, %{results: results, has_more: has_more}} <- get_search_results(search_params) do
+         {:ok, search_results} <- get_search_results(search_params) do
+
+      # Handle both legacy list format and new map format
+      {results, has_more} = case search_results do
+        %{results: results, has_more: has_more} -> {results, has_more}
+        results when is_list(results) -> {results, false}
+      end
 
       filtered_results = filter_results(results, search_params.media_type)
       sorted_results = sort_results(filtered_results, search_params.sort_by)

@@ -42,6 +42,14 @@ defmodule Flixir.Media.Cache do
   end
 
   @doc """
+  Stores a value in the cache synchronously (for testing purposes).
+  Returns :ok when the value is successfully stored.
+  """
+  def put_sync(key, value, ttl_seconds \\ nil) do
+    GenServer.call(__MODULE__, {:put_sync, key, value, ttl_seconds})
+  end
+
+  @doc """
   Removes a specific key from the cache.
   """
   def delete(key) do
@@ -53,6 +61,20 @@ defmodule Flixir.Media.Cache do
   """
   def clear() do
     GenServer.cast(__MODULE__, :clear)
+  end
+
+  @doc """
+  Clears all entries from the cache synchronously.
+  """
+  def clear_sync() do
+    GenServer.call(__MODULE__, :clear_sync)
+  end
+
+  @doc """
+  Forces cleanup of expired entries (for testing purposes).
+  """
+  def force_cleanup() do
+    GenServer.call(__MODULE__, :force_cleanup)
   end
 
   @doc """
@@ -135,6 +157,39 @@ defmodule Flixir.Media.Cache do
       })
 
     {:reply, stats, state}
+  end
+
+  @impl true
+  def handle_call({:put_sync, key, value, ttl_seconds}, _from, state) do
+    ttl = ttl_seconds || state.ttl_seconds
+    expires_at = System.system_time(:second) + ttl
+
+    # Check if we need to evict entries to stay under max_entries limit
+    current_size = :ets.info(state.table, :size)
+
+    new_state =
+      if current_size >= state.max_entries do
+        evict_oldest_entries(state, 1)
+      else
+        state
+      end
+
+    :ets.insert(new_state.table, {key, value, expires_at})
+
+    {:reply, :ok, new_state}
+  end
+
+  @impl true
+  def handle_call(:clear_sync, _from, state) do
+    :ets.delete_all_objects(state.table)
+    Logger.info("Search cache cleared")
+    {:reply, :ok, state}
+  end
+
+  @impl true
+  def handle_call(:force_cleanup, _from, state) do
+    {expired_count, new_state} = cleanup_expired_entries(state)
+    {:reply, expired_count, new_state}
   end
 
   @impl true
