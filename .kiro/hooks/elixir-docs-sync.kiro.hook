@@ -1,0 +1,23 @@
+{
+  "enabled": true,
+  "name": "Elixir Documentation Sync",
+  "description": "Monitors all Elixir source files (.ex, .exs), configuration files, and project files for changes. When changes are detected, automatically updates the README.md and any documentation in the /docs folder to reflect the current state of the codebase.",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "lib/**/*.ex",
+      "lib/**/*.exs",
+      "test/**/*.ex",
+      "test/**/*.exs",
+      "config/*.exs",
+      "mix.exs",
+      ".formatter.exs",
+      "priv/repo/migrations/*.exs"
+    ]
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "Source files have been modified in this Elixir/Phoenix project. Please review the changes and update the documentation accordingly:\n\n1. Update README.md to reflect any new features, modules, or architectural changes\n2. If there's a /docs folder, update relevant documentation files there as well\n3. Ensure documentation covers:\n   - New modules and their purposes\n   - Updated API endpoints or LiveView functionality\n   - Configuration changes\n   - Database schema changes (if migrations were added)\n   - New dependencies or significant changes to existing ones\n\nFocus on keeping documentation accurate, clear, and helpful for developers working with this Elixir/Phoenix application."
+  }
+}

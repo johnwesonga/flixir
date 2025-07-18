@@ -1,20 +1,201 @@
 # Flixir
 
-A Liveview web app that queries the TMDB API. Built using kiro https://kiro.dev/blog/introducing-kiro/ 
+A Phoenix LiveView web application for discovering movies and TV shows, powered by The Movie Database (TMDB) API. Built using [Kiro](https://kiro.dev/blog/introducing-kiro/) for enhanced development experience.
 
-To start your Phoenix server:
+## Features
 
-* Run `mix setup` to install and setup dependencies
-* Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
+### 🎬 Movie & TV Show Discovery
+- **Search**: Real-time search across movies and TV shows
+- **Filtering**: Filter results by media type (movies, TV shows, or all)
+- **Sorting**: Sort by relevance, popularity, release date, or title
+- **Caching**: Intelligent caching system for improved performance
 
-Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+### ⭐ Reviews & Ratings System
+- **Review Display**: Rich review cards with expandable content
+- **Rating Statistics**: Comprehensive rating breakdowns and averages
+- **Spoiler Protection**: Automatic spoiler detection and warnings
+- **Interactive Elements**: Expandable reviews with "read more" functionality
+- **Multi-source Support**: Aggregated ratings from multiple sources
 
-Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+### 🚀 Performance & UX
+- **Real-time Updates**: Phoenix LiveView for seamless interactions
+- **Responsive Design**: Tailwind CSS for mobile-first design
+- **Error Handling**: Graceful error handling with retry mechanisms
+- **Loading States**: Smooth loading indicators and transitions
 
-## Learn more
+## Getting Started
 
+### Prerequisites
+- Elixir ~> 1.15
+- Phoenix ~> 1.8.0
+- PostgreSQL
+- TMDB API Key
+
+### Installation
+
+1. Clone the repository and install dependencies:
+   ```bash
+   mix setup
+   ```
+
+2. Configure your TMDB API key in `config/dev.exs`:
+   ```elixir
+   config :flixir, :tmdb,
+     api_key: "your_tmdb_api_key_here"
+   ```
+
+3. Start the Phoenix server:
+   ```bash
+   mix phx.server
+   ```
+   
+   Or with interactive shell:
+   ```bash
+   iex -S mix phx.server
+   ```
+
+4. Visit [`localhost:4000`](http://localhost:4000) in your browser.
+
+## Architecture
+
+### Core Modules
+
+#### Media Context (`lib/flixir/media/`)
+- **SearchResult**: Data structure for search results
+- **TMDBClient**: API client for The Movie Database
+- **Cache**: High-performance caching layer
+
+#### Reviews Context (`lib/flixir/reviews/`)
+- **Review**: Individual review data structure
+- **RatingStats**: Aggregated rating statistics
+- **Cache**: Review-specific caching system
+- **TMDBClient**: Review-focused API operations
+
+#### Web Components (`lib/flixir_web/components/`)
+- **SearchComponents**: Search interface and result display
+- **ReviewComponents**: Review cards, rating displays, and interactive elements
+
+### Key Features Implementation
+
+#### Review System
+The review system provides comprehensive review management with:
+
+- **Review Cards**: Interactive cards with expandable content, spoiler warnings, and author information
+- **Rating Statistics**: Visual rating breakdowns with percentage distributions
+- **Caching**: Intelligent caching for both individual reviews and aggregated statistics
+- **Filtering & Sorting**: Advanced filtering by rating, author, and content with multiple sorting options
+
+Recent improvements include enhanced rating breakdown display logic that ensures rating distributions are only shown when there are actual reviews with ratings available.
+
+#### Search & Discovery
+- Real-time search with debouncing
+- Advanced filtering and sorting options
+- Shareable URLs with query parameters
+- Pagination support for large result sets
+
+## Configuration
+
+### Environment Variables
+```bash
+# Required
+TMDB_API_KEY=your_api_key_here
+
+# Optional
+DATABASE_URL=postgres://user:pass@localhost/flixir_dev
+SECRET_KEY_BASE=your_secret_key_base
+```
+
+### TMDB Configuration
+Configure in `config/config.exs`:
+```elixir
+config :flixir, :tmdb,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: "https://api.themoviedb.org/3",
+  timeout: 5_000,
+  max_retries: 3
+```
+
+## Testing
+
+Run the full test suite:
+```bash
+mix test
+```
+
+Run tests with coverage:
+```bash
+mix test --cover
+```
+
+The application includes comprehensive test coverage for:
+- Unit tests for all contexts and modules
+- Integration tests for complete user workflows
+- Performance benchmarks and load testing
+- Error handling and edge cases
+
+## Development
+
+### Code Quality
+```bash
+# Format code
+mix format
+
+# Check formatting
+mix format --check-formatted
+```
+
+### Database Operations
+```bash
+# Reset database
+mix ecto.reset
+
+# Create migration
+mix ecto.gen.migration migration_name
+
+# Run migrations
+mix ecto.migrate
+```
+
+### Asset Management
+```bash
+# Build assets for development
+mix assets.build
+
+# Build and minify for production
+mix assets.deploy
+```
+
+## Deployment
+
+Ready to run in production? Please check the [Phoenix deployment guides](https://hexdocs.pm/phoenix/deployment.html).
+
+### Production Configuration
+Ensure the following environment variables are set:
+- `TMDB_API_KEY`
+- `DATABASE_URL`
+- `SECRET_KEY_BASE`
+- `PHX_HOST`
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes with tests
+4. Run the test suite
+5. Submit a pull request
+
+## Learn More
+
+### Phoenix Framework
 * Official website: https://www.phoenixframework.org/
 * Guides: https://hexdocs.pm/phoenix/overview.html
 * Docs: https://hexdocs.pm/phoenix
 * Forum: https://elixirforum.com/c/phoenix-forum
 * Source: https://github.com/phoenixframework/phoenix
+
+### TMDB API
+* Documentation: https://developers.themoviedb.org/3
+* API Reference: https://developers.themoviedb.org/3/getting-started
+
+### Kiro Development Tool
+* Blog: https://kiro.dev/blog/introducing-kiro/
