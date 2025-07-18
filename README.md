@@ -16,6 +16,9 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Spoiler Protection**: Automatic spoiler detection and warnings
 - **Interactive Elements**: Expandable reviews with "read more" functionality
 - **Multi-source Support**: Aggregated ratings from multiple sources
+- **Advanced Filtering**: Filter reviews by rating ranges, author names, and content keywords
+- **Smart Sorting**: Sort reviews by date, rating, or author with ascending/descending options
+- **Real-time Updates**: Live filtering and sorting without page reloads
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -74,6 +77,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 #### Web Components (`lib/flixir_web/components/`)
 - **SearchComponents**: Search interface and result display
 - **ReviewComponents**: Review cards, rating displays, and interactive elements
+- **ReviewFilters**: Advanced filtering and sorting controls for reviews
 
 ### Key Features Implementation
 
@@ -83,7 +87,31 @@ The review system provides comprehensive review management with:
 - **Review Cards**: Interactive cards with expandable content, spoiler warnings, and author information
 - **Rating Statistics**: Visual rating breakdowns with percentage distributions
 - **Caching**: Intelligent caching for both individual reviews and aggregated statistics
-- **Filtering & Sorting**: Advanced filtering by rating, author, and content with multiple sorting options
+- **Advanced Filtering & Sorting**: Comprehensive filtering and sorting system with real-time updates
+
+##### Review Filtering & Sorting Features
+The `ReviewFilters` component provides powerful filtering capabilities:
+
+**Sorting Options:**
+- Sort by date, rating, or author name
+- Toggle between ascending and descending order
+- Visual indicators for active sort settings
+
+**Rating Filters:**
+- Filter by positive reviews (6+ stars) or negative reviews (< 6 stars)
+- Custom rating ranges: High (8-10), Medium (5-7), Low (1-4)
+- Support for all ratings or specific rating criteria
+
+**Content Filters:**
+- Search within review content using keywords
+- Filter by author name with partial matching
+- Real-time filtering with debounced input for performance
+
+**Interactive Features:**
+- Active filter badges with one-click removal
+- Clear all filters functionality
+- Live count of filtered vs. total reviews
+- Responsive design for mobile and desktop
 
 Recent improvements include enhanced rating breakdown display logic that ensures rating distributions are only shown when there are actual reviews with ratings available.
 

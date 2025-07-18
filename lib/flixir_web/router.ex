@@ -19,6 +19,7 @@ defmodule FlixirWeb.Router do
 
     get "/", PageController, :home
     live "/search", SearchLive, :index
+    live "/:type/:id", MovieDetailsLive, :show
   end
 
   # Other scopes may use custom stacks.
