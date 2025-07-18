@@ -200,20 +200,24 @@ defmodule Flixir.Reviews do
   end
 
   defp normalize_options(opts) do
-    normalized = %{
-      page: Keyword.get(opts, :page, 1),
-      per_page: min(Keyword.get(opts, :per_page, @default_per_page), @max_per_page),
-      sort_by: Keyword.get(opts, :sort_by, :date),
-      sort_order: Keyword.get(opts, :sort_order, :desc),
-      filter_by_rating: Keyword.get(opts, :filter_by_rating),
-      author_filter: Keyword.get(opts, :author_filter),
-      content_filter: Keyword.get(opts, :content_filter)
-    }
+    raw_page = Keyword.get(opts, :page, 1)
+    raw_per_page = Keyword.get(opts, :per_page, @default_per_page)
 
-    # Validate options
-    with :ok <- validate_page(normalized.page),
-         :ok <- validate_per_page(normalized.per_page),
-         :ok <- validate_sort_options(normalized.sort_by, normalized.sort_order) do
+    # Validate raw options first
+    with :ok <- validate_page(raw_page),
+         :ok <- validate_per_page(raw_per_page),
+         :ok <- validate_sort_options(Keyword.get(opts, :sort_by, :date), Keyword.get(opts, :sort_order, :desc)) do
+
+      normalized = %{
+        page: raw_page,
+        per_page: min(raw_per_page, @max_per_page),
+        sort_by: Keyword.get(opts, :sort_by, :date),
+        sort_order: Keyword.get(opts, :sort_order, :desc),
+        filter_by_rating: Keyword.get(opts, :filter_by_rating),
+        author_filter: Keyword.get(opts, :author_filter),
+        content_filter: Keyword.get(opts, :content_filter)
+      }
+
       {:ok, normalized}
     end
   end

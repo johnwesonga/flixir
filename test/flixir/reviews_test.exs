@@ -122,7 +122,10 @@ defmodule Flixir.ReviewsTest do
       media_id = 550
 
       with_mocks [
-        {Cache, [], [get_reviews: fn _, _, _ -> :error end]},
+        {Cache, [], [
+          get_reviews: fn _, _, _ -> :error end,
+          put_reviews: fn _, _, _, _ -> :ok end
+        ]},
         {TMDBClient, [], [fetch_reviews: fn _, _, _ -> {:ok, %{reviews: []}} end]}
       ] do
         # Invalid page
