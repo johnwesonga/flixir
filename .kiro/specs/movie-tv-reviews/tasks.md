@@ -6,7 +6,7 @@
   - Write unit tests for data structure validation
   - _Requirements: 1.2, 2.1, 2.2_
 
-- [ ] 2. Implement TMDB reviews API client
+- [x] 2. Implement TMDB reviews API client
   - Create TMDBClient module for fetching reviews from external API
   - Implement API response parsing and error handling
   - Add proper HTTP client configuration with timeouts and retries
