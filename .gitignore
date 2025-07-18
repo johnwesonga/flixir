@@ -35,3 +35,6 @@ flixir-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# ignore env files
+.env
+.envrc
