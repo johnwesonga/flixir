@@ -13,7 +13,7 @@
   - Write unit tests with mocked API responses
   - _Requirements: 1.1, 1.5, 5.4_
 
-- [ ] 3. Create review caching system
+- [x] 3. Create review caching system
   - Implement Cache module with ETS-based storage
   - Add cache key generation with media type, ID, and filter parameters
   - Implement TTL-based cache expiration (1 hour for reviews, 30 minutes for ratings)
