@@ -185,7 +185,14 @@ defmodule FlixirWeb.MovieDetailsLive do
     media_type = socket.assigns.media_type
     media_id = socket.assigns.media_id
 
-    case Media.get_content_details(media_type, media_id) do
+    # Convert string media_type to atom and fix parameter order
+    media_type_atom = case media_type do
+      "movie" -> :movie
+      "tv" -> :tv
+      _ -> :movie  # fallback
+    end
+
+    case Media.get_content_details(media_id, media_type_atom) do
       {:ok, details} ->
         title = get_media_title(details, media_type)
         socket

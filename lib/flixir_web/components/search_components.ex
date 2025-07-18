@@ -6,7 +6,7 @@ defmodule FlixirWeb.SearchComponents do
   loading states, and empty states in a consistent and responsive manner.
   """
 
-  use Phoenix.Component
+  use FlixirWeb, :html
 
   @doc """
   Renders a search result card component.
@@ -20,9 +20,10 @@ defmodule FlixirWeb.SearchComponents do
 
   def search_result_card(assigns) do
     ~H"""
-    <div
+    <.link
+      navigate={~p"/#{@result.media_type}/#{@result.id}"}
       class={[
-        "bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 group",
+        "block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 group cursor-pointer",
         @class
       ]}
       data-testid="search-result-card"
@@ -50,7 +51,7 @@ defmodule FlixirWeb.SearchComponents do
           </div>
         <% end %>
       </div>
-      
+
     <!-- Content Info -->
       <div class="p-4">
         <h3
@@ -75,7 +76,7 @@ defmodule FlixirWeb.SearchComponents do
           </p>
         <% end %>
       </div>
-    </div>
+    </.link>
     """
   end
 
@@ -153,7 +154,7 @@ defmodule FlixirWeb.SearchComponents do
       <%= for result <- @results do %>
         <.search_result_card result={result} />
       <% end %>
-      
+
     <!-- Loading skeleton cards -->
       <%= if @loading do %>
         <%= for _i <- 1..10 do %>
@@ -179,19 +180,19 @@ defmodule FlixirWeb.SearchComponents do
     >
       <!-- Skeleton Poster -->
       <div class="aspect-[2/3] bg-gray-300"></div>
-      
+
     <!-- Skeleton Content -->
       <div class="p-4">
         <!-- Title skeleton -->
         <div class="h-4 bg-gray-300 rounded mb-2"></div>
         <div class="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-        
+
     <!-- Date and rating skeleton -->
         <div class="flex justify-between mb-2">
           <div class="h-3 bg-gray-300 rounded w-16"></div>
           <div class="h-3 bg-gray-300 rounded w-12"></div>
         </div>
-        
+
     <!-- Description skeleton -->
         <div class="space-y-1">
           <div class="h-3 bg-gray-300 rounded"></div>
@@ -232,13 +233,13 @@ defmodule FlixirWeb.SearchComponents do
           </path>
         </svg>
       </div>
-      
+
     <!-- Empty state content -->
       <h3 class="text-xl font-semibold text-gray-900 mb-2">No results found</h3>
       <p class="text-gray-600 mb-6 max-w-md mx-auto">
         We couldn't find any {media_type_label(@media_type) |> String.downcase()} matching "<span class="font-medium text-gray-900"><%= @query %></span>"
       </p>
-      
+
     <!-- Suggestions -->
       <div class="bg-gray-50 rounded-lg p-6 max-w-md mx-auto mb-6">
         <h4 class="font-medium text-gray-900 mb-3">Try these suggestions:</h4>
@@ -249,7 +250,7 @@ defmodule FlixirWeb.SearchComponents do
           <li>• Remove filters to see more results</li>
         </ul>
       </div>
-      
+
     <!-- Action button -->
       <button
         phx-click={@on_clear}
@@ -283,14 +284,14 @@ defmodule FlixirWeb.SearchComponents do
           </path>
         </svg>
       </div>
-      
+
     <!-- Welcome content -->
       <h2 class="text-2xl font-bold text-gray-900 mb-3">Discover Movies & TV Shows</h2>
       <p class="text-gray-600 mb-8 max-w-lg mx-auto">
         Search through thousands of movies and TV shows to find your next favorite.
         Enter a title, actor, or keyword to get started.
       </p>
-      
+
     <!-- Popular suggestions -->
       <div class="max-w-md mx-auto">
         <p class="text-sm font-medium text-gray-700 mb-3">Popular searches:</p>

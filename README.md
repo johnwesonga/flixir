@@ -8,6 +8,8 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Search**: Real-time search across movies and TV shows
 - **Filtering**: Filter results by media type (movies, TV shows, or all)
 - **Sorting**: Sort by relevance, popularity, release date, or title
+- **Navigation**: Click any search result to view detailed information and reviews
+- **Detail Pages**: Dedicated pages for each movie and TV show with comprehensive information
 - **Caching**: Intelligent caching system for improved performance
 
 ### ⭐ Reviews & Ratings System
@@ -76,13 +78,22 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **TMDBClient**: Review-focused API operations
 
 #### Web Components (`lib/flixir_web/components/`)
-- **SearchComponents**: Search interface and result display
+- **SearchComponents**: Interactive search interface with clickable result cards
 - **ReviewComponents**: Review cards, rating displays, and interactive elements
 - **ReviewFilters**: Advanced filtering and sorting controls for reviews
 
 #### LiveView Modules (`lib/flixir_web/live/`)
 - **SearchLive**: Real-time search interface with filtering and sorting
 - **MovieDetailsLive**: Movie and TV show detail pages with review management and error recovery
+  - Handles dynamic routing for both movies and TV shows
+  - Converts string media types from URL parameters to atoms for API compatibility
+  - Provides comprehensive error handling and retry functionality for failed operations
+
+#### Routing & Navigation (`lib/flixir_web/router.ex`)
+- **Search Route**: `/search` - Main search interface with URL parameter support
+- **Detail Routes**: `/:type/:id` - Dynamic routes for movie and TV show details
+- **URL Parameters**: Shareable search states with query, filter, and sort parameters
+- **LiveView Navigation**: Seamless client-side navigation between search and detail pages
 
 ### Key Features Implementation
 
@@ -121,10 +132,14 @@ The `ReviewFilters` component provides powerful filtering capabilities:
 Recent improvements include enhanced rating breakdown display logic that ensures rating distributions are only shown when there are actual reviews with ratings available.
 
 #### Search & Discovery
-- Real-time search with debouncing
-- Advanced filtering and sorting options
-- Shareable URLs with query parameters
-- Pagination support for large result sets
+- **Real-time Search**: Debounced search with instant results
+- **Interactive Results**: Clickable search result cards that navigate to detail pages
+- **Advanced Filtering**: Filter by media type with visual indicators
+- **Smart Sorting**: Multiple sorting options with URL persistence
+- **Shareable URLs**: Query parameters for bookmarkable search states
+- **Responsive Design**: Optimized grid layout for all screen sizes
+- **Loading States**: Skeleton cards and smooth transitions during search
+- **Empty States**: Helpful suggestions when no results are found
 
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:

@@ -122,7 +122,7 @@ defmodule Flixir.Reviews.TMDBClient do
 
   defp make_request(url) do
     options = [
-      timeout: get_timeout(),
+      receive_timeout: get_timeout(),
       retry: :transient,
       max_retries: get_max_retries(),
       retry_delay: fn attempt -> :timer.seconds(2 ** attempt) end
