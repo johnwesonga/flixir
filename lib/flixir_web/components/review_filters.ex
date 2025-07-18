@@ -302,8 +302,7 @@ defmodule FlixirWeb.ReviewFilters do
   def count_active_filters(filters) do
     count = 0
 
-    count = if Map.get(filters, :sort_by, :date) != :date, do: count + 1, else: count
-    count = if Map.get(filters, :sort_order, :desc) != :desc, do: count + 1, else: count
+    # Only count actual filters, not sort changes (sort is not considered a "filter")
     count = if Map.get(filters, :filter_by_rating), do: count + 1, else: count
     count = if filter_present?(Map.get(filters, :author_filter)), do: count + 1, else: count
     count = if filter_present?(Map.get(filters, :content_filter)), do: count + 1, else: count
@@ -318,15 +317,6 @@ defmodule FlixirWeb.ReviewFilters do
 
   defp build_active_filter_tags(filters) do
     tags = []
-
-    # Sort filters
-    tags = if Map.get(filters, :sort_by, :date) != :date do
-      sort_label = format_sort_label(Map.get(filters, :sort_by))
-      order_label = if Map.get(filters, :sort_order, :desc) == :desc, do: "↓", else: "↑"
-      [{"Sort: #{sort_label} #{order_label}", "clear_sort", ""} | tags]
-    else
-      tags
-    end
 
     # Rating filter
     tags = if rating_filter = Map.get(filters, :filter_by_rating) do

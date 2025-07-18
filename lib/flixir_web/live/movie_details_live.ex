@@ -130,6 +130,12 @@ defmodule FlixirWeb.MovieDetailsLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("retry_reviews", _params, socket) do
+    socket = load_reviews(socket)
+    {:noreply, socket}
+  end
+
   # Private functions
 
   defp default_filters do
@@ -243,10 +249,13 @@ defmodule FlixirWeb.MovieDetailsLive do
 
   defp format_error_message(:invalid_media_type), do: "Invalid media type"
   defp format_error_message(:invalid_media_id), do: "Invalid media ID"
-  defp format_error_message({:timeout, _}), do: "Request timed out. Please try again."
-  defp format_error_message({:rate_limited, _}), do: "Too many requests. Please wait a moment."
-  defp format_error_message({:network_error, _}), do: "Network error. Please check your connection."
-  defp format_error_message(:network_error), do: "Network error. Please check your connection."
+  defp format_error_message(:timeout), do: "Request timed out. Please try again."
+  defp format_error_message(:rate_limited), do: "Too many requests. Please wait a moment."
+  defp format_error_message(:unauthorized), do: "Unable to access reviews at this time."
+  defp format_error_message(:not_found), do: "No reviews found for this content."
+  defp format_error_message({:transport_error, _}), do: "Network error. Please check your connection."
+  defp format_error_message({:unexpected_status, status}), do: "Service error (#{status}). Please try again later."
+  defp format_error_message(%{__exception__: true}), do: "An unexpected error occurred. Please try again."
   defp format_error_message(_), do: "An error occurred while loading reviews."
 
   # Template helper functions

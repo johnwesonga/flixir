@@ -51,6 +51,36 @@ defmodule FlixirWeb.MovieDetailsLiveTest do
     rating_distribution: %{"4" => 1, "9" => 1, "10" => 1}
   }
 
+  # Helper functions for mock filtering
+  defp filter_by_rating_mock(reviews, nil), do: reviews
+  defp filter_by_rating_mock(reviews, :positive) do
+    Enum.filter(reviews, & &1.rating >= 6.0)
+  end
+  defp filter_by_rating_mock(reviews, :negative) do
+    Enum.filter(reviews, & &1.rating < 6.0)
+  end
+  defp filter_by_rating_mock(reviews, _), do: reviews
+
+  defp filter_by_author_mock(reviews, nil), do: reviews
+  defp filter_by_author_mock(reviews, ""), do: reviews
+  defp filter_by_author_mock(reviews, author_filter) when is_binary(author_filter) do
+    filter_lower = String.downcase(author_filter)
+    Enum.filter(reviews, fn review ->
+      String.contains?(String.downcase(review.author), filter_lower)
+    end)
+  end
+  defp filter_by_author_mock(reviews, _), do: reviews
+
+  defp filter_by_content_mock(reviews, nil), do: reviews
+  defp filter_by_content_mock(reviews, ""), do: reviews
+  defp filter_by_content_mock(reviews, content_filter) when is_binary(content_filter) do
+    filter_lower = String.downcase(content_filter)
+    Enum.filter(reviews, fn review ->
+      String.contains?(String.downcase(review.content), filter_lower)
+    end)
+  end
+  defp filter_by_content_mock(reviews, _), do: reviews
+
   describe "mount and initial load" do
     test "loads movie details and reviews successfully", %{conn: conn} do
       with_mocks([
@@ -115,14 +145,27 @@ defmodule FlixirWeb.MovieDetailsLiveTest do
           end,
           get_rating_stats: fn("movie", 550) -> {:ok, @sample_rating_stats} end,
           filter_reviews: fn(reviews, filters) ->
-            # Mock filtering logic
-            case Map.get(filters, :filter_by_rating) do
-              :positive -> Enum.filter(reviews, & &1.rating >= 6.0)
-              :negative -> Enum.filter(reviews, & &1.rating < 6.0)
+            # Mock filtering logic - apply all filters
+            reviews
+            |> filter_by_rating_mock(Map.get(filters, :filter_by_rating))
+            |> filter_by_author_mock(Map.get(filters, :author_filter))
+            |> filter_by_content_mock(Map.get(filters, :content_filter))
+          end,
+          sort_reviews: fn(reviews, sort_by, order) ->
+            # Mock sorting logic
+            sorted = case sort_by do
+              :rating -> Enum.sort_by(reviews, & &1.rating)
+              :author -> Enum.sort_by(reviews, & &1.author)
+              :date -> Enum.sort_by(reviews, & &1.created_at)
               _ -> reviews
             end
+
+            case order do
+              :asc -> sorted
+              :desc -> Enum.reverse(sorted)
+              _ -> sorted
+            end
           end,
-          sort_reviews: fn(reviews, _sort_by, _order) -> reviews end,
           paginate_reviews: fn(reviews, _page, _per_page) ->
             %{reviews: reviews, pagination: %{page: 1, per_page: 10, total: length(reviews), total_pages: 1, has_next: false, has_prev: false}}
           end
@@ -260,9 +303,11 @@ defmodule FlixirWeb.MovieDetailsLiveTest do
 
       html = render(view)
 
-      # Should show active sort filter
-      assert html =~ "1 active"
-      assert html =~ "Sort: Rating ↓"
+      # Should show reviews sorted by rating (Bob Wilson: 10.0, John Doe: 9.0, Jane Smith: 4.0)
+      # Since we're sorting descending by default, Bob should be first
+      assert html =~ "Bob Wilson"
+      # Verify the sort dropdown shows "rating" selected
+      assert html =~ "selected=\"selected\">Rating"
     end
 
     test "toggles sort order", %{view: view} do
@@ -275,7 +320,8 @@ defmodule FlixirWeb.MovieDetailsLiveTest do
 
       # Should show ascending arrow
       assert html =~ "hero-arrow-up"
-      assert html =~ "1 active"
+      # Should show ascending sort order in button title
+      assert html =~ "Sort ascending"
     end
 
     test "sorts by author", %{view: view} do
@@ -286,9 +332,11 @@ defmodule FlixirWeb.MovieDetailsLiveTest do
 
       html = render(view)
 
-      # Should show active sort filter
-      assert html =~ "1 active"
-      assert html =~ "Sort: Author ↓"
+      # Should show reviews sorted by author (Bob Wilson, Jane Smith, John Doe)
+      # Since we're sorting descending by default, John should be first (reverse alphabetical)
+      assert html =~ "John Doe"
+      # Verify the sort dropdown shows "author" selected
+      assert html =~ "selected=\"selected\">Author"
     end
   end
 

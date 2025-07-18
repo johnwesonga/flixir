@@ -25,6 +25,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Responsive Design**: Tailwind CSS for mobile-first design
 - **Error Handling**: Graceful error handling with retry mechanisms
 - **Loading States**: Smooth loading indicators and transitions
+- **Error Recovery**: One-click retry functionality for failed operations
 
 ## Getting Started
 
@@ -79,6 +80,10 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **ReviewComponents**: Review cards, rating displays, and interactive elements
 - **ReviewFilters**: Advanced filtering and sorting controls for reviews
 
+#### LiveView Modules (`lib/flixir_web/live/`)
+- **SearchLive**: Real-time search interface with filtering and sorting
+- **MovieDetailsLive**: Movie and TV show detail pages with review management and error recovery
+
 ### Key Features Implementation
 
 #### Review System
@@ -120,6 +125,27 @@ Recent improvements include enhanced rating breakdown display logic that ensures
 - Advanced filtering and sorting options
 - Shareable URLs with query parameters
 - Pagination support for large result sets
+
+#### Error Handling & Recovery
+The application provides robust error handling with user-friendly recovery options:
+
+**Error Types Handled:**
+- Network timeouts and connection failures
+- API rate limiting and authentication errors
+- Service unavailability and server errors
+- Data transformation and parsing errors
+
+**Recovery Mechanisms:**
+- **Retry Functionality**: One-click retry buttons for failed operations
+- **Graceful Degradation**: Partial functionality when some services fail
+- **User Feedback**: Clear error messages with actionable guidance
+- **State Preservation**: Maintains user context during error recovery
+
+**Implementation Details:**
+- The `MovieDetailsLive` module includes a `retry_reviews` event handler
+- Error states are clearly displayed with contextual retry options
+- Loading states prevent duplicate requests during recovery
+- Error messages are formatted for user comprehension
 
 ## Configuration
 

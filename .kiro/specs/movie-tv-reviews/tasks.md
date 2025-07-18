@@ -44,7 +44,7 @@
   - Write tests for filter interactions and state changes
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 7. Integrate reviews into movie/TV details pages
+- [x] 7. Integrate reviews into movie/TV details pages
   - Enhance existing MovieDetailsLive with reviews section
   - Implement review loading with proper loading states and error handling
   - Add pagination or lazy loading for review lists
