@@ -50,7 +50,7 @@ defmodule FlixirWeb.SearchComponents do
           </div>
         <% end %>
       </div>
-
+      
     <!-- Content Info -->
       <div class="p-4">
         <h3
@@ -153,7 +153,7 @@ defmodule FlixirWeb.SearchComponents do
       <%= for result <- @results do %>
         <.search_result_card result={result} />
       <% end %>
-
+      
     <!-- Loading skeleton cards -->
       <%= if @loading do %>
         <%= for _i <- 1..10 do %>
@@ -179,19 +179,19 @@ defmodule FlixirWeb.SearchComponents do
     >
       <!-- Skeleton Poster -->
       <div class="aspect-[2/3] bg-gray-300"></div>
-
+      
     <!-- Skeleton Content -->
       <div class="p-4">
         <!-- Title skeleton -->
         <div class="h-4 bg-gray-300 rounded mb-2"></div>
         <div class="h-4 bg-gray-300 rounded w-3/4 mb-2"></div>
-
+        
     <!-- Date and rating skeleton -->
         <div class="flex justify-between mb-2">
           <div class="h-3 bg-gray-300 rounded w-16"></div>
           <div class="h-3 bg-gray-300 rounded w-12"></div>
         </div>
-
+        
     <!-- Description skeleton -->
         <div class="space-y-1">
           <div class="h-3 bg-gray-300 rounded"></div>
@@ -232,13 +232,13 @@ defmodule FlixirWeb.SearchComponents do
           </path>
         </svg>
       </div>
-
+      
     <!-- Empty state content -->
       <h3 class="text-xl font-semibold text-gray-900 mb-2">No results found</h3>
       <p class="text-gray-600 mb-6 max-w-md mx-auto">
         We couldn't find any {media_type_label(@media_type) |> String.downcase()} matching "<span class="font-medium text-gray-900"><%= @query %></span>"
       </p>
-
+      
     <!-- Suggestions -->
       <div class="bg-gray-50 rounded-lg p-6 max-w-md mx-auto mb-6">
         <h4 class="font-medium text-gray-900 mb-3">Try these suggestions:</h4>
@@ -249,7 +249,7 @@ defmodule FlixirWeb.SearchComponents do
           <li>• Remove filters to see more results</li>
         </ul>
       </div>
-
+      
     <!-- Action button -->
       <button
         phx-click={@on_clear}
@@ -283,14 +283,14 @@ defmodule FlixirWeb.SearchComponents do
           </path>
         </svg>
       </div>
-
+      
     <!-- Welcome content -->
       <h2 class="text-2xl font-bold text-gray-900 mb-3">Discover Movies & TV Shows</h2>
       <p class="text-gray-600 mb-8 max-w-lg mx-auto">
         Search through thousands of movies and TV shows to find your next favorite.
         Enter a title, actor, or keyword to get started.
       </p>
-
+      
     <!-- Popular suggestions -->
       <div class="max-w-md mx-auto">
         <p class="text-sm font-medium text-gray-700 mb-3">Popular searches:</p>
@@ -339,12 +339,13 @@ defmodule FlixirWeb.SearchComponents do
 
   # Private helper functions
 
-  defp poster_url(nil), do: "/images/no-poster.svg"
-  defp poster_url(poster_path) do
-    "https://image.tmdb.org/t/p/w300#{poster_path}"
-  end
+  # defp poster_url(nil), do: "/images/no-poster.svg"
+  # defp poster_url(poster_path) do
+  #  "https://image.tmdb.org/t/p/w300#{poster_path}"
+  # end
 
   defp poster_url(nil, _size), do: "/images/no-poster.svg"
+
   defp poster_url(poster_path, :small) do
     "https://image.tmdb.org/t/p/w185#{poster_path}"
   end
@@ -358,6 +359,7 @@ defmodule FlixirWeb.SearchComponents do
   end
 
   defp poster_srcset(nil), do: ""
+
   defp poster_srcset(poster_path) do
     [
       "#{poster_url(poster_path, :small)} 185w",
