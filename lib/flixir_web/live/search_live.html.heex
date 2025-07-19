@@ -358,7 +358,14 @@
       <.empty_search_state query={@query} media_type={@media_type} />
     <% @search_performed and not Enum.empty?(@results) -> %>
       <!-- Results grid with skeleton loading for additional pages -->
-      <.search_results_grid results={@results} loading={@loading and @page > 1} />
+      <.search_results_grid 
+        results={@results} 
+        loading={@loading and @page > 1}
+        query={@query}
+        media_type={@media_type}
+        sort_by={@sort_by}
+        page={@page}
+      />
       
 <!-- Load More Button -->
       <%= if @has_more_results and not @loading do %>

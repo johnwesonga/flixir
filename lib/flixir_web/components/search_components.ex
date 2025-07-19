@@ -17,11 +17,18 @@ defmodule FlixirWeb.SearchComponents do
   """
   attr :result, :map, required: true, doc: "The search result data"
   attr :class, :string, default: "", doc: "Additional CSS classes"
+  attr :query, :string, default: "", doc: "Current search query"
+  attr :media_type, :atom, default: :all, doc: "Current media type filter"
+  attr :sort_by, :atom, default: :relevance, doc: "Current sort option"
+  attr :page, :integer, default: 1, doc: "Current page number"
 
   def search_result_card(assigns) do
+    # Build search context for back navigation and assign to assigns
+    assigns = assign(assigns, :search_params, build_search_params(assigns))
+
     ~H"""
     <.link
-      navigate={~p"/#{@result.media_type}/#{@result.id}"}
+      navigate={~p"/#{@result.media_type}/#{@result.id}?#{@search_params}"}
       class={[
         "block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 group cursor-pointer",
         @class
@@ -141,6 +148,10 @@ defmodule FlixirWeb.SearchComponents do
   attr :results, :list, required: true, doc: "List of search results"
   attr :loading, :boolean, default: false, doc: "Whether results are loading"
   attr :class, :string, default: "", doc: "Additional CSS classes"
+  attr :query, :string, default: "", doc: "Current search query"
+  attr :media_type, :atom, default: :all, doc: "Current media type filter"
+  attr :sort_by, :atom, default: :relevance, doc: "Current sort option"
+  attr :page, :integer, default: 1, doc: "Current page number"
 
   def search_results_grid(assigns) do
     ~H"""
@@ -152,7 +163,13 @@ defmodule FlixirWeb.SearchComponents do
       data-testid="search-results-grid"
     >
       <%= for result <- @results do %>
-        <.search_result_card result={result} />
+        <.search_result_card
+          result={result}
+          query={@query}
+          media_type={@media_type}
+          sort_by={@sort_by}
+          page={@page}
+        />
       <% end %>
 
     <!-- Loading skeleton cards -->
@@ -398,4 +415,39 @@ defmodule FlixirWeb.SearchComponents do
   defp media_type_label(:all), do: "content"
   defp media_type_label(:movie), do: "movies"
   defp media_type_label(:tv), do: "TV shows"
+
+  defp build_search_params(assigns) do
+    # Extract search context from assigns if available
+    params = %{}
+
+    # Add query parameter if present
+    params = if Map.has_key?(assigns, :query) and assigns.query != "" do
+      Map.put(params, "q", assigns.query)
+    else
+      params
+    end
+
+    # Add media type if not :all
+    params = if Map.has_key?(assigns, :media_type) and assigns.media_type != :all do
+      Map.put(params, "type", Atom.to_string(assigns.media_type))
+    else
+      params
+    end
+
+    # Add sort if not :relevance
+    params = if Map.has_key?(assigns, :sort_by) and assigns.sort_by != :relevance do
+      Map.put(params, "sort", Atom.to_string(assigns.sort_by))
+    else
+      params
+    end
+
+    # Add page if not 1
+    params = if Map.has_key?(assigns, :page) and assigns.page != 1 do
+      Map.put(params, "page", Integer.to_string(assigns.page))
+    else
+      params
+    end
+
+    params
+  end
 end

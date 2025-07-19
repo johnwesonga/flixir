@@ -13,13 +13,17 @@ defmodule FlixirWeb.MovieDetailsLive do
   require Logger
 
   @impl true
-  def mount(%{"type" => media_type, "id" => media_id}, _session, socket) do
+  def mount(%{"type" => media_type, "id" => media_id} = params, _session, socket) do
     media_id = String.to_integer(media_id)
+
+    # Capture search context for back navigation
+    search_context = extract_search_context(params)
 
     socket =
       socket
       |> assign(:media_type, media_type)
       |> assign(:media_id, media_id)
+      |> assign(:search_context, search_context)
       |> assign(:media_details, nil)
       |> assign(:reviews, [])
       |> assign(:rating_stats, nil)
@@ -317,4 +321,54 @@ defmodule FlixirWeb.MovieDetailsLive do
     end
   end
   defp format_release_date(_), do: ""
+
+  defp extract_search_context(params) do
+    %{
+      query: Map.get(params, "q", ""),
+      media_type: Map.get(params, "type", "all"),
+      sort_by: Map.get(params, "sort", "relevance"),
+      page: Map.get(params, "page", "1")
+    }
+  end
+
+  defp build_search_url(search_context) do
+    # Build the search URL with preserved context
+    base_params = []
+
+    # Add query parameter if present
+    params = if search_context.query != "" do
+      [{"q", search_context.query} | base_params]
+    else
+      base_params
+    end
+
+    # Add media type if not "all"
+    params = if search_context.media_type != "all" do
+      [{"type", search_context.media_type} | params]
+    else
+      params
+    end
+
+    # Add sort if not "relevance"
+    params = if search_context.sort_by != "relevance" do
+      [{"sort", search_context.sort_by} | params]
+    else
+      params
+    end
+
+    # Add page if not "1"
+    params = if search_context.page != "1" do
+      [{"page", search_context.page} | params]
+    else
+      params
+    end
+
+    # Build the final URL
+    if params == [] do
+      "/search"
+    else
+      query_string = URI.encode_query(params)
+      "/search?#{query_string}"
+    end
+  end
 end

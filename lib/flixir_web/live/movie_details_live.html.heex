@@ -10,8 +10,15 @@
       </li>
       <li class="flex items-center">
         <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
-        <.link navigate={~p"/search"} class="hover:text-gray-700 transition-colors">
-          Search
+        <.link
+          navigate={build_search_url(@search_context)}
+          class="hover:text-gray-700 transition-colors"
+        >
+          <%= if @search_context.query != "" do %>
+            Search: "{@search_context.query}"
+          <% else %>
+            Search
+          <% end %>
         </.link>
       </li>
       <li class="flex items-center">
