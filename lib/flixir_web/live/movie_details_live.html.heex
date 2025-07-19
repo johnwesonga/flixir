@@ -1,4 +1,39 @@
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <!-- Breadcrumb Navigation -->
+  <nav class="mb-6" aria-label="Breadcrumb">
+    <ol class="flex items-center space-x-2 text-sm text-gray-500">
+      <li>
+        <.link navigate={~p"/"} class="hover:text-gray-700 transition-colors">
+          <.icon name="hero-home" class="h-4 w-4" />
+          <span class="sr-only">Home</span>
+        </.link>
+      </li>
+      <li class="flex items-center">
+        <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+        <.link navigate={~p"/search"} class="hover:text-gray-700 transition-colors">
+          Search
+        </.link>
+      </li>
+      <li class="flex items-center">
+        <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+        <span class="text-gray-900 font-medium">
+          {String.capitalize(@media_type)}
+        </span>
+      </li>
+      <%= if @media_details do %>
+        <li class="flex items-center">
+          <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+          <span
+            class="text-gray-900 font-medium truncate max-w-xs"
+            title={get_media_title(@media_details, @media_type)}
+          >
+            {get_media_title(@media_details, @media_type)}
+          </span>
+        </li>
+      <% end %>
+    </ol>
+  </nav>
+
   <%= if @media_details do %>
     <!-- Media Header -->
     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
@@ -13,36 +48,36 @@
             />
           </div>
         <% end %>
-
-        <!-- Details -->
+        
+<!-- Details -->
         <div class="flex-1">
           <h1 class="text-3xl font-bold text-gray-900 mb-2">
-            <%= get_media_title(@media_details, @media_type) %>
+            {get_media_title(@media_details, @media_type)}
           </h1>
-          
+
           <%= if release_date = get_release_date(@media_details, @media_type) do %>
             <p class="text-gray-600 mb-4">
-              Released: <%= format_release_date(release_date) %>
+              Released: {format_release_date(release_date)}
             </p>
           <% end %>
 
           <%= if overview = Map.get(@media_details, "overview") do %>
             <p class="text-gray-700 leading-relaxed">
-              <%= overview %>
+              {overview}
             </p>
           <% end %>
         </div>
       </div>
     </div>
-
-    <!-- Reviews Section -->
+    
+<!-- Reviews Section -->
     <div class="space-y-6">
       <!-- Rating Stats -->
       <%= if @rating_stats do %>
         <.rating_display stats={@rating_stats} />
       <% end %>
-
-      <!-- Review Filters -->
+      
+<!-- Review Filters -->
       <%= if length(@reviews) > 0 do %>
         <.review_filters
           filters={@review_filters}
@@ -51,12 +86,13 @@
           filtered_count={length(@filtered_reviews)}
         />
       <% end %>
-
-      <!-- Reviews List -->
+      
+<!-- Reviews List -->
       <div class="space-y-6">
         <%= if @loading_reviews and length(@reviews) == 0 do %>
           <div class="text-center py-8">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4">
+            </div>
             <p class="text-gray-600">Loading reviews...</p>
           </div>
         <% end %>
@@ -67,7 +103,7 @@
               <.icon name="hero-exclamation-triangle" class="w-5 h-5" />
               <span class="font-medium">Error loading reviews</span>
             </div>
-            <p class="text-red-700 mt-1"><%= @reviews_error %></p>
+            <p class="text-red-700 mt-1">{@reviews_error}</p>
             <button
               type="button"
               phx-click="retry_reviews"
@@ -86,8 +122,8 @@
               show_spoilers={MapSet.member?(@revealed_spoilers, review.id)}
             />
           <% end %>
-
-          <!-- Load More Button -->
+          
+<!-- Load More Button -->
           <%= if @pagination && @pagination.has_next do %>
             <div class="text-center">
               <button
@@ -112,8 +148,12 @@
             <!-- No results after filtering -->
             <div class="text-center py-12">
               <.icon name="hero-funnel" class="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 class="text-lg font-medium text-gray-900 mb-2">No reviews match your filters</h3>
-              <p class="text-gray-600 mb-4">Try adjusting your filter criteria to see more reviews.</p>
+              <h3 class="text-lg font-medium text-gray-900 mb-2">
+                No reviews match your filters
+              </h3>
+              <p class="text-gray-600 mb-4">
+                Try adjusting your filter criteria to see more reviews.
+              </p>
               <button
                 type="button"
                 phx-click="update_filters"
@@ -127,9 +167,14 @@
             <%= if !@loading_reviews and !@reviews_error do %>
               <!-- No reviews available -->
               <div class="text-center py-12">
-                <.icon name="hero-chat-bubble-left-ellipsis" class="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <.icon
+                  name="hero-chat-bubble-left-ellipsis"
+                  class="w-12 h-12 text-gray-300 mx-auto mb-4"
+                />
                 <h3 class="text-lg font-medium text-gray-900 mb-2">No reviews available</h3>
-                <p class="text-gray-600">Be the first to share your thoughts about this <%= @media_type %>!</p>
+                <p class="text-gray-600">
+                  Be the first to share your thoughts about this {@media_type}!
+                </p>
               </div>
             <% end %>
           <% end %>
@@ -141,8 +186,7 @@
     <div class="text-center py-12">
       <.icon name="hero-film" class="w-12 h-12 text-gray-300 mx-auto mb-4" />
       <h2 class="text-xl font-medium text-gray-900 mb-2">Media not found</h2>
-      <p class="text-gray-600">The requested <%= @media_type %> could not be found.</p>
+      <p class="text-gray-600">The requested {@media_type} could not be found.</p>
     </div>
   <% end %>
 </div>
-
