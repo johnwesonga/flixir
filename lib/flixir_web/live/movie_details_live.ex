@@ -25,6 +25,9 @@ defmodule FlixirWeb.MovieDetailsLive do
       |> assign(:rating_stats, nil)
       |> assign(:loading_reviews, false)
       |> assign(:reviews_error, nil)
+      |> assign(:reviews_state, :loading)
+      |> assign(:rating_stats_state, :loading)
+      |> assign(:rating_stats_error, nil)
       |> assign(:expanded_reviews, MapSet.new())
       |> assign(:revealed_spoilers, MapSet.new())
       |> assign(:review_filters, default_filters())
@@ -136,6 +139,24 @@ defmodule FlixirWeb.MovieDetailsLive do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("retry_rating_stats", _params, socket) do
+    socket =
+      socket
+      |> assign(:rating_stats_state, :loading)
+      |> load_rating_stats()
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("clear-filters", _params, socket) do
+    socket =
+      socket
+      |> assign(:review_filters, default_filters())
+      |> apply_filters()
+    {:noreply, socket}
+  end
+
   # Private functions
 
   defp default_filters do
@@ -225,14 +246,21 @@ defmodule FlixirWeb.MovieDetailsLive do
         |> assign(:pagination, pagination)
         |> assign(:loading_reviews, false)
         |> assign(:reviews_error, nil)
+        |> assign(:reviews_state, :success)
         |> load_rating_stats()
         |> apply_filters()
 
-      {:error, reason} ->
-        Logger.error("Failed to load reviews: #{inspect(reason)}")
+      {:error, error_type} ->
+        Logger.error("Failed to load reviews: #{inspect(error_type)}")
+        error_info = %{
+          error_type: error_type,
+          retry_event: "retry_reviews"
+        }
+
         socket
         |> assign(:loading_reviews, false)
-        |> assign(:reviews_error, format_error_message(reason))
+        |> assign(:reviews_error, error_info)
+        |> assign(:reviews_state, :error)
     end
   end
 
@@ -242,11 +270,21 @@ defmodule FlixirWeb.MovieDetailsLive do
 
     case Reviews.get_rating_stats(media_type, media_id) do
       {:ok, stats} ->
-        assign(socket, :rating_stats, stats)
-
-      {:error, reason} ->
-        Logger.warning("Failed to load rating stats: #{inspect(reason)}")
         socket
+        |> assign(:rating_stats, stats)
+        |> assign(:rating_stats_state, :success)
+        |> assign(:rating_stats_error, nil)
+
+      {:error, error_type} ->
+        Logger.warning("Failed to load rating stats: #{inspect(error_type)}")
+        error_info = %{
+          error_type: error_type,
+          retry_event: "retry_rating_stats"
+        }
+
+        socket
+        |> assign(:rating_stats_state, :error)
+        |> assign(:rating_stats_error, error_info)
     end
   end
 

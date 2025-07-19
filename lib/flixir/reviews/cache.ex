@@ -128,12 +128,17 @@ defmodule Flixir.Reviews.Cache do
   def cleanup_expired do
     current_time = System.system_time(:millisecond)
 
-    :ets.foldl(fn {key, _data, expires_at}, acc ->
-      if current_time >= expires_at do
-        :ets.delete(@table_name, key)
-      end
-      acc
-    end, :ok, @table_name)
+    :ets.foldl(
+      fn {key, _data, expires_at}, acc ->
+        if current_time >= expires_at do
+          :ets.delete(@table_name, key)
+        end
+
+        acc
+      end,
+      :ok,
+      @table_name
+    )
 
     :ok
   end

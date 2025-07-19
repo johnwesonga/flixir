@@ -8,7 +8,7 @@ defmodule Flixir.Reviews do
   """
 
   require Logger
-  alias Flixir.Reviews.{Review, RatingStats, Cache, TMDBClient}
+  alias Flixir.Reviews.{Review, RatingStats, Cache, TMDBClient, ErrorHandler}
 
   @default_per_page 10
   @max_per_page 50
@@ -262,10 +262,24 @@ defmodule Flixir.Reviews do
   defp fetch_and_cache_reviews(media_type, media_id, opts) do
     # For now, fetch only the first page from API and handle pagination in memory
     # This could be optimized later to fetch specific pages from API
+    cache_key_filters = extract_cache_filters(opts)
+
+    context = %{
+      media_type: media_type,
+      media_id: to_string(media_id),
+      operation: :get_reviews,
+      attempt: 1
+    }
+
+    fetch_reviews_with_retry(media_type, media_id, opts, context, cache_key_filters)
+  end
+
+  defp fetch_reviews_with_retry(media_type, media_id, opts, context, cache_key_filters, attempt \\ 1) do
+    updated_context = %{context | attempt: attempt}
+
     case TMDBClient.fetch_reviews(media_type, media_id, 1) do
       {:ok, %{reviews: reviews}} ->
         # Cache the raw reviews
-        cache_key_filters = extract_cache_filters(opts)
         Cache.put_reviews(media_type, to_string(media_id), reviews, cache_key_filters)
 
         # Process and return filtered/sorted/paginated results
@@ -277,12 +291,56 @@ defmodule Flixir.Reviews do
         {:ok, result}
 
       {:error, reason} ->
-        Logger.error("Failed to fetch reviews for #{media_type}/#{media_id}: #{inspect(reason)}")
-        {:error, reason}
+        error_result = ErrorHandler.handle_api_error(reason, updated_context)
+
+        # Try cached fallback if appropriate
+        if ErrorHandler.use_cached_fallback?(error_result) do
+          case try_cached_fallback(media_type, media_id, opts, cache_key_filters) do
+            {:ok, result} -> {:ok, result}
+            :error ->
+              # Retry if possible
+              if ErrorHandler.retryable?(error_result) and attempt < 3 do
+                :timer.sleep(ErrorHandler.retry_delay(attempt))
+                fetch_reviews_with_retry(media_type, media_id, opts, context, cache_key_filters, attempt + 1)
+              else
+                error_result
+              end
+          end
+        else
+          error_result
+        end
+    end
+  end
+
+  defp try_cached_fallback(media_type, media_id, opts, _cache_key_filters) do
+    # Try to get any cached reviews, even if they don't match exact filters
+    case Cache.get_reviews(media_type, to_string(media_id), %{}) do
+      {:ok, cached_reviews} ->
+        Logger.info("Using cached fallback for reviews: #{media_type}/#{media_id}")
+        result = cached_reviews
+        |> filter_reviews(opts)
+        |> sort_reviews(opts.sort_by, opts.sort_order)
+        |> paginate_reviews(opts.page, opts.per_page)
+        {:ok, result}
+
+      :error -> :error
     end
   end
 
   defp fetch_and_cache_rating_stats(media_type, media_id) do
+    context = %{
+      media_type: media_type,
+      media_id: to_string(media_id),
+      operation: :get_rating_stats,
+      attempt: 1
+    }
+
+    fetch_rating_stats_with_retry(media_type, media_id, context)
+  end
+
+  defp fetch_rating_stats_with_retry(media_type, media_id, context, attempt \\ 1) do
+    updated_context = %{context | attempt: attempt}
+
     case TMDBClient.fetch_reviews(media_type, media_id, 1) do
       {:ok, %{reviews: reviews}} ->
         stats = calculate_rating_stats(reviews)
@@ -290,8 +348,27 @@ defmodule Flixir.Reviews do
         {:ok, stats}
 
       {:error, reason} ->
-        Logger.error("Failed to fetch rating stats for #{media_type}/#{media_id}: #{inspect(reason)}")
-        {:error, reason}
+        error_result = ErrorHandler.handle_api_error(reason, updated_context)
+
+        # Try cached fallback if appropriate
+        if ErrorHandler.use_cached_fallback?(error_result) do
+          case Cache.get_ratings(media_type, to_string(media_id)) do
+            {:ok, cached_stats} ->
+              Logger.info("Using cached fallback for rating stats: #{media_type}/#{media_id}")
+              {:ok, cached_stats}
+
+            :error ->
+              # Retry if possible
+              if ErrorHandler.retryable?(error_result) and attempt < 3 do
+                :timer.sleep(ErrorHandler.retry_delay(attempt))
+                fetch_rating_stats_with_retry(media_type, media_id, context, attempt + 1)
+              else
+                error_result
+              end
+          end
+        else
+          error_result
+        end
     end
   end
 

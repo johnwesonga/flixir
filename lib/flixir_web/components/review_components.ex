@@ -11,7 +11,10 @@ defmodule FlixirWeb.ReviewComponents do
   use Gettext, backend: FlixirWeb.Gettext
 
   alias Phoenix.LiveView.JS
+  alias Flixir.Reviews.ErrorHandler
   import FlixirWeb.CoreComponents, only: [icon: 1]
+  import FlixirWeb.Components.LoadingComponents
+  import FlixirWeb.Components.EmptyStateComponents
 
   @doc """
   Renders a review card component with expandable content and spoiler handling.
@@ -376,5 +379,167 @@ defmodule FlixirWeb.ReviewComponents do
   def format_average_rating(rating) when is_number(rating) do
     Float.round(rating, 1) |> to_string()
   end
+
+  @doc """
+  Renders a reviews section with proper state handling (loading, error, empty, success).
+  """
+  attr :state, :atom, required: true, doc: "Current state: :loading, :error, :empty, :success"
+  attr :reviews, :list, default: [], doc: "List of reviews to display"
+  attr :error, :map, default: nil, doc: "Error information if state is :error"
+  attr :loading_message, :string, default: "Loading reviews...", doc: "Message to show while loading"
+  attr :expanded_reviews, :list, default: [], doc: "List of expanded review IDs"
+  attr :spoiler_reviews, :list, default: [], doc: "List of review IDs with revealed spoilers"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def reviews_section(assigns) do
+    ~H"""
+    <div class={["reviews-section", @class]}>
+      <%= case @state do %>
+        <% :loading -> %>
+          <.loading_overlay show={true} message={@loading_message}>
+            <.review_skeleton count={3} />
+          </.loading_overlay>
+
+        <% :error -> %>
+          <%= render_error_state(@error) %>
+
+        <% :empty -> %>
+          <.no_reviews_empty_state />
+
+        <% :success -> %>
+          <%= if length(@reviews) == 0 do %>
+            <.no_reviews_empty_state />
+          <% else %>
+            <div class="space-y-4">
+              <.review_card
+                :for={review <- @reviews}
+                review={review}
+                expanded={review.id in @expanded_reviews}
+                show_spoilers={review.id in @spoiler_reviews}
+              />
+            </div>
+          <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a rating statistics section with proper state handling.
+  """
+  attr :state, :atom, required: true, doc: "Current state: :loading, :error, :empty, :success"
+  attr :stats, :map, default: nil, doc: "Rating statistics to display"
+  attr :error, :map, default: nil, doc: "Error information if state is :error"
+  attr :compact, :boolean, default: false, doc: "Whether to show compact version"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def rating_stats_section(assigns) do
+    ~H"""
+    <div class={["rating-stats-section", @class]}>
+      <%= case @state do %>
+        <% :loading -> %>
+          <.rating_stats_skeleton />
+
+        <% :error -> %>
+          <%= render_error_state(@error) %>
+
+        <% :empty -> %>
+          <.no_ratings_empty_state />
+
+        <% :success -> %>
+          <%= if @stats do %>
+            <.rating_display stats={@stats} compact={@compact} />
+          <% else %>
+            <.no_ratings_empty_state />
+          <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders filtered reviews with empty state handling.
+  """
+  attr :reviews, :list, required: true, doc: "List of filtered reviews"
+  attr :filters_applied, :boolean, default: false, doc: "Whether any filters are currently applied"
+  attr :expanded_reviews, :list, default: [], doc: "List of expanded review IDs"
+  attr :spoiler_reviews, :list, default: [], doc: "List of review IDs with revealed spoilers"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def filtered_reviews_list(assigns) do
+    ~H"""
+    <div class={@class}>
+      <%= if length(@reviews) == 0 do %>
+        <%= if @filters_applied do %>
+          <.no_filtered_results_empty_state />
+        <% else %>
+          <.no_reviews_empty_state />
+        <% end %>
+      <% else %>
+        <div class="space-y-4">
+          <.review_card
+            :for={review <- @reviews}
+            review={review}
+            expanded={review.id in @expanded_reviews}
+            show_spoilers={review.id in @spoiler_reviews}
+          />
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
+  # Private helper functions
+
+  defp render_error_state(%{error_type: error_type} = error) do
+    case error_type do
+      :network_error ->
+        assigns = %{retry_event: Map.get(error, :retry_event, "retry-reviews")}
+        ~H"""
+        <.network_error_state retry_event={@retry_event} />
+        """
+
+      :service_unavailable ->
+        assigns = %{retry_event: Map.get(error, :retry_event, "retry-reviews")}
+        ~H"""
+        <.service_error_state retry_event={@retry_event} />
+        """
+
+      :rate_limited ->
+        assigns = %{}
+        ~H"""
+        <.rate_limit_error_state />
+        """
+
+      :not_found ->
+        assigns = %{}
+        ~H"""
+        <.no_reviews_empty_state
+          title="No reviews found"
+          description="This content doesn't have any reviews yet."
+        />
+        """
+
+      _ ->
+        message = ErrorHandler.format_user_error({:error, error_type})
+        retry_event = Map.get(error, :retry_event, "retry-reviews")
+        assigns = %{message: message, retry_event: retry_event}
+        ~H"""
+        <.error_state
+          description={@message}
+          retry_event={@retry_event}
+        />
+        """
+    end
+  end
+
+  defp render_error_state(error) when is_binary(error) do
+    assigns = %{message: error}
+    ~H"""
+    <.error_state description={@message} />
+    """
+  end
+
+  defp render_error_state(_), do: nil
 
 end

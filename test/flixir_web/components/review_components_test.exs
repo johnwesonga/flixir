@@ -419,6 +419,158 @@ defmodule FlixirWeb.ReviewComponentsTest do
     end
   end
 
+  describe "reviews_section/1" do
+    test "renders loading state" do
+      assigns = %{
+        state: :loading,
+        reviews: [],
+        loading_message: "Loading reviews..."
+      }
+      html = render_component(&reviews_section/1, assigns)
+
+      assert html =~ "Loading reviews..."
+      assert html =~ "animate-pulse"
+    end
+
+    test "renders success state with reviews" do
+      review = %Review{
+        id: "test_1",
+        author: "Test User",
+        content: "Great movie!",
+        rating: 8.5,
+        created_at: ~U[2024-01-01 12:00:00Z]
+      }
+
+      assigns = %{
+        state: :success,
+        reviews: [review],
+        expanded_reviews: [],
+        spoiler_reviews: []
+      }
+      html = render_component(&reviews_section/1, assigns)
+
+      assert html =~ "Test User"
+      assert html =~ "Great movie!"
+      assert html =~ "8.5"
+    end
+
+    test "renders empty state when no reviews" do
+      assigns = %{
+        state: :success,
+        reviews: [],
+        expanded_reviews: [],
+        spoiler_reviews: []
+      }
+      html = render_component(&reviews_section/1, assigns)
+
+      assert html =~ "No reviews yet"
+    end
+
+    test "renders error state" do
+      assigns = %{
+        state: :error,
+        reviews: [],
+        error: %{error_type: :network_error, retry_event: "retry-reviews"}
+      }
+      html = render_component(&reviews_section/1, assigns)
+
+      assert html =~ "Connection problem"
+      assert html =~ "phx-click=\"retry-reviews\""
+    end
+  end
+
+  describe "rating_stats_section/1" do
+    test "renders loading state" do
+      assigns = %{state: :loading}
+      html = render_component(&rating_stats_section/1, assigns)
+
+      assert html =~ "animate-pulse"
+      assert html =~ "w-16 h-16 bg-gray-300 rounded-full"
+    end
+
+    test "renders success state with stats" do
+      stats = %RatingStats{
+        average_rating: 8.2,
+        total_reviews: 15,
+        rating_distribution: %{"8" => 10, "9" => 5},
+        source: "tmdb"
+      }
+
+      assigns = %{state: :success, stats: stats}
+      html = render_component(&rating_stats_section/1, assigns)
+
+      assert html =~ "8.2"
+      assert html =~ "15 reviews"
+    end
+
+    test "renders empty state when no stats" do
+      assigns = %{state: :success, stats: nil}
+      html = render_component(&rating_stats_section/1, assigns)
+
+      assert html =~ "Not yet rated"
+    end
+
+    test "renders error state" do
+      assigns = %{
+        state: :error,
+        error: %{error_type: :service_unavailable, retry_event: "retry-stats"}
+      }
+      html = render_component(&rating_stats_section/1, assigns)
+
+      assert html =~ "Service temporarily unavailable"
+      assert html =~ "phx-click=\"retry-stats\""
+    end
+  end
+
+  describe "filtered_reviews_list/1" do
+    test "renders reviews when available" do
+      review = %Review{
+        id: "filtered_1",
+        author: "Filtered User",
+        content: "Filtered review",
+        rating: 7.0,
+        created_at: ~U[2024-01-01 12:00:00Z]
+      }
+
+      assigns = %{
+        reviews: [review],
+        filters_applied: false,
+        expanded_reviews: [],
+        spoiler_reviews: []
+      }
+      html = render_component(&filtered_reviews_list/1, assigns)
+
+      assert html =~ "Filtered User"
+      assert html =~ "Filtered review"
+    end
+
+    test "renders no filtered results when filters applied" do
+      assigns = %{
+        reviews: [],
+        filters_applied: true,
+        expanded_reviews: [],
+        spoiler_reviews: []
+      }
+      html = render_component(&filtered_reviews_list/1, assigns)
+
+      assert html =~ "No reviews match your filters"
+      assert html =~ "Clear filters"
+    end
+
+    test "renders no reviews when no filters applied" do
+      assigns = %{
+        reviews: [],
+        filters_applied: false,
+        expanded_reviews: [],
+        spoiler_reviews: []
+      }
+      html = render_component(&filtered_reviews_list/1, assigns)
+
+      assert html =~ "No reviews yet"
+      refute html =~ "Clear filters"
+    end
+  end
+
   describe "edge cases and error handling" do
     test "handles review with empty content" do
       review = %Review{
@@ -468,6 +620,36 @@ defmodule FlixirWeb.ReviewComponentsTest do
 
       assert html =~ "8.0"
       assert html =~ "100 reviews"
+    end
+
+    test "handles error state with different error types" do
+      error_types = [
+        {:network_error, "Connection problem"},
+        {:service_unavailable, "Service temporarily unavailable"},
+        {:rate_limited, "Too many requests"},
+        {:not_found, "No reviews found"}
+      ]
+
+      for {error_type, expected_text} <- error_types do
+        assigns = %{
+          state: :error,
+          reviews: [],
+          error: %{error_type: error_type, retry_event: "retry"}
+        }
+        html = render_component(&reviews_section/1, assigns)
+        assert html =~ expected_text
+      end
+    end
+
+    test "handles error state with string error message" do
+      assigns = %{
+        state: :error,
+        reviews: [],
+        error: "Custom error message"
+      }
+      html = render_component(&reviews_section/1, assigns)
+
+      assert html =~ "Custom error message"
     end
   end
 end
