@@ -305,6 +305,8 @@ defmodule FlixirWeb.MovieDetailsLive do
   defp format_error_message({:transport_error, _}), do: "Network error. Please check your connection."
   defp format_error_message({:unexpected_status, status}), do: "Service error (#{status}). Please try again later."
   defp format_error_message(%{__exception__: true}), do: "An unexpected error occurred. Please try again."
+  defp format_error_message(%{error_type: error_type}), do: format_error_message(error_type)
+  defp format_error_message(:network_error), do: "Network error occurred. Please check your connection and try again."
   defp format_error_message(_), do: "An error occurred while loading reviews."
 
   # Template helper functions

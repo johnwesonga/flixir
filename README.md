@@ -201,6 +201,22 @@ The application includes comprehensive test coverage for:
 - Integration tests for complete user workflows
 - Performance benchmarks and load testing
 - Error handling and edge cases
+- Mock testing for external API dependencies and context functions
+
+### Test Architecture
+
+The test suite uses comprehensive mocking strategies to ensure reliable and fast tests:
+
+**Reviews Context Testing:**
+- All Reviews context functions are properly mocked in LiveView tests
+- `filter_reviews/2` function is mocked to test filtering behavior without dependencies
+- `get_reviews/3`, `get_rating_stats/2`, and other context functions have dedicated mocks
+- Test mocks simulate real filtering, sorting, and pagination logic for accurate behavior testing
+
+**LiveView Integration Tests:**
+- MovieDetailsLive tests include complete mocking of the Reviews context
+- Tests verify proper integration between LiveView and context layers
+- Mock functions return realistic data structures matching production behavior
 
 ## Development
 
