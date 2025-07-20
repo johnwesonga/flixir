@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Extend TMDB Client with movie list endpoints
+- [x] 1. Extend TMDB Client with movie list endpoints
   - Add new functions to `lib/flixir/media/tmdb_client.ex` for each movie list type
   - Implement `get_popular_movies/1`, `get_trending_movies/2`, `get_top_rated_movies/1`, `get_upcoming_movies/1`, and `get_now_playing_movies/1`
   - Follow existing error handling patterns and HTTP request structure

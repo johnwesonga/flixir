@@ -90,10 +90,11 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Provides comprehensive error handling and retry functionality for failed operations
 
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
-- **Search Route**: `/search` - Main search interface with URL parameter support
-- **Detail Routes**: `/:type/:id` - Dynamic routes for movie and TV show details
+- **Home Route**: `/` - Landing page with HTTP GET route to SearchLive for immediate search functionality
+- **Search Route**: `/search` - Main search interface with LiveView and URL parameter support
+- **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
-- **LiveView Navigation**: Seamless client-side navigation between search and detail pages
+- **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
 
 ### Key Features Implementation
 

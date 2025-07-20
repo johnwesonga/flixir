@@ -1,18 +1,18 @@
 defmodule Flixir.Media.TMDBClient do
   @moduledoc """
   Client for The Movie Database (TMDB) API integration.
-  
+
   Provides functions to interact with TMDB API endpoints for searching
   movies and TV shows, fetching details, and handling API responses.
   """
 
   @doc """
   Searches for movies and TV shows using TMDB's multi-search endpoint.
-  
+
   ## Parameters
   - query: Search term string
   - page: Page number for pagination (default: 1)
-  
+
   ## Returns
   - {:ok, response} on successful API call
   - {:error, reason} on failure
@@ -23,16 +23,16 @@ defmodule Flixir.Media.TMDBClient do
       page: page,
       api_key: api_key()
     }
-    
+
     get("/search/multi", params)
   end
 
   @doc """
   Fetches detailed information for a specific movie.
-  
+
   ## Parameters
   - movie_id: TMDB movie ID
-  
+
   ## Returns
   - {:ok, response} on successful API call
   - {:error, reason} on failure
@@ -44,10 +44,10 @@ defmodule Flixir.Media.TMDBClient do
 
   @doc """
   Fetches detailed information for a specific TV show.
-  
+
   ## Parameters
   - tv_id: TMDB TV show ID
-  
+
   ## Returns
   - {:ok, response} on successful API call
   - {:error, reason} on failure
@@ -57,11 +57,107 @@ defmodule Flixir.Media.TMDBClient do
     get("/tv/#{tv_id}", params)
   end
 
+  @doc """
+  Fetches popular movies from TMDB.
+
+  ## Parameters
+  - page: Page number for pagination (default: 1)
+
+  ## Returns
+  - {:ok, response} on successful API call
+  - {:error, reason} on failure
+  """
+  def get_popular_movies(page \\ 1) do
+    params = %{
+      page: page,
+      api_key: api_key()
+    }
+
+    get("/movie/popular", params)
+  end
+
+  @doc """
+  Fetches trending movies from TMDB.
+
+  ## Parameters
+  - time_window: Time window for trending ("day" or "week", default: "week")
+  - page: Page number for pagination (default: 1)
+
+  ## Returns
+  - {:ok, response} on successful API call
+  - {:error, reason} on failure
+  """
+  def get_trending_movies(time_window \\ "week", page \\ 1) do
+    params = %{
+      page: page,
+      api_key: api_key()
+    }
+
+    get("/trending/movie/#{time_window}", params)
+  end
+
+  @doc """
+  Fetches top-rated movies from TMDB.
+
+  ## Parameters
+  - page: Page number for pagination (default: 1)
+
+  ## Returns
+  - {:ok, response} on successful API call
+  - {:error, reason} on failure
+  """
+  def get_top_rated_movies(page \\ 1) do
+    params = %{
+      page: page,
+      api_key: api_key()
+    }
+
+    get("/movie/top_rated", params)
+  end
+
+  @doc """
+  Fetches upcoming movies from TMDB.
+
+  ## Parameters
+  - page: Page number for pagination (default: 1)
+
+  ## Returns
+  - {:ok, response} on successful API call
+  - {:error, reason} on failure
+  """
+  def get_upcoming_movies(page \\ 1) do
+    params = %{
+      page: page,
+      api_key: api_key()
+    }
+
+    get("/movie/upcoming", params)
+  end
+
+  @doc """
+  Fetches now playing movies from TMDB.
+
+  ## Parameters
+  - page: Page number for pagination (default: 1)
+
+  ## Returns
+  - {:ok, response} on successful API call
+  - {:error, reason} on failure
+  """
+  def get_now_playing_movies(page \\ 1) do
+    params = %{
+      page: page,
+      api_key: api_key()
+    }
+
+    get("/movie/now_playing", params)
+  end
+
   # Private functions
 
   defp get(path, params) do
     url = base_url() <> path
-    
+
     request_options = [
       params: params,
       headers: headers(),
@@ -69,23 +165,23 @@ defmodule Flixir.Media.TMDBClient do
       retry: :transient,
       max_retries: max_retries()
     ]
-    
+
     case Req.get(url, request_options) do
       {:ok, %Req.Response{status: 200, body: body}} ->
         {:ok, body}
-      
+
       {:ok, %Req.Response{status: 401, body: body}} ->
         {:error, {:unauthorized, "Invalid API key", body}}
-      
+
       {:ok, %Req.Response{status: 429, body: body}} ->
         {:error, {:rate_limited, "Too many requests", body}}
-      
+
       {:ok, %Req.Response{status: status, body: body}} ->
         {:error, {:api_error, status, body}}
-      
+
       {:error, %Req.TransportError{reason: :timeout}} ->
         {:error, {:timeout, "Request timed out"}}
-      
+
       {:error, reason} ->
         {:error, {:request_failed, reason}}
     end
@@ -104,7 +200,7 @@ defmodule Flixir.Media.TMDBClient do
   end
 
   defp api_key do
-    Application.get_env(:flixir, :tmdb)[:api_key] || 
+    Application.get_env(:flixir, :tmdb)[:api_key] ||
       raise "TMDB API key not configured. Please set TMDB_API_KEY environment variable."
   end
 

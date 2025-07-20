@@ -17,7 +17,8 @@ defmodule FlixirWeb.Router do
   scope "/", FlixirWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
+    # get "/", PageController, :home
+    live "/", SearchLive, :home
     live "/search", SearchLive, :index
     live "/:type/:id", MovieDetailsLive, :show
   end
