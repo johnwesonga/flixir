@@ -351,10 +351,10 @@ defmodule FlixirWeb.ReviewFilters do
     Enum.reverse(tags)
   end
 
-  defp format_sort_label(:date), do: "Date"
-  defp format_sort_label(:rating), do: "Rating"
-  defp format_sort_label(:author), do: "Author"
-  defp format_sort_label(_), do: "Unknown"
+  #defp format_sort_label(:date), do: "Date"
+  #defp format_sort_label(:rating), do: "Rating"
+  #defp format_sort_label(:author), do: "Author"
+ # defp format_sort_label(_), do: "Unknown"
 
   defp format_rating_filter_label(:positive), do: "Positive"
   defp format_rating_filter_label(:negative), do: "Negative"

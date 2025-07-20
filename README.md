@@ -6,6 +6,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 ### 🎬 Movie & TV Show Discovery
 - **Search**: Real-time search across movies and TV shows
+- **Movie Lists**: Browse curated lists of popular, trending, top-rated, upcoming, and now playing movies
 - **Filtering**: Filter results by media type (movies, TV shows, or all)
 - **Sorting**: Sort by relevance, popularity, release date, or title
 - **Navigation**: Click any search result to view detailed information and reviews
@@ -67,9 +68,10 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 ### Core Modules
 
 #### Media Context (`lib/flixir/media/`)
-- **SearchResult**: Data structure for search results
-- **TMDBClient**: API client for The Movie Database
-- **Cache**: High-performance caching layer
+- **SearchResult**: Data structure for search results and movie lists
+- **TMDBClient**: API client for The Movie Database with movie list endpoints
+- **Cache**: High-performance caching layer with specialized movie list caching
+- **Movie Lists**: Five curated movie list functions with caching and error handling
 
 #### Reviews Context (`lib/flixir/reviews/`)
 - **Review**: Individual review data structure
@@ -141,6 +143,42 @@ Recent improvements include enhanced rating breakdown display logic that ensures
 - **Responsive Design**: Optimized grid layout for all screen sizes
 - **Loading States**: Skeleton cards and smooth transitions during search
 - **Empty States**: Helpful suggestions when no results are found
+
+#### Movie Lists API
+The application now includes comprehensive movie list functionality through the Media context:
+
+**Available Movie Lists:**
+- **Popular Movies**: `Flixir.Media.get_popular_movies/1` - Currently popular movies
+- **Trending Movies**: `Flixir.Media.get_trending_movies/1` - Trending movies (daily or weekly)
+- **Top Rated Movies**: `Flixir.Media.get_top_rated_movies/1` - Highest rated movies
+- **Upcoming Movies**: `Flixir.Media.get_upcoming_movies/1` - Soon-to-be-released movies
+- **Now Playing**: `Flixir.Media.get_now_playing_movies/1` - Currently in theaters
+
+**API Features:**
+- **Consistent Interface**: All functions follow the same pattern with options support
+- **Flexible Return Formats**: Support for both legacy list format and new map format with pagination
+- **Intelligent Caching**: 15-minute TTL for movie lists (longer than search results)
+- **Error Handling**: Comprehensive error handling with user-friendly messages
+- **Pagination Support**: Built-in pagination with `has_more` indicators
+
+**Usage Examples:**
+```elixir
+# Get popular movies (legacy format)
+{:ok, movies} = Flixir.Media.get_popular_movies()
+
+# Get trending movies with pagination info
+{:ok, %{results: movies, has_more: true}} = 
+  Flixir.Media.get_trending_movies(return_format: :map, time_window: "day")
+
+# Get top rated movies for page 2
+{:ok, movies} = Flixir.Media.get_top_rated_movies(page: 2)
+```
+
+**TMDB Integration:**
+- Direct integration with TMDB movie list endpoints
+- Automatic transformation to `SearchResult` structs for consistency
+- Proper media type handling (all results marked as `:movie`)
+- Robust error handling for API failures and network issues
 
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:

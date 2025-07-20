@@ -4,7 +4,7 @@ defmodule FlixirWeb.Components.LoadingComponents do
   """
 
   use Phoenix.Component
-  import FlixirWeb.CoreComponents
+
 
   @doc """
   Renders a loading spinner with optional message.

@@ -6,7 +6,7 @@
   - Follow existing error handling patterns and HTTP request structure
   - _Requirements: 1.1, 2.1, 3.1, 4.1, 5.1_
 
-- [ ] 2. Extend Media context with movie list functions
+- [x] 2. Extend Media context with movie list functions
   - Add new public functions to `lib/flixir/media.ex` for retrieving movie lists
   - Implement caching, error handling, and result transformation for each list type
   - Reuse existing `SearchResult` struct and transformation logic

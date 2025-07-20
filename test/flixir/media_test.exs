@@ -381,6 +381,296 @@ defmodule Flixir.MediaTest do
     end
   end
 
+  describe "movie list functions" do
+    test "get_popular_movies/1 returns popular movies" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 550,
+            "title" => "Fight Club",
+            "release_date" => "1999-10-15",
+            "overview" => "A ticking-time-bomb insomniac...",
+            "poster_path" => "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+            "genre_ids" => [18, 53],
+            "vote_average" => 8.4,
+            "popularity" => 61.416
+          }
+        ],
+        "total_pages" => 5,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_popular_movies: fn _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_popular_movies()
+        assert %SearchResult{} = result
+        assert result.title == "Fight Club"
+        assert result.media_type == :movie
+        assert result.id == 550
+      end
+    end
+
+    test "get_trending_movies/1 returns trending movies" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 123,
+            "title" => "Trending Movie",
+            "release_date" => "2023-01-15",
+            "overview" => "A trending movie...",
+            "poster_path" => "/trending.jpg",
+            "genre_ids" => [28, 12],
+            "vote_average" => 7.5,
+            "popularity" => 85.2
+          }
+        ],
+        "total_pages" => 3,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_trending_movies: fn _time_window, _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_trending_movies()
+        assert %SearchResult{} = result
+        assert result.title == "Trending Movie"
+        assert result.media_type == :movie
+        assert result.id == 123
+      end
+    end
+
+    test "get_top_rated_movies/1 returns top rated movies" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 456,
+            "title" => "Top Rated Movie",
+            "release_date" => "2020-05-10",
+            "overview" => "A highly rated movie...",
+            "poster_path" => "/toprated.jpg",
+            "genre_ids" => [18],
+            "vote_average" => 9.1,
+            "popularity" => 45.8
+          }
+        ],
+        "total_pages" => 10,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_top_rated_movies: fn _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_top_rated_movies()
+        assert %SearchResult{} = result
+        assert result.title == "Top Rated Movie"
+        assert result.media_type == :movie
+        assert result.vote_average == 9.1
+      end
+    end
+
+    test "get_upcoming_movies/1 returns upcoming movies" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 789,
+            "title" => "Upcoming Movie",
+            "release_date" => "2024-12-25",
+            "overview" => "An upcoming movie...",
+            "poster_path" => "/upcoming.jpg",
+            "genre_ids" => [28, 878],
+            "vote_average" => 0.0,
+            "popularity" => 120.5
+          }
+        ],
+        "total_pages" => 2,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_upcoming_movies: fn _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_upcoming_movies()
+        assert %SearchResult{} = result
+        assert result.title == "Upcoming Movie"
+        assert result.media_type == :movie
+        assert result.release_date == ~D[2024-12-25]
+      end
+    end
+
+    test "get_now_playing_movies/1 returns now playing movies" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 101,
+            "title" => "Now Playing Movie",
+            "release_date" => "2023-11-01",
+            "overview" => "A movie now playing...",
+            "poster_path" => "/nowplaying.jpg",
+            "genre_ids" => [35, 10749],
+            "vote_average" => 6.8,
+            "popularity" => 75.3
+          }
+        ],
+        "total_pages" => 4,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_now_playing_movies: fn _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_now_playing_movies()
+        assert %SearchResult{} = result
+        assert result.title == "Now Playing Movie"
+        assert result.media_type == :movie
+        assert result.id == 101
+      end
+    end
+
+    test "movie list functions support return_format: :map" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 550,
+            "title" => "Fight Club",
+            "release_date" => "1999-10-15",
+            "overview" => "A ticking-time-bomb insomniac...",
+            "poster_path" => "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+            "genre_ids" => [18, 53],
+            "vote_average" => 8.4,
+            "popularity" => 61.416
+          }
+        ],
+        "total_pages" => 5,
+        "page" => 1
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_popular_movies: fn _page -> {:ok, mock_api_response} end
+        ]}
+      ]) do
+        assert {:ok, %{results: [result], has_more: true}} = Media.get_popular_movies(return_format: :map)
+        assert %SearchResult{} = result
+        assert result.title == "Fight Club"
+        assert result.media_type == :movie
+      end
+    end
+
+    test "movie list functions support pagination" do
+      mock_api_response = %{
+        "results" => [
+          %{
+            "id" => 550,
+            "title" => "Fight Club",
+            "release_date" => "1999-10-15",
+            "overview" => "A ticking-time-bomb insomniac...",
+            "poster_path" => "/pB8BM7pdSp6B6Ih7QZ4DrQ3PmJK.jpg",
+            "genre_ids" => [18, 53],
+            "vote_average" => 8.4,
+            "popularity" => 61.416
+          }
+        ],
+        "total_pages" => 5,
+        "page" => 2
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end,
+          put: fn _key, _value, _ttl -> :ok end
+        ]},
+        {TMDBClient, [], [
+          get_popular_movies: fn page -> {:ok, Map.put(mock_api_response, "page", page)} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_popular_movies(page: 2)
+        assert %SearchResult{} = result
+        assert called(TMDBClient.get_popular_movies(2))
+      end
+    end
+
+    test "movie list functions return cached results when available" do
+      cached_results = %{
+        results: [
+          %SearchResult{
+            id: 550,
+            title: "Cached Movie",
+            media_type: :movie,
+            release_date: ~D[1999-10-15],
+            overview: "A cached movie...",
+            poster_path: "/cached.jpg",
+            genre_ids: [18, 53],
+            vote_average: 8.4,
+            popularity: 61.416
+          }
+        ],
+        has_more: true
+      }
+
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> {:ok, cached_results} end
+        ]},
+        {TMDBClient, [], [
+          get_popular_movies: fn _page -> {:ok, %{}} end
+        ]}
+      ]) do
+        assert {:ok, [result]} = Media.get_popular_movies()
+        assert result.title == "Cached Movie"
+        refute called(TMDBClient.get_popular_movies(:_))
+      end
+    end
+
+    test "movie list functions handle API errors" do
+      with_mocks([
+        {Cache, [], [
+          get: fn _key -> :error end
+        ]},
+        {TMDBClient, [], [
+          get_popular_movies: fn _page -> {:error, {:timeout, "Request timed out"}} end
+        ]}
+      ]) do
+        assert {:error, {:timeout, message}} = Media.get_popular_movies()
+        assert message == "Search request timed out. Please try again."
+      end
+    end
+  end
+
   describe "edge cases and error handling" do
     test "handles malformed search results from API" do
       malformed_response = %{
