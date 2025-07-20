@@ -15,7 +15,7 @@ defmodule Flixir.Application do
       # Start the search cache
       {Flixir.Media.Cache, Application.get_env(:flixir, :search_cache, [])},
       # Start the reviews cache
-      Flixir.Reviews.Cache,
+      {Flixir.Reviews.Cache, Application.get_env(:flixir, :reviews_cache, [])},
       # Start a worker by calling: Flixir.Worker.start_link(arg)
       # {Flixir.Worker, arg},
       # Start to serve requests, typically the last entry
