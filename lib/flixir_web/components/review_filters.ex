@@ -49,7 +49,7 @@ defmodule FlixirWeb.ReviewFilters do
           <h3 class="font-medium text-gray-900">Filter & Sort Reviews</h3>
           <%= if @has_active_filters do %>
             <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
-              <%= @active_filters_count %> active
+              {@active_filters_count} active
             </span>
           <% end %>
         </div>
@@ -67,46 +67,48 @@ defmodule FlixirWeb.ReviewFilters do
         <% end %>
       </div>
 
-      <!-- Results Summary -->
+    <!-- Results Summary -->
       <%= if @total_reviews > 0 do %>
         <div class="text-sm text-gray-600">
           <%= if @filtered_count != @total_reviews do %>
-            Showing <%= @filtered_count %> of <%= @total_reviews %> reviews
+            Showing {@filtered_count} of {@total_reviews} reviews
           <% else %>
-            Showing all <%= @total_reviews %> reviews
+            Showing all {@total_reviews} reviews
           <% end %>
         </div>
       <% end %>
 
-      <!-- Filter Controls -->
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <!-- Sort By -->
-        <.sort_control
-          current_sort={Map.get(@filters, :sort_by, :date)}
-          current_order={Map.get(@filters, :sort_order, :desc)}
-          on_change={@on_filter_change}
-        />
+    <!-- Filter Controls -->
+      <form phx-change={@on_filter_change}>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Sort By -->
+          <.sort_control
+            current_sort={Map.get(@filters, :sort_by, :date)}
+            current_order={Map.get(@filters, :sort_order, :desc)}
+            on_change={@on_filter_change}
+          />
 
-        <!-- Rating Filter -->
-        <.rating_filter
-          current_filter={Map.get(@filters, :filter_by_rating)}
-          on_change={@on_filter_change}
-        />
+    <!-- Rating Filter -->
+          <.rating_filter
+            current_filter={Map.get(@filters, :filter_by_rating)}
+            on_change={@on_filter_change}
+          />
 
-        <!-- Author Filter -->
-        <.author_filter
-          current_filter={Map.get(@filters, :author_filter)}
-          on_change={@on_filter_change}
-        />
+    <!-- Author Filter -->
+          <.author_filter
+            current_filter={Map.get(@filters, :author_filter)}
+            on_change={@on_filter_change}
+          />
 
-        <!-- Content Filter -->
-        <.content_filter
-          current_filter={Map.get(@filters, :content_filter)}
-          on_change={@on_filter_change}
-        />
-      </div>
+    <!-- Content Filter -->
+          <.content_filter
+            current_filter={Map.get(@filters, :content_filter)}
+            on_change={@on_filter_change}
+          />
+        </div>
+      </form>
 
-      <!-- Active Filters Display -->
+    <!-- Active Filters Display -->
       <%= if @has_active_filters do %>
         <.active_filters_display filters={@filters} on_remove={@on_filter_change} />
       <% end %>
@@ -144,7 +146,10 @@ defmodule FlixirWeb.ReviewFilters do
           phx-value-action="toggle_sort_order"
           class={[
             "px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium transition-colors duration-200",
-            if(@current_order == :desc, do: "bg-gray-100 text-gray-700", else: "bg-white text-gray-500 hover:bg-gray-50")
+            if(@current_order == :desc,
+              do: "bg-gray-100 text-gray-700",
+              else: "bg-white text-gray-500 hover:bg-gray-50"
+            )
           ]}
           title={if @current_order == :desc, do: "Sort descending", else: "Sort ascending"}
           data-testid="sort-order-toggle"
@@ -179,7 +184,9 @@ defmodule FlixirWeb.ReviewFilters do
       >
         <option value="" selected={is_nil(@current_filter)}>All ratings</option>
         <option value="positive" selected={@current_filter == :positive}>Positive (6+ stars)</option>
-        <option value="negative" selected={@current_filter == :negative}>Negative (&lt; 6 stars)</option>
+        <option value="negative" selected={@current_filter == :negative}>
+          Negative (&lt; 6 stars)
+        </option>
         <option value="high" selected={@current_filter == {8, 10}}>High (8-10 stars)</option>
         <option value="medium" selected={@current_filter == {5, 7}}>Medium (5-7 stars)</option>
         <option value="low" selected={@current_filter == {1, 4}}>Low (1-4 stars)</option>
@@ -279,7 +286,7 @@ defmodule FlixirWeb.ReviewFilters do
       <div class="flex flex-wrap gap-2">
         <%= for {label, action, value} <- @active_filter_tags do %>
           <span class="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full">
-            <%= label %>
+            {label}
             <button
               type="button"
               phx-click={@on_remove}
@@ -319,42 +326,49 @@ defmodule FlixirWeb.ReviewFilters do
     tags = []
 
     # Rating filter
-    tags = if rating_filter = Map.get(filters, :filter_by_rating) do
-      label = format_rating_filter_label(rating_filter)
-      [{"Rating: #{label}", "clear_rating", ""} | tags]
-    else
-      tags
-    end
+    tags =
+      if rating_filter = Map.get(filters, :filter_by_rating) do
+        label = format_rating_filter_label(rating_filter)
+        [{"Rating: #{label}", "clear_rating", ""} | tags]
+      else
+        tags
+      end
 
     # Author filter
-    tags = case Map.get(filters, :author_filter) do
-      author_filter when is_binary(author_filter) ->
-        if filter_present?(author_filter) do
-          [{"Author: #{String.slice(author_filter, 0, 20)}", "clear_author", ""} | tags]
-        else
+    tags =
+      case Map.get(filters, :author_filter) do
+        author_filter when is_binary(author_filter) ->
+          if filter_present?(author_filter) do
+            [{"Author: #{String.slice(author_filter, 0, 20)}", "clear_author", ""} | tags]
+          else
+            tags
+          end
+
+        _ ->
           tags
-        end
-      _ -> tags
-    end
+      end
 
     # Content filter
-    tags = case Map.get(filters, :content_filter) do
-      content_filter when is_binary(content_filter) ->
-        if filter_present?(content_filter) do
-          [{"Content: #{String.slice(content_filter, 0, 20)}", "clear_content", ""} | tags]
-        else
+    tags =
+      case Map.get(filters, :content_filter) do
+        content_filter when is_binary(content_filter) ->
+          if filter_present?(content_filter) do
+            [{"Content: #{String.slice(content_filter, 0, 20)}", "clear_content", ""} | tags]
+          else
+            tags
+          end
+
+        _ ->
           tags
-        end
-      _ -> tags
-    end
+      end
 
     Enum.reverse(tags)
   end
 
-  #defp format_sort_label(:date), do: "Date"
-  #defp format_sort_label(:rating), do: "Rating"
-  #defp format_sort_label(:author), do: "Author"
- # defp format_sort_label(_), do: "Unknown"
+  # defp format_sort_label(:date), do: "Date"
+  # defp format_sort_label(:rating), do: "Rating"
+  # defp format_sort_label(:author), do: "Author"
+  # defp format_sort_label(_), do: "Unknown"
 
   defp format_rating_filter_label(:positive), do: "Positive"
   defp format_rating_filter_label(:negative), do: "Negative"

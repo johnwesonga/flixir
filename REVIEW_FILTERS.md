@@ -2,7 +2,7 @@
 
 ## Overview
 
-The `FlixirWeb.ReviewFilters` component provides a comprehensive filtering and sorting interface for movie and TV show reviews. It offers real-time filtering capabilities with visual feedback and an intuitive user experience.
+The `FlixirWeb.ReviewFilters` component provides a comprehensive filtering and sorting interface for movie and TV show reviews. It offers real-time filtering capabilities with visual feedback and an intuitive user experience. The component uses proper Phoenix LiveView form handling for optimal performance and accessibility.
 
 ## Features
 
