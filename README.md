@@ -91,13 +91,29 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Handles dynamic routing for both movies and TV shows
   - Converts string media types from URL parameters to atoms for API compatibility
   - Provides comprehensive error handling and retry functionality for failed operations
+- **MovieListsLive**: Curated movie lists interface with navigation and pagination
+  - Displays popular, trending, top-rated, upcoming, and now playing movies
+  - Tab-based navigation between different list types with URL routing
+  - Infinite scroll pagination with load more functionality
+  - Real-time error handling and retry mechanisms
+  - Responsive design optimized for all screen sizes
 
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
 - **Home Route**: `/` - Landing page with HTTP GET route to SearchLive for immediate search functionality
 - **Search Route**: `/search` - Main search interface with LiveView and URL parameter support
+- **Movie Lists Routes**: 
+  - `/movies` - Popular movies (default list)
+  - `/movies/:list_type` - Specific movie lists (trending, top-rated, upcoming, now-playing)
+  - URL parameters: `?page=N` for pagination support
 - **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
+
+**Note**: Movie lists routes need to be added to the router for full functionality:
+```elixir
+live "/movies", MovieListsLive, :index
+live "/movies/:list_type", MovieListsLive, :show
+```
 
 ### Key Features Implementation
 
