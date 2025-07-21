@@ -170,6 +170,7 @@ The `ReviewFilters` component provides powerful filtering capabilities:
 - Enhanced rating breakdown display logic that ensures rating distributions are only shown when there are actual reviews with ratings available
 - Improved form structure with proper form wrapper for better event handling and accessibility
 - Optimized filter control organization for better user experience
+- Fixed duplicate event handlers in sort controls for cleaner event handling and improved performance
 
 #### Search & Discovery
 - **Real-time Search**: Debounced search with instant results
