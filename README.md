@@ -83,6 +83,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **SearchComponents**: Interactive search interface with clickable result cards
 - **ReviewComponents**: Review cards, rating displays, and interactive elements
 - **ReviewFilters**: Advanced filtering and sorting controls for reviews
+- **MovieListComponents**: Comprehensive UI components for movie list display and navigation
 
 #### LiveView Modules (`lib/flixir_web/live/`)
 - **SearchLive**: Real-time search interface with filtering and sorting
@@ -144,9 +145,10 @@ Recent improvements include enhanced rating breakdown display logic that ensures
 - **Loading States**: Skeleton cards and smooth transitions during search
 - **Empty States**: Helpful suggestions when no results are found
 
-#### Movie Lists API
-The application now includes comprehensive movie list functionality through the Media context:
+#### Movie Lists System
+The application features a comprehensive movie lists system with both backend API and frontend UI components:
 
+##### Movie Lists API
 **Available Movie Lists:**
 - **Popular Movies**: `Flixir.Media.get_popular_movies/1` - Currently popular movies
 - **Trending Movies**: `Flixir.Media.get_trending_movies/1` - Trending movies (daily or weekly)
@@ -179,6 +181,62 @@ The application now includes comprehensive movie list functionality through the 
 - Automatic transformation to `SearchResult` structs for consistency
 - Proper media type handling (all results marked as `:movie`)
 - Robust error handling for API failures and network issues
+
+##### Movie Lists UI Components
+The `MovieListComponents` module provides a complete UI system for displaying movie lists:
+
+**Core Components:**
+- **`movie_lists_container/1`**: Main container with navigation, content area, and state management
+- **`list_navigation/1`**: Tab-based navigation between different movie list types
+- **`movie_grid/1`**: Responsive grid layout for movie cards
+- **`movie_card/1`**: Individual movie cards with posters, ratings, and metadata
+
+**Visual Features:**
+- **Responsive Design**: Adaptive grid layout (1-5 columns based on screen size)
+- **Interactive Cards**: Hover effects, smooth transitions, and click navigation
+- **Rich Metadata**: Movie posters, titles, release dates, ratings, and popularity indicators
+- **Visual Indicators**: Special badges for trending and upcoming movies
+- **Loading States**: Skeleton cards and loading spinners for smooth UX
+
+**Navigation & Context:**
+- **Tab Navigation**: Clean tab interface for switching between list types
+- **Context Preservation**: Navigation parameters maintain list context when viewing movie details
+- **URL Integration**: Designed for integration with routing (`/movies/:list_type`)
+- **Back Navigation**: Preserves user's position when returning from detail pages
+
+**State Management:**
+- **Loading States**: Comprehensive loading indicators and skeleton screens
+- **Error States**: User-friendly error messages with retry functionality
+- **Empty States**: Helpful messaging when no movies are available
+- **Pagination**: Load more functionality with visual feedback
+
+**Accessibility & Performance:**
+- **Semantic HTML**: Proper ARIA labels and semantic structure
+- **Image Optimization**: Responsive images with srcset and lazy loading
+- **Performance**: Optimized rendering with efficient data structures
+- **Mobile-First**: Touch-friendly interface optimized for mobile devices
+
+**Component Usage:**
+```heex
+<!-- Main movie lists container -->
+<.movie_lists_container
+  current_list={:popular}
+  movies={@movies}
+  loading={@loading}
+  error={@error}
+  has_more={@has_more}
+  page={@page}
+/>
+
+<!-- Individual movie card -->
+<.movie_card 
+  movie={movie} 
+  current_list={:trending} 
+/>
+
+<!-- Navigation tabs -->
+<.list_navigation current_list={:top_rated} />
+```
 
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:

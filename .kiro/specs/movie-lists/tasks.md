@@ -13,7 +13,7 @@
   - Support pagination and return format options consistent with search functionality
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.1, 4.1, 5.1, 8.1, 8.2, 8.3_
 
-- [ ] 3. Create movie list UI components
+- [x] 3. Create movie list UI components
   - Create `lib/flixir_web/components/movie_list_components.ex` with reusable components
   - Implement `movie_lists_container/1`, `list_navigation/1`, `movie_grid/1`, and `movie_card/1` components
   - Design responsive movie card layout with poster, title, rating, and release date
