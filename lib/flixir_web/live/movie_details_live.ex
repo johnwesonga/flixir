@@ -57,52 +57,45 @@ defmodule FlixirWeb.MovieDetailsLive do
   def handle_event("update_filters", params, socket) do
     action = Map.get(params, "action")
 
-    socket = case action do
-      "sort" ->
-        sort_by = String.to_atom(Map.get(params, "sort_by", "date"))
-        update_filter(socket, :sort_by, sort_by)
+    socket =
+      case action do
+        # Handle button-based actions (clear buttons, toggle sort order)
+        "toggle_sort_order" ->
+          current_order = Map.get(socket.assigns.review_filters, :sort_order, :desc)
+          new_order = if current_order == :desc, do: :asc, else: :desc
+          update_filter(socket, :sort_order, new_order)
 
-      "toggle_sort_order" ->
-        current_order = Map.get(socket.assigns.review_filters, :sort_order, :desc)
-        new_order = if current_order == :desc, do: :asc, else: :desc
-        update_filter(socket, :sort_order, new_order)
+        "clear_all" ->
+          socket
+          |> assign(:review_filters, default_filters())
+          |> apply_filters()
 
-      "filter_rating" ->
-        rating_filter = parse_rating_filter(Map.get(params, "filter_by_rating"))
-        update_filter(socket, :filter_by_rating, rating_filter)
+        "clear_sort" ->
+          socket
+          |> update_filter(:sort_by, :date)
+          |> update_filter(:sort_order, :desc)
 
-      "filter_author" ->
-        author_filter = Map.get(params, "author_filter")
-        author_filter = if author_filter && String.trim(author_filter) == "", do: nil, else: author_filter
-        update_filter(socket, :author_filter, author_filter)
+        "clear_rating" ->
+          update_filter(socket, :filter_by_rating, nil)
 
-      "filter_content" ->
-        content_filter = Map.get(params, "content_filter")
-        content_filter = if content_filter && String.trim(content_filter) == "", do: nil, else: content_filter
-        update_filter(socket, :content_filter, content_filter)
+        "clear_author" ->
+          update_filter(socket, :author_filter, nil)
 
-      "clear_all" ->
-        socket
-        |> assign(:review_filters, default_filters())
-        |> apply_filters()
+        "clear_content" ->
+          update_filter(socket, :content_filter, nil)
 
-      "clear_sort" ->
-        socket
-        |> update_filter(:sort_by, :date)
-        |> update_filter(:sort_order, :desc)
+        # Handle form-based changes (when action is nil, it's a form change event)
+        _ ->
+          # Process all form fields at once
+          socket =
+            socket
+            |> maybe_update_sort_by(Map.get(params, "sort_by"))
+            |> maybe_update_rating_filter(Map.get(params, "filter_by_rating"))
+            |> maybe_update_author_filter(Map.get(params, "author_filter"))
+            |> maybe_update_content_filter(Map.get(params, "content_filter"))
 
-      "clear_rating" ->
-        update_filter(socket, :filter_by_rating, nil)
-
-      "clear_author" ->
-        update_filter(socket, :author_filter, nil)
-
-      "clear_content" ->
-        update_filter(socket, :content_filter, nil)
-
-      _ ->
-        socket
-    end
+          apply_filters(socket)
+      end
 
     {:noreply, socket}
   end
@@ -149,6 +142,7 @@ defmodule FlixirWeb.MovieDetailsLive do
       socket
       |> assign(:rating_stats_state, :loading)
       |> load_rating_stats()
+
     {:noreply, socket}
   end
 
@@ -158,6 +152,7 @@ defmodule FlixirWeb.MovieDetailsLive do
       socket
       |> assign(:review_filters, default_filters())
       |> apply_filters()
+
     {:noreply, socket}
   end
 
@@ -175,6 +170,7 @@ defmodule FlixirWeb.MovieDetailsLive do
 
   defp update_filter(socket, key, value) do
     filters = Map.put(socket.assigns.review_filters, key, value)
+
     socket
     |> assign(:review_filters, filters)
     |> apply_filters()
@@ -206,26 +202,70 @@ defmodule FlixirWeb.MovieDetailsLive do
   defp parse_rating_filter("low"), do: {1, 4}
   defp parse_rating_filter(_), do: nil
 
+  # Helper functions for updating individual filter fields
+  defp maybe_update_sort_by(socket, nil), do: socket
+  defp maybe_update_sort_by(socket, ""), do: socket
+
+  defp maybe_update_sort_by(socket, sort_by) when is_binary(sort_by) do
+    sort_by_atom = String.to_atom(sort_by)
+
+    if sort_by_atom in [:date, :rating, :author] do
+      update_filter(socket, :sort_by, sort_by_atom)
+    else
+      socket
+    end
+  end
+
+  defp maybe_update_rating_filter(socket, nil), do: socket
+  defp maybe_update_rating_filter(socket, ""), do: update_filter(socket, :filter_by_rating, nil)
+
+  defp maybe_update_rating_filter(socket, rating_filter) when is_binary(rating_filter) do
+    parsed_filter = parse_rating_filter(rating_filter)
+    update_filter(socket, :filter_by_rating, parsed_filter)
+  end
+
+  defp maybe_update_author_filter(socket, nil), do: socket
+  defp maybe_update_author_filter(socket, ""), do: update_filter(socket, :author_filter, nil)
+
+  defp maybe_update_author_filter(socket, author_filter) when is_binary(author_filter) do
+    trimmed_filter = String.trim(author_filter)
+    filter_value = if trimmed_filter == "", do: nil, else: trimmed_filter
+    update_filter(socket, :author_filter, filter_value)
+  end
+
+  defp maybe_update_content_filter(socket, nil), do: socket
+  defp maybe_update_content_filter(socket, ""), do: update_filter(socket, :content_filter, nil)
+
+  defp maybe_update_content_filter(socket, content_filter) when is_binary(content_filter) do
+    trimmed_filter = String.trim(content_filter)
+    filter_value = if trimmed_filter == "", do: nil, else: trimmed_filter
+    update_filter(socket, :content_filter, filter_value)
+  end
+
   defp load_media_details(socket) do
     media_type = socket.assigns.media_type
     media_id = socket.assigns.media_id
 
     # Convert string media_type to atom and fix parameter order
-    media_type_atom = case media_type do
-      "movie" -> :movie
-      "tv" -> :tv
-      _ -> :movie  # fallback
-    end
+    media_type_atom =
+      case media_type do
+        "movie" -> :movie
+        "tv" -> :tv
+        # fallback
+        _ -> :movie
+      end
 
     case Media.get_content_details(media_id, media_type_atom) do
       {:ok, details} ->
         title = get_media_title(details, media_type)
+
         socket
         |> assign(:media_details, details)
         |> assign(:page_title, title)
 
       {:error, reason} ->
         Logger.error("Failed to load media details: #{inspect(reason)}")
+
         socket
         |> assign(:media_details, nil)
         |> assign(:page_title, "Media Not Found")
@@ -256,6 +296,7 @@ defmodule FlixirWeb.MovieDetailsLive do
 
       {:error, error_type} ->
         Logger.error("Failed to load reviews: #{inspect(error_type)}")
+
         error_info = %{
           error_type: error_type,
           retry_event: "retry_reviews"
@@ -281,6 +322,7 @@ defmodule FlixirWeb.MovieDetailsLive do
 
       {:error, error_type} ->
         Logger.warning("Failed to load rating stats: #{inspect(error_type)}")
+
         error_info = %{
           error_type: error_type,
           retry_event: "retry_rating_stats"
@@ -302,11 +344,21 @@ defmodule FlixirWeb.MovieDetailsLive do
   defp format_error_message(:rate_limited), do: "Too many requests. Please wait a moment."
   defp format_error_message(:unauthorized), do: "Unable to access reviews at this time."
   defp format_error_message(:not_found), do: "No reviews found for this content."
-  defp format_error_message({:transport_error, _}), do: "Network error. Please check your connection."
-  defp format_error_message({:unexpected_status, status}), do: "Service error (#{status}). Please try again later."
-  defp format_error_message(%{__exception__: true}), do: "An unexpected error occurred. Please try again."
+
+  defp format_error_message({:transport_error, _}),
+    do: "Network error. Please check your connection."
+
+  defp format_error_message({:unexpected_status, status}),
+    do: "Service error (#{status}). Please try again later."
+
+  defp format_error_message(%{__exception__: true}),
+    do: "An unexpected error occurred. Please try again."
+
   defp format_error_message(%{error_type: error_type}), do: format_error_message(error_type)
-  defp format_error_message(:network_error), do: "Network error occurred. Please check your connection and try again."
+
+  defp format_error_message(:network_error),
+    do: "Network error occurred. Please check your connection and try again."
+
   defp format_error_message(_), do: "An error occurred while loading reviews."
 
   # Template helper functions
@@ -316,12 +368,14 @@ defmodule FlixirWeb.MovieDetailsLive do
   defp get_release_date(_, _), do: nil
 
   defp format_release_date(nil), do: ""
+
   defp format_release_date(date_string) when is_binary(date_string) do
     case Date.from_iso8601(date_string) do
       {:ok, date} -> Calendar.strftime(date, "%B %d, %Y")
       {:error, _} -> date_string
     end
   end
+
   defp format_release_date(_), do: ""
 
   defp extract_search_context(params) do
@@ -338,32 +392,36 @@ defmodule FlixirWeb.MovieDetailsLive do
     base_params = []
 
     # Add query parameter if present
-    params = if search_context.query != "" do
-      [{"q", search_context.query} | base_params]
-    else
-      base_params
-    end
+    params =
+      if search_context.query != "" do
+        [{"q", search_context.query} | base_params]
+      else
+        base_params
+      end
 
     # Add media type if not "all"
-    params = if search_context.media_type != "all" do
-      [{"type", search_context.media_type} | params]
-    else
-      params
-    end
+    params =
+      if search_context.media_type != "all" do
+        [{"type", search_context.media_type} | params]
+      else
+        params
+      end
 
     # Add sort if not "relevance"
-    params = if search_context.sort_by != "relevance" do
-      [{"sort", search_context.sort_by} | params]
-    else
-      params
-    end
+    params =
+      if search_context.sort_by != "relevance" do
+        [{"sort", search_context.sort_by} | params]
+      else
+        params
+      end
 
     # Add page if not "1"
-    params = if search_context.page != "1" do
-      [{"page", search_context.page} | params]
-    else
-      params
-    end
+    params =
+      if search_context.page != "1" do
+        [{"page", search_context.page} | params]
+      else
+        params
+      end
 
     # Build the final URL
     if params == [] do

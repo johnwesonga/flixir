@@ -130,8 +130,6 @@ defmodule FlixirWeb.ReviewFilters do
       <div class="flex gap-2">
         <select
           name="sort_by"
-          phx-change={@on_change}
-          phx-value-action="sort"
           class="flex-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
           data-testid="sort-by-select"
         >
@@ -177,8 +175,6 @@ defmodule FlixirWeb.ReviewFilters do
       <label class="block text-sm font-medium text-gray-700">Rating</label>
       <select
         name="filter_by_rating"
-        phx-change={@on_change}
-        phx-value-action="filter_rating"
         class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
         data-testid="rating-filter-select"
       >
@@ -211,8 +207,6 @@ defmodule FlixirWeb.ReviewFilters do
           name="author_filter"
           value={@current_filter || ""}
           placeholder="Filter by author name..."
-          phx-change={@on_change}
-          phx-value-action="filter_author"
           phx-debounce="300"
           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm pr-8"
           data-testid="author-filter-input"
@@ -249,8 +243,6 @@ defmodule FlixirWeb.ReviewFilters do
           name="content_filter"
           value={@current_filter || ""}
           placeholder="Search review content..."
-          phx-change={@on_change}
-          phx-value-action="filter_content"
           phx-debounce="300"
           class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm pr-8"
           data-testid="content-filter-input"
@@ -309,7 +301,11 @@ defmodule FlixirWeb.ReviewFilters do
   def count_active_filters(filters) do
     count = 0
 
-    # Only count actual filters, not sort changes (sort is not considered a "filter")
+    # Count sort changes as active filters
+    count = if Map.get(filters, :sort_by) != :date, do: count + 1, else: count
+    count = if Map.get(filters, :sort_order) != :desc, do: count + 1, else: count
+
+    # Count actual filters
     count = if Map.get(filters, :filter_by_rating), do: count + 1, else: count
     count = if filter_present?(Map.get(filters, :author_filter)), do: count + 1, else: count
     count = if filter_present?(Map.get(filters, :content_filter)), do: count + 1, else: count
@@ -324,6 +320,18 @@ defmodule FlixirWeb.ReviewFilters do
 
   defp build_active_filter_tags(filters) do
     tags = []
+
+    # Sort filter (if not default)
+    tags =
+      if Map.get(filters, :sort_by) != :date or Map.get(filters, :sort_order) != :desc do
+        sort_by = Map.get(filters, :sort_by, :date)
+        sort_order = Map.get(filters, :sort_order, :desc)
+        sort_label = format_sort_label(sort_by)
+        order_symbol = if sort_order == :desc, do: "↓", else: "↑"
+        [{"Sort: #{sort_label} #{order_symbol}", "clear_sort", ""} | tags]
+      else
+        tags
+      end
 
     # Rating filter
     tags =
@@ -365,10 +373,10 @@ defmodule FlixirWeb.ReviewFilters do
     Enum.reverse(tags)
   end
 
-  # defp format_sort_label(:date), do: "Date"
-  # defp format_sort_label(:rating), do: "Rating"
-  # defp format_sort_label(:author), do: "Author"
-  # defp format_sort_label(_), do: "Unknown"
+  defp format_sort_label(:date), do: "Date"
+  defp format_sort_label(:rating), do: "Rating"
+  defp format_sort_label(:author), do: "Author"
+  defp format_sort_label(_), do: "Unknown"
 
   defp format_rating_filter_label(:positive), do: "Positive"
   defp format_rating_filter_label(:negative), do: "Negative"
