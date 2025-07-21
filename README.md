@@ -109,11 +109,27 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
 
-**Note**: Movie lists routes need to be added to the router for full functionality:
+**Movie Lists Routing:**
+The router now includes dedicated routes for the movie lists functionality:
 ```elixir
 live "/movies", MovieListsLive, :index
 live "/movies/:list_type", MovieListsLive, :show
 ```
+
+**Supported List Types:**
+- `popular` - Most popular movies (default when accessing `/movies`)
+- `trending` - Movies trending this week
+- `top-rated` - Highest rated movies of all time
+- `upcoming` - Movies coming soon to theaters
+- `now-playing` - Movies currently playing in theaters
+
+**Template Helper Functions:**
+The MovieListsLive module includes comprehensive template helper functions for:
+- **Navigation**: Dynamic URL building and list type parameter conversion
+- **Display**: Movie poster URLs with multiple sizes and responsive srcsets
+- **Formatting**: Release date formatting and text truncation utilities
+- **Error Handling**: User-friendly error message formatting for different error types
+- **Internationalization**: Consistent labeling and descriptions for all movie list types
 
 ### Key Features Implementation
 

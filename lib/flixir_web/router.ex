@@ -20,6 +20,8 @@ defmodule FlixirWeb.Router do
     # get "/", PageController, :home
     live "/", SearchLive, :home
     live "/search", SearchLive, :index
+    live "/movies", MovieListsLive, :index
+    live "/movies/:list_type", MovieListsLive, :show
     live "/:type/:id", MovieDetailsLive, :show
   end
 

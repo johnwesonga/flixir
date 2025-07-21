@@ -34,7 +34,7 @@
   - Add navigation tabs and load more functionality
   - _Requirements: 6.1, 6.5, 7.1, 7.2_
 
-- [ ] 6. Add routing for movie lists
+- [x] 6. Add routing for movie lists
   - Update `lib/flixir_web/router.ex` to include movie lists routes
   - Add routes for `/movies` and `/movies/:list_type` with proper parameter handling
   - Ensure URL parameters are properly parsed and validated
