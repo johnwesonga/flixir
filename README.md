@@ -336,10 +336,17 @@ The application includes comprehensive test coverage for:
 - Performance benchmarks and load testing
 - Error handling and edge cases
 - Mock testing for external API dependencies and context functions
+- Continuous test maintenance with occasional adjustments for improved reliability
 
 ### Test Architecture
 
 The test suite uses comprehensive mocking strategies to ensure reliable and fast tests:
+
+**Media Context Testing:**
+- TMDB Client tests include comprehensive mocking of API responses for all endpoints
+- Movie list functions (`get_popular_movies`, `get_trending_movies`, `get_top_rated_movies`, `get_upcoming_movies`, `get_now_playing_movies`) are fully tested
+- Search functionality tests cover pagination, filtering, and error scenarios
+- Cache integration tests verify hit/miss scenarios and TTL behavior
 
 **Reviews Context Testing:**
 - All Reviews context functions are properly mocked in LiveView tests
@@ -347,10 +354,23 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
 - `get_reviews/3`, `get_rating_stats/2`, and other context functions have dedicated mocks
 - Test mocks simulate real filtering, sorting, and pagination logic for accurate behavior testing
 
+**Component Testing:**
+- Movie list components are tested with various data states and user interactions
+- Review components include tests for expandable content, spoiler warnings, and filtering
+- Search components verify real-time search behavior and result display
+
 **LiveView Integration Tests:**
 - MovieDetailsLive tests include complete mocking of the Reviews context
+- MovieListsLive tests verify list navigation, pagination, and error handling
+- SearchLive tests cover comprehensive search workflows with filtering and sorting
 - Tests verify proper integration between LiveView and context layers
 - Mock functions return realistic data structures matching production behavior
+
+**API Client Testing:**
+- TMDB Client tests use structured mock responses for consistent testing
+- Error handling tests cover timeout, rate limiting, authentication, and network failures
+- Movie list endpoint tests verify correct URL construction and parameter handling
+- Integration tests can be run with real API keys when available (tagged with `:integration`)
 
 ## Development
 

@@ -40,7 +40,7 @@
   - Ensure URL parameters are properly parsed and validated
   - _Requirements: 6.1, 6.2_
 
-- [ ] 7. Write unit tests for TMDB client extensions
+- [x] 7. Write unit tests for TMDB client extensions
   - Create tests in `test/flixir/media/tmdb_client_test.exs` for new movie list functions
   - Mock API responses and test error scenarios
   - Test parameter validation and HTTP request formatting

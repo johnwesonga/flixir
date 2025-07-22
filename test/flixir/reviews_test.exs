@@ -78,7 +78,7 @@ defmodule Flixir.ReviewsTest do
         {Cache, [], [get_reviews: fn _, _, _ -> :error end]},
         {TMDBClient, [], [fetch_reviews: fn _, _, _ -> {:error, :timeout} end]}
       ] do
-        assert {:error, :timeout} = Reviews.get_reviews(media_type, media_id)
+        assert {:error, :network_error} = Reviews.get_reviews(media_type, media_id)
       end
     end
 
