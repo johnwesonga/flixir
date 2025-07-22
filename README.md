@@ -199,6 +199,7 @@ The application features a comprehensive movie lists system with both backend AP
 - **Intelligent Caching**: 15-minute TTL for movie lists (longer than search results)
 - **Error Handling**: Comprehensive error handling with user-friendly messages
 - **Pagination Support**: Built-in pagination with `has_more` indicators
+- **Cache Format Compatibility**: Handles both legacy list format and new map format cached results
 
 **Usage Examples:**
 ```elixir
@@ -211,6 +212,10 @@ The application features a comprehensive movie lists system with both backend AP
 
 # Get top rated movies for page 2
 {:ok, movies} = Flixir.Media.get_top_rated_movies(page: 2)
+
+# Get upcoming movies with map format
+{:ok, %{results: movies, has_more: false}} = 
+  Flixir.Media.get_upcoming_movies(return_format: :map, page: 3)
 ```
 
 **TMDB Integration:**
@@ -218,6 +223,7 @@ The application features a comprehensive movie lists system with both backend AP
 - Automatic transformation to `SearchResult` structs for consistency
 - Proper media type handling (all results marked as `:movie`)
 - Robust error handling for API failures and network issues
+- Smart pagination detection with fallback logic for responses without pagination info
 
 ##### Movie Lists UI Components
 The `MovieListComponents` module provides a complete UI system for displaying movie lists:
@@ -344,7 +350,14 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
 
 **Media Context Testing:**
 - TMDB Client tests include comprehensive mocking of API responses for all endpoints
-- Movie list functions (`get_popular_movies`, `get_trending_movies`, `get_top_rated_movies`, `get_upcoming_movies`, `get_now_playing_movies`) are fully tested
+- Movie list functions (`get_popular_movies`, `get_trending_movies`, `get_top_rated_movies`, `get_upcoming_movies`, `get_now_playing_movies`) are fully tested with extensive scenarios:
+  - API response handling and data transformation
+  - Caching behavior with 15-minute TTL verification
+  - Pagination support and `has_more` logic
+  - Return format compatibility (list vs map formats)
+  - Error handling for timeouts, rate limiting, authentication, and network failures
+  - Edge cases like empty results, malformed data, and missing pagination info
+  - Cache format conversion between legacy list format and new map format
 - Search functionality tests cover pagination, filtering, and error scenarios
 - Cache integration tests verify hit/miss scenarios and TTL behavior
 

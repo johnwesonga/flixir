@@ -46,7 +46,7 @@
   - Test parameter validation and HTTP request formatting
   - _Requirements: 1.4, 1.5, 2.4, 3.4, 4.4, 5.4_
 
-- [ ] 8. Write unit tests for Media context extensions
+- [x] 8. Write unit tests for Media context extensions
   - Add tests in `test/flixir/media_test.exs` for new movie list functions
   - Test caching behavior, error handling, and result transformation
   - Test pagination logic and return format options
