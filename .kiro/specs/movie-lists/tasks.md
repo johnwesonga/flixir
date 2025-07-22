@@ -73,8 +73,9 @@
   - Test error scenarios and recovery mechanisms
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
 
-- [ ] 12. Update navigation and add movie lists to main menu
-  - Update main navigation in `lib/flixir_web/components/core_components.ex` or layout files
-  - Add "Movies" link to primary navigation menu
-  - Ensure proper active state highlighting for movie lists section
+- [x] 12. Update navigation and add movie lists to main menu
+  - Create `lib/flixir_web/components/main_navigation.ex` with unified navigation system
+  - Add "Movies" link to primary navigation menu with proper routing
+  - Implement proper active state highlighting for movie lists section
+  - Include secondary navigation support for subsections
   - _Requirements: 6.1_

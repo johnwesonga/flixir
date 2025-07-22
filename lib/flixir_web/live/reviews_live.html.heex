@@ -1,0 +1,58 @@
+<.app_layout 
+  current_section={:reviews} 
+  current_subsection={@current_filter}
+  show_sub_nav={true}
+  sub_nav_items={review_nav_items()}
+  page_title={@page_title}
+>
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Breadcrumb Navigation -->
+    <nav class="mb-6" aria-label="Breadcrumb">
+      <ol class="flex items-center space-x-2 text-sm text-gray-500">
+        <li>
+          <.link navigate={~p"/"} class="hover:text-gray-700 transition-colors">
+            <.icon name="hero-home" class="h-4 w-4" />
+            <span class="sr-only">Home</span>
+          </.link>
+        </li>
+        <li class="flex items-center">
+          <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+          <span class="text-gray-900 font-medium">Reviews</span>
+        </li>
+        <%= if @current_filter != :recent do %>
+          <li class="flex items-center">
+            <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+            <span class="text-gray-900 font-medium">{filter_type_label(@current_filter)}</span>
+          </li>
+        <% end %>
+      </ol>
+    </nav>
+    
+    <!-- Page Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">{@page_title}</h1>
+      <p class="text-gray-600">{filter_description(@current_filter)}</p>
+    </div>
+    
+    <!-- Content Area -->
+    <div class="min-h-[400px]">
+      <!-- Future implementation: Reviews grid/list -->
+      <div class="text-center py-16">
+        <div class="mx-auto w-24 h-24 bg-blue-100 rounded-full flex items-center justify-center mb-6">
+          <.icon name="hero-star" class="w-12 h-12 text-blue-500" />
+        </div>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Reviews Coming Soon</h3>
+        <p class="text-gray-600 mb-6 max-w-md mx-auto">
+          The reviews section is under development. Check back soon for the latest movie and TV show reviews.
+        </p>
+        <.link 
+          navigate={~p"/movies"} 
+          class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-sm hover:shadow-md"
+        >
+          Browse Movies
+        </.link>
+      </div>
+    </div>
+  </div>
+</.app_layout>

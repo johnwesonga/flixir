@@ -8,6 +8,7 @@ defmodule FlixirWeb.MovieListsLive do
   """
 
   use FlixirWeb, :live_view
+  import FlixirWeb.AppLayout
   alias Flixir.Media
   require Logger
 
@@ -277,18 +278,7 @@ defmodule FlixirWeb.MovieListsLive do
   defp page_description(:upcoming), do: "Get ready for upcoming movie releases"
   defp page_description(:now_playing), do: "Find movies currently playing in theaters"
 
-  defp nav_items do
-    [
-      {:popular, "Popular", "Most popular movies"},
-      {:trending, "Trending", "Trending this week"},
-      {:top_rated, "Top Rated", "Highest rated movies"},
-      {:upcoming, "Upcoming", "Coming soon"},
-      {:now_playing, "Now Playing", "In theaters now"}
-    ]
-  end
 
-  defp build_nav_url(:popular), do: ~p"/movies"
-  defp build_nav_url(list_type), do: ~p"/movies/#{list_type_to_param(list_type)}"
 
   defp error_message(:timeout),
     do: "The request timed out. Please check your connection and try again."
@@ -340,4 +330,7 @@ defmodule FlixirWeb.MovieListsLive do
   end
 
   defp truncate_text(_, _), do: ""
+
+  # Navigation helper function for the app layout
+
 end

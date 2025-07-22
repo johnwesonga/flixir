@@ -17,11 +17,19 @@ defmodule FlixirWeb.Router do
   scope "/", FlixirWeb do
     pipe_through :browser
 
-    # get "/", PageController, :home
+    # Home/Search
     live "/", SearchLive, :home
     live "/search", SearchLive, :index
+
+    # Movies section
     live "/movies", MovieListsLive, :index
     live "/movies/:list_type", MovieListsLive, :show
+
+    # Reviews section
+    live "/reviews", ReviewsLive, :index
+    live "/reviews/:filter", ReviewsLive, :show
+
+    # Media details (movies/TV shows with reviews)
     live "/:type/:id", MovieDetailsLive, :show
   end
 

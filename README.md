@@ -84,6 +84,11 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **ReviewComponents**: Review cards, rating displays, and interactive elements
 - **ReviewFilters**: Advanced filtering and sorting controls for reviews
 - **MovieListComponents**: Comprehensive UI components for movie list display and navigation
+- **MainNavigation**: Primary navigation component with unified navigation across search, movies, and reviews sections
+  - Provides consistent navigation experience across all sections
+  - Supports both main navigation and secondary sub-navigation
+  - Includes active state highlighting and responsive design
+  - Features brand logo with navigation to home page
 
 #### LiveView Modules (`lib/flixir_web/live/`)
 - **SearchLive**: Real-time search interface with filtering and sorting
@@ -130,6 +135,44 @@ The MovieListsLive module includes comprehensive template helper functions for:
 - **Formatting**: Release date formatting and text truncation utilities
 - **Error Handling**: User-friendly error message formatting for different error types
 - **Internationalization**: Consistent labeling and descriptions for all movie list types
+
+#### Navigation System (`lib/flixir_web/components/main_navigation.ex`)
+The application features a comprehensive navigation system built around the `MainNavigation` component:
+
+**Main Navigation Features:**
+- **Unified Navigation**: Consistent navigation experience across search, movies, and reviews sections
+- **Active State Management**: Visual indicators for current section and subsection
+- **Responsive Design**: Mobile-friendly navigation with proper touch targets and overflow handling
+- **Brand Integration**: Prominent Flixir logo with home page navigation
+- **Accessibility**: Proper ARIA labels, semantic HTML, keyboard navigation, and test IDs
+
+**Navigation Components:**
+- **`main_nav/1`**: Primary navigation bar with search, movies, and reviews sections
+- **`sub_nav/1`**: Secondary navigation for subsections within each main section
+- **`nav_item/1`**: Private component for individual navigation items with icons, labels, and descriptions
+
+**Component Usage:**
+```heex
+<!-- Main navigation with current section -->
+<.main_nav current_section={:movies} />
+
+<!-- Sub-navigation for movie lists -->
+<.sub_nav 
+  items={[
+    {:popular, "Popular", "/movies", "Most popular movies"},
+    {:trending, "Trending", "/movies/trending", "Trending this week"},
+    {:top_rated, "Top Rated", "/movies/top-rated", "Highest rated movies"}
+  ]}
+  current={:popular}
+/>
+```
+
+**Visual Design:**
+- Clean, modern interface with subtle shadows and borders
+- Blue accent color for active states and brand elements
+- Smooth transitions and hover effects
+- Responsive grid layout that adapts to different screen sizes
+- Consistent spacing and typography throughout
 
 ### Key Features Implementation
 

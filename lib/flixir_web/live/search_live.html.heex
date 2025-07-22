@@ -1,33 +1,37 @@
-<div class="container mx-auto px-4 py-8">
-  <!-- Breadcrumb Navigation -->
-  <nav class="mb-6" aria-label="Breadcrumb">
-    <ol class="flex items-center space-x-2 text-sm text-gray-500">
-      <li>
-        <.link navigate={~p"/"} class="hover:text-gray-700 transition-colors">
-          <.icon name="hero-home" class="h-4 w-4" />
-          <span class="sr-only">Home</span>
-        </.link>
-      </li>
-      <li class="flex items-center">
-        <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
-        <%= if @query != "" do %>
-          <.link navigate={~p"/search"} class="hover:text-gray-700 transition-colors">
-            Search
+<.app_layout 
+  current_section={:search} 
+  page_title={if @query != "", do: "Search: #{@query}", else: "Search Movies & TV Shows"}
+>
+  <div class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb Navigation -->
+    <nav class="mb-6" aria-label="Breadcrumb">
+      <ol class="flex items-center space-x-2 text-sm text-gray-500">
+        <li>
+          <.link navigate={~p"/"} class="hover:text-gray-700 transition-colors">
+            <.icon name="hero-home" class="h-4 w-4" />
+            <span class="sr-only">Home</span>
           </.link>
-        <% else %>
-          <span class="text-gray-900 font-medium">Search</span>
-        <% end %>
-      </li>
-      <%= if @query != "" do %>
+        </li>
         <li class="flex items-center">
           <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
-          <span class="text-gray-900 font-medium truncate max-w-xs" title={@query}>
-            {@query}
-          </span>
+          <%= if @query != "" do %>
+            <.link navigate={~p"/search"} class="hover:text-gray-700 transition-colors">
+              Search
+            </.link>
+          <% else %>
+            <span class="text-gray-900 font-medium">Search</span>
+          <% end %>
         </li>
-      <% end %>
-    </ol>
-  </nav>
+        <%= if @query != "" do %>
+          <li class="flex items-center">
+            <.icon name="hero-chevron-right" class="h-4 w-4 mx-2" />
+            <span class="text-gray-900 font-medium truncate max-w-xs" title={@query}>
+              {@query}
+            </span>
+          </li>
+        <% end %>
+      </ol>
+    </nav>
 
   <!-- Page Header -->
   <div class="mb-8">
@@ -386,4 +390,5 @@
       <!-- Fallback -->
       <div></div>
   <% end %>
-</div>
+  </div>
+</.app_layout>

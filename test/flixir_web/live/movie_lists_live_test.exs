@@ -163,9 +163,9 @@ defmodule FlixirWeb.MovieListsLiveTest do
         get_trending_movies: fn _opts -> {:ok, @sample_movies_with_pagination} end do
         {:ok, _view, html} = live(conn, ~p"/movies/trending")
 
-        # Trending tab should be active
+        # Trending tab should be active in sub-navigation
         assert html =~ "border-blue-500 text-blue-600"
-        assert html =~ "data-testid=\"nav-tab-trending\""
+        assert html =~ "data-testid=\"sub-nav-trending\""
       end
     end
 
@@ -174,12 +174,12 @@ defmodule FlixirWeb.MovieListsLiveTest do
         get_popular_movies: fn _opts -> {:ok, @sample_movies_with_pagination} end do
         {:ok, view, _html} = live(conn, ~p"/movies")
 
-        # All navigation tabs should be present
-        assert has_element?(view, "a[data-testid='nav-tab-popular']")
-        assert has_element?(view, "a[data-testid='nav-tab-trending']")
-        assert has_element?(view, "a[data-testid='nav-tab-top_rated']")
-        assert has_element?(view, "a[data-testid='nav-tab-upcoming']")
-        assert has_element?(view, "a[data-testid='nav-tab-now_playing']")
+        # All sub-navigation tabs should be present
+        assert has_element?(view, "a[data-testid='sub-nav-popular']")
+        assert has_element?(view, "a[data-testid='sub-nav-trending']")
+        assert has_element?(view, "a[data-testid='sub-nav-top_rated']")
+        assert has_element?(view, "a[data-testid='sub-nav-upcoming']")
+        assert has_element?(view, "a[data-testid='sub-nav-now_playing']")
       end
     end
 
@@ -188,15 +188,15 @@ defmodule FlixirWeb.MovieListsLiveTest do
         get_popular_movies: fn _opts -> {:ok, @sample_movies_with_pagination} end do
         {:ok, view, _html} = live(conn, ~p"/movies")
 
-        # Check navigation URLs
-        assert has_element?(view, "a[href='/movies'][data-testid='nav-tab-popular']")
-        assert has_element?(view, "a[href='/movies/trending'][data-testid='nav-tab-trending']")
-        assert has_element?(view, "a[href='/movies/top-rated'][data-testid='nav-tab-top_rated']")
-        assert has_element?(view, "a[href='/movies/upcoming'][data-testid='nav-tab-upcoming']")
+        # Check sub-navigation URLs
+        assert has_element?(view, "a[href='/movies'][data-testid='sub-nav-popular']")
+        assert has_element?(view, "a[href='/movies/trending'][data-testid='sub-nav-trending']")
+        assert has_element?(view, "a[href='/movies/top-rated'][data-testid='sub-nav-top_rated']")
+        assert has_element?(view, "a[href='/movies/upcoming'][data-testid='sub-nav-upcoming']")
 
         assert has_element?(
                  view,
-                 "a[href='/movies/now-playing'][data-testid='nav-tab-now_playing']"
+                 "a[href='/movies/now-playing'][data-testid='sub-nav-now_playing']"
                )
       end
     end

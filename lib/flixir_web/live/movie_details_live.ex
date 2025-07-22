@@ -10,7 +10,10 @@ defmodule FlixirWeb.MovieDetailsLive do
   import FlixirWeb.ReviewComponents
   import FlixirWeb.ReviewFilters
   alias Flixir.{Media, Reviews}
+  import FlixirWeb.AppLayout
   require Logger
+
+  @default_list_type :popular
 
   @impl true
   def mount(%{"type" => media_type, "id" => media_id} = params, _session, socket) do
@@ -38,6 +41,7 @@ defmodule FlixirWeb.MovieDetailsLive do
       |> assign(:filtered_reviews, [])
       |> assign(:pagination, nil)
       |> assign(:page_title, "Loading...")
+      |> assign(:current_list, @default_list_type)
 
     # Load media details and reviews
     socket =

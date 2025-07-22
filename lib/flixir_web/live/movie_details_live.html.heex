@@ -1,4 +1,12 @@
+<.app_layout
+  current_section={:movies}
+  current_subsection={@current_list}
+  show_sub_nav={false}
+  sub_nav_items={movie_nav_items()}
+  page_title={@page_title}
+>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  
   <!-- Breadcrumb Navigation -->
   <nav class="mb-6" aria-label="Breadcrumb">
     <ol class="flex items-center space-x-2 text-sm text-gray-500">
@@ -197,3 +205,4 @@
     </div>
   <% end %>
 </div>
+</.app_layout>

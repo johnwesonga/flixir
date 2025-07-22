@@ -7,7 +7,7 @@ defmodule FlixirWeb.SearchLive do
   """
 
   use FlixirWeb, :live_view
-  import FlixirWeb.SearchComponents
+  import FlixirWeb.{AppLayout, SearchComponents}
   alias Flixir.Media
   require Logger
 

@@ -1,4 +1,10 @@
-<div class="min-h-screen bg-gray-50">
+<.app_layout
+  current_section={:movies}
+  current_subsection={@current_list}
+  show_sub_nav={true}
+  sub_nav_items={movie_nav_items()}
+  page_title={@page_title}
+>
   <!-- Main Container -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Breadcrumb Navigation -->
@@ -28,30 +34,6 @@
       <h1 class="text-3xl font-bold text-gray-900 mb-2">{@page_title}</h1>
       <p class="text-gray-600">{page_description(@current_list)}</p>
     </div>
-    
-<!-- List Navigation Tabs -->
-    <nav class="border-b border-gray-200 mb-8" data-testid="list-navigation">
-      <div class="flex space-x-8 overflow-x-auto scrollbar-hide">
-        <%= for {list_type, label, description} <- nav_items() do %>
-          <.link
-            navigate={build_nav_url(list_type)}
-            class={[
-              "flex flex-col items-center py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap transition-colors min-w-0 group",
-              if(@current_list == list_type,
-                do: "border-blue-500 text-blue-600",
-                else: "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              )
-            ]}
-            data-testid={"nav-tab-#{list_type}"}
-          >
-            <span class="font-semibold group-hover:text-current transition-colors">{label}</span>
-            <span class="text-xs text-gray-500 mt-1 group-hover:text-gray-600 transition-colors">
-              {description}
-            </span>
-          </.link>
-        <% end %>
-      </div>
-    </nav>
     
 <!-- Content Area -->
     <div class="min-h-[400px]">
@@ -289,4 +271,4 @@
       <% end %>
     </div>
   </div>
-</div>
+</.app_layout>
