@@ -198,7 +198,7 @@ The application features a comprehensive movie lists system with both backend AP
 - **Flexible Return Formats**: Support for both legacy list format and new map format with pagination
 - **Intelligent Caching**: 15-minute TTL for movie lists (longer than search results)
 - **Error Handling**: Comprehensive error handling with user-friendly messages
-- **Pagination Support**: Built-in pagination with `has_more` indicators
+- **Pagination Support**: Built-in pagination with `has_more` indicators and load more functionality
 - **Cache Format Compatibility**: Handles both legacy list format and new map format cached results
 
 **Usage Examples:**
@@ -368,13 +368,21 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
 - Test mocks simulate real filtering, sorting, and pagination logic for accurate behavior testing
 
 **Component Testing:**
-- Movie list components are tested with various data states and user interactions
+- Movie list components are comprehensively tested with various data states, user interactions, loading states, error states, empty states, responsive behavior, and accessibility features
 - Review components include tests for expandable content, spoiler warnings, and filtering
 - Search components verify real-time search behavior and result display
 
 **LiveView Integration Tests:**
 - MovieDetailsLive tests include complete mocking of the Reviews context
-- MovieListsLive tests verify list navigation, pagination, and error handling
+- MovieListsLive tests verify list navigation, pagination, and error handling with comprehensive coverage:
+  - Mount behavior and initial state management
+  - URL parameter handling for list types and pagination
+  - List switching with proper state transitions
+  - Load more functionality with movie appending
+  - Error recovery workflows with retry mechanisms
+  - Complete user workflows from browsing to pagination
+  - Navigation state preservation and URL generation
+  - Data handling for both legacy and new API response formats
 - SearchLive tests cover comprehensive search workflows with filtering and sorting
 - Tests verify proper integration between LiveView and context layers
 - Mock functions return realistic data structures matching production behavior
