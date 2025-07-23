@@ -387,6 +387,51 @@ The application includes comprehensive test coverage for:
 - Mock testing for external API dependencies and context functions
 - Continuous test maintenance with occasional adjustments for improved reliability
 
+### Integration Test Suite
+
+The application features a comprehensive integration test suite (`test/flixir_web/integration/movie_lists_test.exs`) that provides end-to-end testing for the movie lists feature:
+
+**End-to-End Workflow Testing:**
+- Complete navigation workflows between different list types (popular, trending, top-rated, upcoming, now-playing)
+- Pagination workflows with load more functionality and URL parameter handling
+- Direct URL navigation with parameters and state preservation
+- Movie card navigation with list context preservation
+
+**Caching Behavior Integration:**
+- Cache hit vs cache miss performance testing and behavior verification
+- Cache behavior across different list types with state management
+- Cache performance under concurrent load with multiple simulated users
+- Memory usage monitoring during extended navigation sessions
+
+**Error Scenarios and Recovery:**
+- Timeout error handling with automatic retry mechanisms
+- Rate limiting error handling with appropriate user feedback
+- Network error handling and recovery workflows
+- API error handling for various failure scenarios
+- Unauthorized error handling with proper messaging
+- Error recovery across list type switches with state management
+
+**Performance Integration Tests:**
+- List switching performance benchmarks with timing requirements
+- Pagination performance testing with increasing delays simulation
+- Memory usage stability monitoring during extended navigation
+- Concurrent user load testing with success rate validation
+
+**Test Features:**
+- **Realistic Data**: Uses comprehensive mock API responses that mirror production data structures
+- **Performance Monitoring**: Includes timing benchmarks and memory usage tracking
+- **Concurrent Testing**: Simulates multiple users accessing the system simultaneously
+- **Error Simulation**: Tests various failure scenarios with proper recovery mechanisms
+- **State Management**: Verifies proper state transitions and URL parameter handling
+- **Cache Integration**: Tests actual caching behavior with Agent-based cache state simulation
+
+**Helper Functions:**
+- `transform_api_response/1`: Converts mock API responses to SearchResult structs
+- `parse_date/1`: Handles date parsing with proper error handling
+- `format_response/3`: Formats responses for different return format requirements
+
+The integration tests ensure that all components work together seamlessly and provide confidence in the system's reliability under various conditions.
+
 ### Test Architecture
 
 The test suite uses comprehensive mocking strategies to ensure reliable and fast tests:
@@ -429,6 +474,16 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
 - SearchLive tests cover comprehensive search workflows with filtering and sorting
 - Tests verify proper integration between LiveView and context layers
 - Mock functions return realistic data structures matching production behavior
+
+**Comprehensive Integration Testing:**
+- **End-to-End Workflows**: Full user journey testing from initial page load through navigation, pagination, and error recovery
+- **Multi-Component Integration**: Tests verify seamless interaction between LiveView, Media context, TMDB client, and cache layers
+- **Performance Benchmarking**: Integration tests include performance requirements and timing validations
+- **Concurrent User Simulation**: Tests system behavior under concurrent load with multiple simulated users
+- **Cache Integration Testing**: Verifies actual caching behavior with realistic cache state management
+- **Error Recovery Testing**: Comprehensive error scenario testing with proper recovery mechanisms
+- **Memory Stability Testing**: Long-running tests monitor memory usage patterns during extended navigation
+- **Real-World Scenarios**: Tests simulate actual user behavior patterns and edge cases
 
 **API Client Testing:**
 - TMDB Client tests use structured mock responses for consistent testing

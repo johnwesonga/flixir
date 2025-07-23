@@ -84,8 +84,8 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 ### Testing Structure
 - **Unit Tests**: `test/flixir/media/` - Test individual components
 - **LiveView Tests**: `test/flixir_web/live/` - Test user interactions
-- **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows
-- **Performance Tests**: Measure search response times and concurrent usage
+- **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including comprehensive movie lists integration testing
+- **Performance Tests**: Measure search response times, concurrent usage, and system performance under load
 
 ### Environment-Specific Configuration
 - Development: Live reloading, debug logging, local mailbox
