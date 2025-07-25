@@ -126,6 +126,13 @@ config :flixir, :tmdb,
   timeout: String.to_integer(System.get_env("TMDB_TIMEOUT") || "5000"),
   max_retries: String.to_integer(System.get_env("TMDB_MAX_RETRIES") || "3")
 
+# TMDB Authentication configuration
+config :flixir, :tmdb_auth,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
+  redirect_url: System.get_env("TMDB_REDIRECT_URL") || "http://localhost:4000/auth/callback",
+  session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400")
+
 # Search cache configuration
 config :flixir, :search_cache,
   ttl_seconds: String.to_integer(System.get_env("SEARCH_CACHE_TTL") || "300"),

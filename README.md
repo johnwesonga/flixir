@@ -62,6 +62,8 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
    ```bash
    mix ecto.migrate
    ```
+   
+   This will create the `auth_sessions` table required for TMDB authentication.
 
 4. Start the Phoenix server:
    ```bash
@@ -475,6 +477,12 @@ This table stores user authentication sessions with:
 - **Expiration Management**: Automatic session cleanup based on timestamps
 - **Performance Indexes**: Optimized queries for session validation and cleanup
 
+**Migration**: The table is created by the `20250725214604_create_auth_sessions.exs` migration, which includes:
+- Primary table creation with proper field types and constraints
+- Unique index on `tmdb_session_id` for fast session lookups
+- Index on `expires_at` for efficient cleanup operations
+- Index on `tmdb_user_id` for user-specific session queries
+
 ## Testing
 
 Run the full test suite:
@@ -547,6 +555,14 @@ The integration tests ensure that all components work together seamlessly and pr
 The test suite uses comprehensive mocking strategies to ensure reliable and fast tests:
 
 **Auth Context Testing:**
+- **TMDBClient Testing**: Comprehensive tests for all authentication API operations
+  - `create_request_token/0` tests with success and failure scenarios
+  - `create_session/1` tests with valid and invalid tokens
+  - `delete_session/1` tests for proper session cleanup
+  - `get_account_details/1` tests for user data retrieval
+  - Error handling tests for all HTTP status codes and network failures
+  - Request/response parsing tests with various API response formats
+  - Configuration tests for API key validation and timeout settings
 - Authentication flow tests with comprehensive TMDB API mocking
 - Session management tests including creation, validation, and expiration
 - Security tests for session encryption and cookie handling
@@ -668,7 +684,57 @@ Ensure the following environment variables are set:
 
 ### Authentication Development Notes
 - The authentication system uses TMDB's session-based authentication
-- All authentication-related code should follow security best practices
+- The `TMDBClient` module provides a complete HTTP client for TMDB authentication operations
+- All authentication requests include proper error handling and retry mechanisms
+- Session tokens are validated and managed through secure database storage
+- The client supports configurable timeouts and retry policies for production reliability
+- Authentication errors are properly categorized and handled with user-friendly messages
+
+**Module Structure:**
+- **Request Handling**: Uses the `Req` HTTP client with proper headers and configuration
+- **Response Parsing**: Dedicated parsing functions for each API response type
+- **Error Classification**: Comprehensive error handling with specific error types
+- **Security**: Input validation and secure parameter handling
+- **Logging**: Structured logging for debugging and monitoring
+- **Configuration**: Flexible configuration through application environment
+
+### TMDB Authentication Client API
+The `Flixir.Auth.TMDBClient` module provides the following functions:
+
+```elixir
+# Create a new request token (Step 1 of authentication)
+{:ok, %{request_token: token, expires_at: datetime}} = TMDBClient.create_request_token()
+
+# Create session from approved token (Step 3 of authentication)
+{:ok, %{session_id: session_id}} = TMDBClient.create_session(approved_token)
+
+# Get user account details
+{:ok, account_data} = TMDBClient.get_account_details(session_id)
+
+# Delete/invalidate session
+{:ok, %{success: true}} = TMDBClient.delete_session(session_id)
+```
+
+**Error Handling:**
+The client handles various error scenarios:
+- `:unauthorized` - Invalid API key or session
+- `:not_found` - Resource not found
+- `:rate_limited` - API rate limit exceeded
+- `:timeout` - Request timeout
+- `{:transport_error, reason}` - Network connectivity issues
+- `:token_creation_failed` - Token request failed
+- `:session_creation_failed` - Session creation failed
+- `:session_deletion_failed` - Session deletion failed
+- `:invalid_response_format` - Malformed API response
+
+**Configuration:**
+The client uses the same TMDB configuration as other modules:
+```elixir
+config :flixir, :tmdb,
+  api_key: System.get_env("TMDB_API_KEY"),
+  timeout: 5_000,
+  max_retries: 3
+```ation-related code should follow security best practices
 - Session data is encrypted and stored securely in the database
 - Authentication tests should mock TMDB API responses appropriately
 
