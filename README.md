@@ -134,6 +134,68 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Real-time error handling and retry mechanisms
   - Responsive design optimized for all screen sizes
 
+#### Session Management (`lib/flixir_web/plugs/auth_session.ex`)
+The `AuthSession` plug provides comprehensive session management and authentication validation:
+
+**Core Functionality:**
+- **Session Validation**: Validates TMDB session IDs from cookies against the database
+- **User Context Injection**: Automatically injects current user data and session information into conn assigns
+- **Automatic Cleanup**: Handles expired sessions with automatic cookie cleanup
+- **Authentication Requirements**: Optional authentication enforcement with configurable redirect behavior
+- **Security Logging**: Comprehensive logging for authentication events and security monitoring
+
+**Plug Configuration:**
+```elixir
+# Optional authentication (default)
+pipeline :browser do
+  plug :accepts, ["html"]
+  plug :fetch_session
+  plug :fetch_live_flash
+  plug FlixirWeb.Plugs.AuthSession
+  # ... other plugs
+end
+
+# Required authentication
+pipeline :authenticated do
+  plug :browser
+  plug FlixirWeb.Plugs.AuthSession, require_auth: true
+end
+
+# Custom redirect path
+pipeline :admin do
+  plug :browser
+  plug FlixirWeb.Plugs.AuthSession, 
+    require_auth: true, 
+    redirect_to: "/admin/login"
+end
+```
+
+**Conn Assigns:**
+The plug sets the following assigns on every request:
+- `:current_user` - Map of current user data from TMDB API, or `nil` if not authenticated
+- `:current_session` - Session struct from database, or `nil` if no valid session
+- `:authenticated?` - Boolean indicating if the user has a valid authenticated session
+
+**Helper Functions:**
+- `put_session_id/2` - Stores session ID in cookie after successful authentication
+- `clear_session_id/1` - Removes session from cookie during logout
+- `get_redirect_after_login/1` - Retrieves stored redirect path for post-login navigation
+- `clear_redirect_after_login/1` - Clears redirect path after successful redirect
+
+**Session Lifecycle:**
+1. **Validation**: Checks for session ID in cookie and validates against database
+2. **User Data**: Retrieves fresh user data from TMDB API for valid sessions
+3. **Expiration Handling**: Automatically clears expired or invalid sessions
+4. **Context Injection**: Makes user data available throughout the application
+5. **Redirect Logic**: Handles authentication requirements and post-login navigation
+
+**Security Features:**
+- **Session Encryption**: Uses Phoenix's secure session storage
+- **Automatic Expiration**: Respects TMDB session lifetime and database expiration
+- **Invalid Session Cleanup**: Removes stale sessions from cookies automatically
+- **Request Path Preservation**: Stores intended destination for post-login redirect
+- **Comprehensive Logging**: Tracks authentication events for security monitoring
+
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
 - **Authentication Routes**: 
   - `/auth/login` - User login initiation
@@ -148,7 +210,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
-- **Protected Routes**: Session validation middleware for authenticated-only features
+- **Protected Routes**: Session validation middleware for authenticated-only features using `AuthSession` plug
 
 **Movie Lists Routing:**
 The router now includes dedicated routes for the movie lists functionality:
@@ -361,7 +423,7 @@ The `MovieListComponents` module provides a complete UI system for displaying mo
 ```
 
 #### Authentication System Implementation
-The application implements a comprehensive TMDB-based authentication system:
+The application implements a comprehensive TMDB-based authentication system with seamless session management:
 
 **Authentication Flow:**
 1. **Token Request**: `TMDBClient.create_request_token/0` requests a token from TMDB API
@@ -371,30 +433,42 @@ The application implements a comprehensive TMDB-based authentication system:
 5. **Account Integration**: `TMDBClient.get_account_details/1` retrieves user profile information
 6. **Session Management**: `TMDBClient.delete_session/1` handles secure logout and cleanup
 
+**Session Middleware Integration:**
+The `AuthSession` plug provides seamless authentication integration across the entire application:
+- **Automatic Validation**: Every request validates the user's session against the database
+- **Fresh User Data**: Retrieves current user information from TMDB API for valid sessions
+- **Context Injection**: Makes user data available in all LiveView components and controllers
+- **Transparent Operation**: Works behind the scenes without requiring explicit session checks
+- **Flexible Configuration**: Supports both optional and required authentication per route
+
 **Security Features:**
 - **Secure Cookies**: HTTP-only, secure, and SameSite cookie configuration
 - **Session Encryption**: All session data is encrypted using Phoenix's signed cookies
 - **Automatic Expiration**: Sessions automatically expire based on TMDB session lifetime
-- **Background Cleanup**: Expired sessions are cleaned up automatically
+- **Background Cleanup**: Expired sessions are cleaned up automatically with database cleanup
 - **CSRF Protection**: Built-in CSRF protection for authentication forms
+- **Session Invalidation**: Automatic cleanup of invalid or expired sessions from cookies
 
 **Database Integration:**
-- **Session Persistence**: User sessions are stored in the `auth_sessions` table
-- **Performance Optimization**: Indexed queries for fast session validation
-- **Data Integrity**: Foreign key constraints and proper data validation
+- **Session Persistence**: User sessions are stored in the `auth_sessions` table with proper indexing
+- **Performance Optimization**: Indexed queries for fast session validation and user lookups
+- **Data Integrity**: Foreign key constraints and proper data validation with session expiration
 - **Privacy Compliance**: GDPR-compliant session handling and data retention policies
+- **Concurrent Access**: Handles multiple concurrent sessions per user with proper isolation
 
 **Logging & Monitoring:**
-- **Authentication Events**: Comprehensive logging of login, logout, and session events
+- **Authentication Events**: Comprehensive logging of login, logout, and session validation events
 - **Security Monitoring**: Failed authentication attempts and suspicious activity logging
-- **Error Tracking**: Detailed error logging for debugging and monitoring
+- **Error Tracking**: Detailed error logging for debugging and monitoring authentication issues
 - **User Activity**: Session validation and access pattern logging for security analysis
+- **Performance Monitoring**: Session validation timing and database query performance tracking
 
 **User Experience:**
-- **Seamless Integration**: Authentication state is maintained across all LiveView components
-- **Error Handling**: Comprehensive error handling for authentication failures
-- **Session Management**: Automatic session refresh and logout functionality
-- **User Context**: User information is available throughout the application
+- **Seamless Integration**: Authentication state is maintained across all LiveView components automatically
+- **Error Handling**: Comprehensive error handling for authentication failures with user-friendly messages
+- **Session Management**: Automatic session refresh and logout functionality with proper cleanup
+- **User Context**: User information is available throughout the application via conn assigns
+- **Redirect Handling**: Preserves intended destination and redirects users after successful authentication
 
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:
@@ -576,6 +650,13 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
   - `validate_session/1` tests with session validation and last access updates
   - `logout/1` tests with proper TMDB session cleanup and local session deletion
   - `get_current_user/1` tests with fresh user data retrieval from TMDB
+- **AuthSession Plug Testing**: Comprehensive middleware testing for session management
+  - Session validation tests with valid, expired, and invalid sessions
+  - User context injection tests with proper conn assign verification
+  - Authentication requirement tests with redirect behavior
+  - Helper function tests for session storage and retrieval
+  - Security tests for session cleanup and cookie handling
+  - Error handling tests for authentication failures and recovery
 - Authentication flow tests with comprehensive TMDB API mocking
 - Session management tests including creation, validation, and expiration
 - Security tests for session encryption and cookie handling

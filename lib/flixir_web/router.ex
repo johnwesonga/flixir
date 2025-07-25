@@ -8,6 +8,12 @@ defmodule FlixirWeb.Router do
     plug :put_root_layout, html: {FlixirWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug FlixirWeb.Plugs.AuthSession
+  end
+
+  pipeline :authenticated do
+    plug :browser
+    plug FlixirWeb.Plugs.AuthSession, require_auth: true
   end
 
   pipeline :api do

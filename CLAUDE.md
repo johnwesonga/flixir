@@ -45,6 +45,15 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Implements complete authentication flow with proper error handling and logging
 - Includes session validation, user data retrieval, and secure logout functionality
 
+**Auth Session Plug (`lib/flixir_web/plugs/auth_session.ex`)**
+- Middleware for automatic session validation and user context injection
+- Validates TMDB session IDs from cookies against the database on every request
+- Injects current user data and authentication status into conn assigns
+- Handles expired session cleanup and authentication requirements
+- Provides helper functions for session management (put/clear session ID, redirect handling)
+- Supports both optional and required authentication with configurable redirect behavior
+- Comprehensive logging for authentication events and security monitoring
+
 **Search Live View (`lib/flixir_web/live/search_live.ex`)**
 - Real-time search interface with debounced input (300ms)
 - Handles URL parameters for shareable search links
@@ -70,12 +79,22 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Provides cache statistics and management functions
 
 ### Data Flow
+
+**Search Flow:**
 1. User input → SearchLive (debounced validation)
 2. SearchLive → Media context (search orchestration)
 3. Media → Cache (check for cached results)
 4. Cache miss → TMDB Client (API call)
 5. TMDB Client → Media (transform and cache response)
 6. Media → SearchLive (display results)
+
+**Authentication Flow:**
+1. Every request → AuthSession plug (session validation)
+2. AuthSession → Auth context (validate session against database)
+3. Auth context → TMDB API (get fresh user data for valid sessions)
+4. AuthSession → conn assigns (inject user context: current_user, current_session, authenticated?)
+5. LiveView/Controller → access user data from conn assigns
+6. Optional: Redirect to login if authentication required and user not authenticated
 
 ### Key Features
 - **Debounced Search**: 300ms delay to reduce API calls
@@ -84,6 +103,9 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Sorting**: By relevance, popularity, release date, or title
 - **Caching**: Optimized API usage with intelligent cache management
 - **Error Handling**: Comprehensive error states and recovery
+- **Authentication**: TMDB-based user authentication with automatic session management
+- **Session Management**: Transparent session validation and user context injection across all requests
+- **Security**: Secure session storage, automatic cleanup, and comprehensive logging
 
 ### Configuration
 - Database: PostgreSQL with Ecto
