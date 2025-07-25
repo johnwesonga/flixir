@@ -1,6 +1,6 @@
 # Flixir
 
-A Phoenix LiveView web application for discovering movies and TV shows, powered by The Movie Database (TMDB) API. Built using [Kiro](https://kiro.dev/blog/introducing-kiro/) for enhanced development experience.
+A Phoenix LiveView web application for discovering movies and TV shows, powered by The Movie Database (TMDB) API. Features secure user authentication, comprehensive review systems, and curated movie lists. Built using [Kiro](https://kiro.dev/blog/introducing-kiro/) for enhanced development experience.
 
 ## Features
 
@@ -22,6 +22,13 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Advanced Filtering**: Filter reviews by rating ranges, author names, and content keywords
 - **Smart Sorting**: Sort reviews by date, rating, or author with ascending/descending options
 - **Real-time Updates**: Live filtering and sorting without page reloads
+
+### 🔐 Authentication System
+- **TMDB Authentication**: Secure user authentication using TMDB's session-based system
+- **Session Management**: Persistent user sessions with automatic expiration handling
+- **Secure Storage**: Encrypted session data with proper security measures
+- **User Context**: Seamless integration of user authentication across the application
+- **Privacy Protection**: GDPR-compliant session handling and data protection
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -51,7 +58,12 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
      api_key: "your_tmdb_api_key_here"
    ```
 
-3. Start the Phoenix server:
+3. Run database migrations (includes authentication tables):
+   ```bash
+   mix ecto.migrate
+   ```
+
+4. Start the Phoenix server:
    ```bash
    mix phx.server
    ```
@@ -61,11 +73,23 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
    iex -S mix phx.server
    ```
 
-4. Visit [`localhost:4000`](http://localhost:4000) in your browser.
+5. Visit [`localhost:4000`](http://localhost:4000) in your browser.
 
 ## Architecture
 
 ### Core Modules
+
+#### Auth Context (`lib/flixir/auth/`)
+- **Session**: User session management with TMDB integration
+- **TMDBClient**: TMDB authentication API client for token and session management
+  - `create_request_token/0`: Initiates TMDB authentication flow by creating request tokens
+  - `create_session/1`: Converts approved tokens into authenticated sessions
+  - `delete_session/1`: Invalidates TMDB sessions for secure logout
+  - `get_account_details/1`: Retrieves user account information from TMDB
+  - Comprehensive error handling with retry logic and exponential backoff
+  - Secure HTTP client configuration with proper timeouts and headers
+- **Authentication Flow**: Three-step TMDB authentication (token → approval → session)
+- **Security**: Secure session storage with encryption and proper expiration handling
 
 #### Media Context (`lib/flixir/media/`)
 - **SearchResult**: Data structure for search results and movie lists
@@ -91,6 +115,10 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Features brand logo with navigation to home page
 
 #### LiveView Modules (`lib/flixir_web/live/`)
+- **AuthLive**: User authentication interface with login/logout functionality
+  - TMDB authentication flow with secure token handling
+  - Session management and user context integration
+  - Error handling for authentication failures and recovery
 - **SearchLive**: Real-time search interface with filtering and sorting
 - **MovieDetailsLive**: Movie and TV show detail pages with review management and error recovery
   - Handles dynamic routing for both movies and TV shows
@@ -104,6 +132,10 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Responsive design optimized for all screen sizes
 
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
+- **Authentication Routes**: 
+  - `/auth/login` - User login initiation
+  - `/auth/callback` - TMDB authentication callback handling
+  - `/auth/logout` - User logout and session cleanup
 - **Home Route**: `/` - Landing page with HTTP GET route to SearchLive for immediate search functionality
 - **Search Route**: `/search` - Main search interface with LiveView and URL parameter support
 - **Movie Lists Routes**: 
@@ -113,6 +145,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
+- **Protected Routes**: Session validation middleware for authenticated-only features
 
 **Movie Lists Routing:**
 The router now includes dedicated routes for the movie lists functionality:
@@ -324,6 +357,36 @@ The `MovieListComponents` module provides a complete UI system for displaying mo
 <.list_navigation current_list={:top_rated} />
 ```
 
+#### Authentication System Implementation
+The application implements a comprehensive TMDB-based authentication system:
+
+**Authentication Flow:**
+1. **Token Request**: `TMDBClient.create_request_token/0` requests a token from TMDB API
+2. **User Authorization**: User is redirected to TMDB to approve the application
+3. **Session Creation**: `TMDBClient.create_session/1` exchanges approved token for session ID
+4. **Session Storage**: Session data is securely stored in the database with encryption
+5. **Account Integration**: `TMDBClient.get_account_details/1` retrieves user profile information
+6. **Session Management**: `TMDBClient.delete_session/1` handles secure logout and cleanup
+
+**Security Features:**
+- **Secure Cookies**: HTTP-only, secure, and SameSite cookie configuration
+- **Session Encryption**: All session data is encrypted using Phoenix's signed cookies
+- **Automatic Expiration**: Sessions automatically expire based on TMDB session lifetime
+- **Background Cleanup**: Expired sessions are cleaned up automatically
+- **CSRF Protection**: Built-in CSRF protection for authentication forms
+
+**Database Integration:**
+- **Session Persistence**: User sessions are stored in the `auth_sessions` table
+- **Performance Optimization**: Indexed queries for fast session validation
+- **Data Integrity**: Foreign key constraints and proper data validation
+- **Privacy Compliance**: GDPR-compliant session handling and data retention policies
+
+**User Experience:**
+- **Seamless Integration**: Authentication state is maintained across all LiveView components
+- **Error Handling**: Comprehensive error handling for authentication failures
+- **Session Management**: Automatic session refresh and logout functionality
+- **User Context**: User information is available throughout the application
+
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:
 
@@ -332,18 +395,21 @@ The application provides robust error handling with user-friendly recovery optio
 - API rate limiting and authentication errors
 - Service unavailability and server errors
 - Data transformation and parsing errors
+- Authentication failures and session expiration
 
 **Recovery Mechanisms:**
 - **Retry Functionality**: One-click retry buttons for failed operations
 - **Graceful Degradation**: Partial functionality when some services fail
 - **User Feedback**: Clear error messages with actionable guidance
 - **State Preservation**: Maintains user context during error recovery
+- **Authentication Recovery**: Automatic re-authentication prompts for expired sessions
 
 **Implementation Details:**
 - The `MovieDetailsLive` module includes a `retry_reviews` event handler
 - Error states are clearly displayed with contextual retry options
 - Loading states prevent duplicate requests during recovery
 - Error messages are formatted for user comprehension
+- Authentication errors trigger appropriate login flows
 
 ## Configuration
 
@@ -352,9 +418,15 @@ The application provides robust error handling with user-friendly recovery optio
 # Required
 TMDB_API_KEY=your_api_key_here
 
-# Optional
+# Authentication (Optional - defaults provided)
+TMDB_BASE_URL=https://api.themoviedb.org/3
+TMDB_REDIRECT_URL=http://localhost:4000/auth/callback
+TMDB_SESSION_TIMEOUT=86400
+
+# Database & Application (Optional)
 DATABASE_URL=postgres://user:pass@localhost/flixir_dev
 SECRET_KEY_BASE=your_secret_key_base
+PHX_HOST=localhost
 ```
 
 ### TMDB Configuration
@@ -365,7 +437,43 @@ config :flixir, :tmdb,
   base_url: "https://api.themoviedb.org/3",
   timeout: 5_000,
   max_retries: 3
+
+# Authentication-specific configuration
+config :flixir, :tmdb_auth,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
+  redirect_url: System.get_env("TMDB_REDIRECT_URL") || "http://localhost:4000/auth/callback",
+  session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400")
 ```
+
+### Database Schema
+
+The application includes the following database tables:
+
+#### Authentication Sessions (`auth_sessions`)
+```sql
+CREATE TABLE auth_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tmdb_session_id VARCHAR(255) NOT NULL UNIQUE,
+  tmdb_user_id INTEGER NOT NULL,
+  username VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  last_accessed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for performance
+CREATE UNIQUE INDEX idx_auth_sessions_tmdb_session_id ON auth_sessions(tmdb_session_id);
+CREATE INDEX idx_auth_sessions_expires_at ON auth_sessions(expires_at);
+CREATE INDEX idx_auth_sessions_tmdb_user_id ON auth_sessions(tmdb_user_id);
+```
+
+This table stores user authentication sessions with:
+- **UUID Primary Key**: Secure session identification
+- **TMDB Integration**: Links to TMDB user accounts and sessions
+- **Expiration Management**: Automatic session cleanup based on timestamps
+- **Performance Indexes**: Optimized queries for session validation and cleanup
 
 ## Testing
 
@@ -385,6 +493,8 @@ The application includes comprehensive test coverage for:
 - Performance benchmarks and load testing
 - Error handling and edge cases
 - Mock testing for external API dependencies and context functions
+- Authentication system testing with session management
+- Security testing for authentication flows and session handling
 - Continuous test maintenance with occasional adjustments for improved reliability
 
 ### Integration Test Suite
@@ -435,6 +545,14 @@ The integration tests ensure that all components work together seamlessly and pr
 ### Test Architecture
 
 The test suite uses comprehensive mocking strategies to ensure reliable and fast tests:
+
+**Auth Context Testing:**
+- Authentication flow tests with comprehensive TMDB API mocking
+- Session management tests including creation, validation, and expiration
+- Security tests for session encryption and cookie handling
+- Authentication error handling and recovery mechanism testing
+- Session cleanup and background job testing
+- User context integration tests across LiveView components
 
 **Media Context Testing:**
 - TMDB Client tests include comprehensive mocking of API responses for all endpoints
@@ -504,14 +622,17 @@ mix format --check-formatted
 
 ### Database Operations
 ```bash
-# Reset database
+# Reset database (includes auth_sessions table)
 mix ecto.reset
 
 # Create migration
 mix ecto.gen.migration migration_name
 
-# Run migrations
+# Run migrations (includes authentication system)
 mix ecto.migrate
+
+# Check migration status
+mix ecto.migrations
 ```
 
 ### Asset Management
@@ -529,18 +650,27 @@ Ready to run in production? Please check the [Phoenix deployment guides](https:/
 
 ### Production Configuration
 Ensure the following environment variables are set:
-- `TMDB_API_KEY`
-- `DATABASE_URL`
-- `SECRET_KEY_BASE`
-- `PHX_HOST`
+- `TMDB_API_KEY` - Required for TMDB API access
+- `DATABASE_URL` - PostgreSQL connection string
+- `SECRET_KEY_BASE` - Phoenix session encryption key
+- `PHX_HOST` - Production hostname
+- `TMDB_REDIRECT_URL` - Production callback URL for authentication (e.g., `https://yourapp.com/auth/callback`)
+- `TMDB_SESSION_TIMEOUT` - Session timeout in seconds (default: 86400 = 24 hours)
 
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes with tests
-4. Run the test suite
-5. Submit a pull request
+3. Make your changes with tests (including authentication tests if applicable)
+4. Run the test suite (includes authentication system tests)
+5. Ensure database migrations are properly tested
+6. Submit a pull request
+
+### Authentication Development Notes
+- The authentication system uses TMDB's session-based authentication
+- All authentication-related code should follow security best practices
+- Session data is encrypted and stored securely in the database
+- Authentication tests should mock TMDB API responses appropriately
 
 ## Learn More
 

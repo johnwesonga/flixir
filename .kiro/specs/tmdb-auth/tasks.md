@@ -6,7 +6,7 @@
   - Create database functions for session management
   - _Requirements: 4.1, 4.2, 6.2_
 
-- [ ] 2. Implement TMDB authentication client
+- [x] 2. Implement TMDB authentication client
   - Create TMDBClient module with authentication-specific API calls
   - Implement create_request_token/0 function for token generation
   - Implement create_session/1 function for session creation from approved token
