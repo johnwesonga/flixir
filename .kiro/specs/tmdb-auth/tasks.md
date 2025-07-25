@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up database schema and core authentication models
+- [x] 1. Set up database schema and core authentication models
   - Create migration for auth_sessions table with proper indexes
   - Implement Session schema with validations and changesets
   - Create database functions for session management
