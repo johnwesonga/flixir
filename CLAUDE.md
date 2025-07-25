@@ -39,9 +39,11 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling
-- Integrates with TMDB's session-based authentication system
-- Provides secure session storage and validation
+- Integrates with TMDB's session-based authentication system through TMDBClient
+- Provides secure session storage and validation with comprehensive logging
 - Handles user account management and session cleanup
+- Implements complete authentication flow with proper error handling and logging
+- Includes session validation, user data retrieval, and secure logout functionality
 
 **Search Live View (`lib/flixir_web/live/search_live.ex`)**
 - Real-time search interface with debounced input (300ms)
@@ -60,6 +62,7 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Handles request token creation, session management, and user account details
 - Provides secure session deletion and comprehensive error handling
 - Includes retry logic with exponential backoff for network resilience
+- Integrated with Auth context for seamless authentication flow management
 
 **Caching System (`lib/flixir/media/cache.ex`)**
 - In-memory caching for search results and content details

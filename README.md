@@ -92,6 +92,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Secure HTTP client configuration with proper timeouts and headers
 - **Authentication Flow**: Three-step TMDB authentication (token → approval → session)
 - **Security**: Secure session storage with encryption and proper expiration handling
+- **Logging**: Comprehensive logging for authentication events, errors, and security monitoring
 
 #### Media Context (`lib/flixir/media/`)
 - **SearchResult**: Data structure for search results and movie lists
@@ -383,6 +384,12 @@ The application implements a comprehensive TMDB-based authentication system:
 - **Data Integrity**: Foreign key constraints and proper data validation
 - **Privacy Compliance**: GDPR-compliant session handling and data retention policies
 
+**Logging & Monitoring:**
+- **Authentication Events**: Comprehensive logging of login, logout, and session events
+- **Security Monitoring**: Failed authentication attempts and suspicious activity logging
+- **Error Tracking**: Detailed error logging for debugging and monitoring
+- **User Activity**: Session validation and access pattern logging for security analysis
+
 **User Experience:**
 - **Seamless Integration**: Authentication state is maintained across all LiveView components
 - **Error Handling**: Comprehensive error handling for authentication failures
@@ -563,12 +570,19 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
   - Error handling tests for all HTTP status codes and network failures
   - Request/response parsing tests with various API response formats
   - Configuration tests for API key validation and timeout settings
+- **Auth Context Integration**: Full authentication flow testing with proper logging verification
+  - `start_authentication/0` tests with token creation and URL building
+  - `complete_authentication/1` tests with session creation and user account integration
+  - `validate_session/1` tests with session validation and last access updates
+  - `logout/1` tests with proper TMDB session cleanup and local session deletion
+  - `get_current_user/1` tests with fresh user data retrieval from TMDB
 - Authentication flow tests with comprehensive TMDB API mocking
 - Session management tests including creation, validation, and expiration
 - Security tests for session encryption and cookie handling
 - Authentication error handling and recovery mechanism testing
 - Session cleanup and background job testing
 - User context integration tests across LiveView components
+- Logging verification tests for authentication events and error tracking
 
 **Media Context Testing:**
 - TMDB Client tests include comprehensive mocking of API responses for all endpoints
