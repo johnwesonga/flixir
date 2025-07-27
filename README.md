@@ -118,10 +118,16 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Features brand logo with navigation to home page
 
 #### LiveView Modules (`lib/flixir_web/live/`)
-- **AuthLive**: User authentication interface with login/logout functionality
-  - TMDB authentication flow with secure token handling
-  - Session management and user context integration
-  - Error handling for authentication failures and recovery
+- **AuthLive**: Comprehensive user authentication interface with TMDB integration
+  - **Authentication Flow**: Complete TMDB three-step authentication (token → approval → session)
+  - **Route Handling**: Supports login, callback, and logout routes with parameter validation
+  - **Session Management**: Secure session storage and retrieval with cookie integration
+  - **Async Operations**: Non-blocking authentication operations using Phoenix async assigns with enhanced result handling
+  - **Robust Processing**: Improved async result handlers that support both direct and nested response formats for maximum compatibility
+  - **Error Recovery**: Comprehensive error handling with user-friendly messages and retry functionality
+  - **State Management**: Loading states, success/error messages, and proper UI feedback
+  - **Security Integration**: Works seamlessly with `AuthSession` plug for session management
+  - **User Experience**: Smooth redirects, flash messages, and preserved navigation context
 - **SearchLive**: Real-time search interface with filtering and sorting
 - **MovieDetailsLive**: Movie and TV show detail pages with review management and error recovery
   - Handles dynamic routing for both movies and TV shows
@@ -197,20 +203,43 @@ The plug sets the following assigns on every request:
 - **Comprehensive Logging**: Tracks authentication events for security monitoring
 
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
-- **Authentication Routes**: 
-  - `/auth/login` - User login initiation
-  - `/auth/callback` - TMDB authentication callback handling
-  - `/auth/logout` - User logout and session cleanup
-- **Home Route**: `/` - Landing page with HTTP GET route to SearchLive for immediate search functionality
+The application uses Phoenix pipelines with integrated authentication middleware:
+
+**Pipeline Configuration:**
+```elixir
+pipeline :browser do
+  plug :accepts, ["html"]
+  plug :fetch_session
+  plug :fetch_live_flash
+  plug :put_root_layout, html: {FlixirWeb.Layouts, :root}
+  plug :protect_from_forgery
+  plug :put_secure_browser_headers
+  plug FlixirWeb.Plugs.AuthSession  # Automatic session validation
+end
+
+pipeline :authenticated do
+  plug :browser
+  plug FlixirWeb.Plugs.AuthSession, require_auth: true  # Required authentication
+end
+```
+
+**Application Routes:**
+- **Home Route**: `/` - Landing page with SearchLive for immediate search functionality
 - **Search Route**: `/search` - Main search interface with LiveView and URL parameter support
+- **Authentication Routes**:
+  - `/auth/login` - User login interface with TMDB authentication initiation
+  - `/auth/callback` - TMDB authentication callback handler with token processing
+  - `/auth/logout` - User logout interface with session cleanup confirmation
 - **Movie Lists Routes**: 
   - `/movies` - Popular movies (default list)
   - `/movies/:list_type` - Specific movie lists (trending, top-rated, upcoming, now-playing)
   - URL parameters: `?page=N` for pagination support
+- **Reviews Route**: `/reviews` - Review browsing interface with filtering capabilities
 - **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
-- **Protected Routes**: Session validation middleware for authenticated-only features using `AuthSession` plug
+- **Session Management**: All routes automatically validate user sessions via `AuthSession` plug
+- **Protected Routes**: Future authenticated-only features can use the `:authenticated` pipeline
 
 **Movie Lists Routing:**
 The router now includes dedicated routes for the movie lists functionality:
@@ -433,6 +462,19 @@ The application implements a comprehensive TMDB-based authentication system with
 5. **Account Integration**: `TMDBClient.get_account_details/1` retrieves user profile information
 6. **Session Management**: `TMDBClient.delete_session/1` handles secure logout and cleanup
 
+**AuthLive Implementation:**
+The `AuthLive` module provides a complete user interface for the authentication system:
+
+- **Route Management**: Handles `/auth/login`, `/auth/callback`, and `/auth/logout` routes
+- **Async Authentication**: Uses Phoenix async assigns for non-blocking authentication operations with improved result handling
+- **Robust Result Processing**: Enhanced async result handlers that support both direct and nested response formats for maximum compatibility
+- **Token Processing**: Securely processes TMDB callback tokens and handles approval/denial scenarios
+- **Session Integration**: Seamlessly integrates with the `AuthSession` plug for cookie management
+- **Error Handling**: Comprehensive error formatting with user-friendly messages for all failure scenarios
+- **State Management**: Proper loading states, success messages, and error recovery mechanisms
+- **Navigation Context**: Preserves user's intended destination and handles post-login redirects
+- **Security Logging**: Comprehensive logging for authentication events and security monitoring
+
 **Session Middleware Integration:**
 The `AuthSession` plug provides seamless authentication integration across the entire application:
 - **Automatic Validation**: Every request validates the user's session against the database
@@ -527,6 +569,46 @@ config :flixir, :tmdb_auth,
   base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
   redirect_url: System.get_env("TMDB_REDIRECT_URL") || "http://localhost:4000/auth/callback",
   session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400")
+```
+
+### Session Management Configuration
+
+The `AuthSession` plug is automatically configured in the router pipelines:
+
+```elixir
+# All browser routes include automatic session validation
+pipeline :browser do
+  # ... other plugs
+  plug FlixirWeb.Plugs.AuthSession
+end
+
+# Protected routes require authentication
+pipeline :authenticated do
+  plug :browser
+  plug FlixirWeb.Plugs.AuthSession, require_auth: true
+end
+```
+
+**Session Storage:**
+- Session IDs are stored in secure, HTTP-only cookies using Phoenix's session configuration
+- Session data is persisted in the `auth_sessions` database table
+- Automatic cleanup of expired sessions with database maintenance
+- Fresh user data retrieved from TMDB API on each request validation
+- Configurable redirect paths for authentication requirements
+
+**Phoenix Session Configuration:**
+```elixir
+# config/config.exs
+config :flixir_web, FlixirWeb.Endpoint,
+  session: [
+    store: :cookie,
+    key: "_flixir_key",
+    signing_salt: "session_salt",
+    max_age: 86400, # 24 hours
+    secure: true,
+    http_only: true,
+    same_site: "Lax"
+  ]
 ```
 
 ### Database Schema
@@ -650,13 +732,14 @@ The test suite uses comprehensive mocking strategies to ensure reliable and fast
   - `validate_session/1` tests with session validation and last access updates
   - `logout/1` tests with proper TMDB session cleanup and local session deletion
   - `get_current_user/1` tests with fresh user data retrieval from TMDB
-- **AuthSession Plug Testing**: Comprehensive middleware testing for session management
+- **AuthSession Plug Testing**: Comprehensive middleware testing for session management (`test/flixir_web/plugs/auth_session_test.exs`)
   - Session validation tests with valid, expired, and invalid sessions
   - User context injection tests with proper conn assign verification
-  - Authentication requirement tests with redirect behavior
-  - Helper function tests for session storage and retrieval
+  - Authentication requirement tests with redirect behavior and custom paths
+  - Helper function tests for session storage, retrieval, and redirect handling
   - Security tests for session cleanup and cookie handling
   - Error handling tests for authentication failures and recovery
+  - Edge case testing for malformed session data and Auth context errors
 - Authentication flow tests with comprehensive TMDB API mocking
 - Session management tests including creation, validation, and expiration
 - Security tests for session encryption and cookie handling

@@ -27,6 +27,15 @@ defmodule FlixirWeb.Router do
     live "/", SearchLive, :home
     live "/search", SearchLive, :index
 
+    # Authentication routes
+    live "/auth/login", AuthLive, :login
+    live "/auth/callback", AuthLive, :callback
+    live "/auth/logout", AuthLive, :logout
+
+    # Authentication session management
+    get "/auth/store_session", AuthController, :store_session
+    get "/auth/clear_session", AuthController, :clear_session
+
     # Movies section
     live "/movies", MovieListsLive, :index
     live "/movies/:list_type", MovieListsLive, :show

@@ -54,6 +54,17 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Supports both optional and required authentication with configurable redirect behavior
 - Comprehensive logging for authentication events and security monitoring
 
+**Auth Live View (`lib/flixir_web/live/auth_live.ex`)**
+- Complete user authentication interface for TMDB integration
+- Handles login initiation, callback processing, and logout confirmation
+- Implements async authentication operations using Phoenix async assigns with enhanced result handling
+- Robust async result processing that supports both direct and nested response formats for improved reliability
+- Manages authentication state with loading indicators and error messages
+- Integrates seamlessly with AuthSession plug for session management
+- Provides comprehensive error handling with user-friendly messages
+- Supports authentication flow routes: /auth/login, /auth/callback, /auth/logout
+- Preserves navigation context and handles post-login redirects
+
 **Search Live View (`lib/flixir_web/live/search_live.ex`)**
 - Real-time search interface with debounced input (300ms)
 - Handles URL parameters for shareable search links
@@ -89,12 +100,18 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 6. Media → SearchLive (display results)
 
 **Authentication Flow:**
-1. Every request → AuthSession plug (session validation)
-2. AuthSession → Auth context (validate session against database)
-3. Auth context → TMDB API (get fresh user data for valid sessions)
-4. AuthSession → conn assigns (inject user context: current_user, current_session, authenticated?)
-5. LiveView/Controller → access user data from conn assigns
-6. Optional: Redirect to login if authentication required and user not authenticated
+1. User login → AuthLive (initiate TMDB authentication)
+2. AuthLive → Auth context → TMDB API (create request token)
+3. User redirect → TMDB website (approve application access)
+4. TMDB callback → AuthLive (process approved token)
+5. AuthLive → Auth context → TMDB API (create session from token)
+6. AuthLive → AuthSession plug (store session ID in cookie)
+7. Every request → AuthSession plug (session validation)
+8. AuthSession → Auth context (validate session against database)
+9. Auth context → TMDB API (get fresh user data for valid sessions)
+10. AuthSession → conn assigns (inject user context: current_user, current_session, authenticated?)
+11. LiveView/Controller → access user data from conn assigns
+12. Optional: Redirect to login if authentication required and user not authenticated
 
 ### Key Features
 - **Debounced Search**: 300ms delay to reduce API calls

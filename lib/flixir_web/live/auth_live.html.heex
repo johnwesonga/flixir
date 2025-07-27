@@ -1,0 +1,218 @@
+<div class="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+  <div class="sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="text-center">
+      <h1 class="text-3xl font-bold text-gray-900">Flixir</h1>
+      <p class="mt-2 text-sm text-gray-600">Movie and TV Show Reviews</p>
+    </div>
+  </div>
+
+  <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+    <div class="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+      <%= if @live_action == :login do %>
+        <div class="space-y-6">
+          <div class="text-center">
+            <h2 class="text-2xl font-bold text-gray-900">Sign in to your account</h2>
+            <p class="mt-2 text-sm text-gray-600">
+              Sign in with your TMDB account to access personalized features
+            </p>
+          </div>
+
+          <%= if @error_message do %>
+            <div class="rounded-md bg-red-50 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <.icon name="hero-x-circle" class="h-5 w-5 text-red-400" />
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-red-800">Authentication Error</h3>
+                  <div class="mt-2 text-sm text-red-700">
+                    <p><%= @error_message %></p>
+                  </div>
+                  <div class="mt-4">
+                    <button
+                      type="button"
+                      phx-click="retry_login"
+                      class="text-sm font-medium text-red-800 hover:text-red-600"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <%= if @success_message do %>
+            <div class="rounded-md bg-green-50 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <.icon name="hero-check-circle" class="h-5 w-5 text-green-400" />
+                </div>
+                <div class="ml-3">
+                  <div class="text-sm text-green-700">
+                    <p><%= @success_message %></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <div>
+            <button
+              type="button"
+              phx-click="login"
+              disabled={@loading}
+              class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <%= if @loading do %>
+                <.icon name="hero-arrow-path" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" />
+                Connecting to TMDB...
+              <% else %>
+                <.icon name="hero-film" class="-ml-1 mr-3 h-5 w-5" />
+                Sign in with TMDB
+              <% end %>
+            </button>
+          </div>
+
+          <div class="text-center">
+            <p class="text-xs text-gray-500">
+              Don't have a TMDB account?
+              <a
+                href="https://www.themoviedb.org/signup"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Create one here
+              </a>
+            </p>
+          </div>
+        </div>
+      <% end %>
+
+      <%= if @live_action == :callback do %>
+        <div class="space-y-6">
+          <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-blue-100">
+              <.icon name="hero-arrow-path" class="animate-spin h-6 w-6 text-blue-600" />
+            </div>
+            <h2 class="mt-4 text-2xl font-bold text-gray-900">Completing Sign In</h2>
+            <p class="mt-2 text-sm text-gray-600">
+              Please wait while we complete your authentication...
+            </p>
+          </div>
+
+          <%= if @error_message do %>
+            <div class="rounded-md bg-red-50 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <.icon name="hero-x-circle" class="h-5 w-5 text-red-400" />
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-red-800">Authentication Failed</h3>
+                  <div class="mt-2 text-sm text-red-700">
+                    <p><%= @error_message %></p>
+                  </div>
+                  <div class="mt-4">
+                    <.link
+                      navigate={~p"/auth/login"}
+                      class="text-sm font-medium text-red-800 hover:text-red-600"
+                    >
+                      Try logging in again
+                    </.link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%= if @live_action == :logout do %>
+        <div class="space-y-6">
+          <div class="text-center">
+            <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100">
+              <.icon name="hero-arrow-right-start-on-rectangle" class="h-6 w-6 text-red-600" />
+            </div>
+            <h2 class="mt-4 text-2xl font-bold text-gray-900">Sign Out</h2>
+            <%= if @authenticated? do %>
+              <p class="mt-2 text-sm text-gray-600">
+                Are you sure you want to sign out, <%= @current_user["username"] %>?
+              </p>
+            <% else %>
+              <p class="mt-2 text-sm text-gray-600">
+                You are not currently signed in.
+              </p>
+            <% end %>
+          </div>
+
+          <%= if @error_message do %>
+            <div class="rounded-md bg-red-50 p-4">
+              <div class="flex">
+                <div class="flex-shrink-0">
+                  <.icon name="hero-x-circle" class="h-5 w-5 text-red-400" />
+                </div>
+                <div class="ml-3">
+                  <h3 class="text-sm font-medium text-red-800">Sign Out Error</h3>
+                  <div class="mt-2 text-sm text-red-700">
+                    <p><%= @error_message %></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <%= if @authenticated? do %>
+            <div class="flex space-x-4">
+              <button
+                type="button"
+                phx-click="confirm_logout"
+                disabled={@loading}
+                class="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <%= if @loading do %>
+                  <.icon name="hero-arrow-path" class="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Signing out...
+                <% else %>
+                  Sign Out
+                <% end %>
+              </button>
+              <button
+                type="button"
+                phx-click="cancel_logout"
+                disabled={@loading}
+                class="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+            </div>
+          <% else %>
+            <div class="text-center">
+              <.link
+                navigate={~p"/auth/login"}
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                <.icon name="hero-film" class="-ml-1 mr-2 h-4 w-4" />
+                Sign In Instead
+              </.link>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <div class="mt-6 text-center">
+      <p class="text-xs text-gray-500">
+        Powered by
+        <a
+          href="https://www.themoviedb.org/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-medium text-blue-600 hover:text-blue-500"
+        >
+          The Movie Database (TMDB)
+        </a>
+      </p>
+    </div>
+  </div>
+</div>

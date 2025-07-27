@@ -35,13 +35,15 @@
   - Implement redirect logic for unauthenticated users
   - _Requirements: 2.4, 4.3, 6.1_
 
-- [ ] 5. Create authentication LiveView components
-  - Create AuthLive module for login/logout UI
-  - Implement login initiation with TMDB redirect
-  - Handle authentication callback with token processing
-  - Implement logout functionality with session cleanup
-  - Add error handling and user feedback for authentication failures
-  - Create authentication state management in LiveView
+- [x] 5. Create authentication LiveView components
+  - Create AuthLive module for login/logout UI with comprehensive route handling
+  - Implement login initiation with TMDB redirect using async operations
+  - Handle authentication callback with token processing and parameter validation
+  - Implement logout functionality with session cleanup and confirmation
+  - Add error handling and user feedback for authentication failures with formatted messages
+  - Create authentication state management in LiveView with loading states and success/error messages
+  - Integrate seamlessly with AuthSession plug for cookie management and redirects
+  - Support authentication flow routes: /auth/login, /auth/callback, /auth/logout
   - _Requirements: 1.1, 1.5, 2.1, 2.3, 3.3, 5.4_
 
 - [ ] 6. Add authentication routes and navigation
