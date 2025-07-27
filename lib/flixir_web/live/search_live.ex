@@ -13,6 +13,7 @@ defmodule FlixirWeb.SearchLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    # Authentication state is now handled by the on_mount hook
     socket =
       socket
       |> assign(:query, "")
@@ -367,6 +368,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:timeout, message}} ->
           Logger.warning("Search timeout for query: #{query}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -374,6 +376,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:rate_limited, message}} ->
           Logger.warning("Rate limited for query: #{query}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -381,6 +384,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:unauthorized, message}} ->
           Logger.error("API authentication failed for query: #{query}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -388,6 +392,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:api_error, message}} ->
           Logger.error("API error for query: #{query}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -395,6 +400,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:network_error, message}} ->
           Logger.warning("Network error for query: #{query}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -402,6 +408,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:transformation_error, reason}} ->
           Logger.error("Data transformation error for query: #{query}: #{inspect(reason)}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, "Unable to process search results. Please try again.")
@@ -409,6 +416,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, {:unknown_error, message}} ->
           Logger.error("Unknown error for query: #{query}: #{inspect(message)}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, message)
@@ -416,6 +424,7 @@ defmodule FlixirWeb.SearchLive do
 
         {:error, reason} ->
           Logger.error("Unexpected search error for query: #{query}: #{inspect(reason)}")
+
           socket
           |> assign(:loading, false)
           |> assign(:error, "An unexpected error occurred. Please try again.")
@@ -525,7 +534,9 @@ defmodule FlixirWeb.SearchLive do
 
   defp cancel_debounce_timer(socket) do
     case socket.assigns.debounce_timer do
-      nil -> socket
+      nil ->
+        socket
+
       timer_ref ->
         Process.cancel_timer(timer_ref)
         assign(socket, :debounce_timer, nil)

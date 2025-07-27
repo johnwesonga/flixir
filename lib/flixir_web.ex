@@ -52,6 +52,8 @@ defmodule FlixirWeb do
     quote do
       use Phoenix.LiveView
 
+      on_mount FlixirWeb.AuthHooks
+
       unquote(html_helpers())
     end
   end

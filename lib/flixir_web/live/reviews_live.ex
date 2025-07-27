@@ -8,14 +8,15 @@ defmodule FlixirWeb.ReviewsLive do
 
   use FlixirWeb, :live_view
   import FlixirWeb.{AppLayout, ReviewComponents}
-  alias Flixir.Reviews
+  #alias Flixir.Reviews
   require Logger
 
-  @valid_filter_types [:recent, :popular, :movies, :tv, :top_rated]
+
   @default_filter_type :recent
 
   @impl true
   def mount(_params, _session, socket) do
+    # Authentication state is now handled by the on_mount hook
     socket =
       socket
       |> assign(:current_filter, @default_filter_type)
@@ -62,6 +63,7 @@ defmodule FlixirWeb.ReviewsLive do
       _ -> 1
     end
   end
+
   defp parse_page(_), do: 1
 
   defp build_page_title(:recent), do: "Recent Reviews"

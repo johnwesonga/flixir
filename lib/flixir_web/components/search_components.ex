@@ -21,6 +21,7 @@ defmodule FlixirWeb.SearchComponents do
   attr :media_type, :atom, default: :all, doc: "Current media type filter"
   attr :sort_by, :atom, default: :relevance, doc: "Current sort option"
   attr :page, :integer, default: 1, doc: "Current page number"
+  attr :authenticated?, :boolean, default: false, doc: "Whether user is authenticated"
 
   def search_result_card(assigns) do
     # Build search context for back navigation and assign to assigns
@@ -152,6 +153,7 @@ defmodule FlixirWeb.SearchComponents do
   attr :media_type, :atom, default: :all, doc: "Current media type filter"
   attr :sort_by, :atom, default: :relevance, doc: "Current sort option"
   attr :page, :integer, default: 1, doc: "Current page number"
+  attr :authenticated?, :boolean, default: false, doc: "Whether user is authenticated"
 
   def search_results_grid(assigns) do
     ~H"""
@@ -169,6 +171,7 @@ defmodule FlixirWeb.SearchComponents do
           media_type={@media_type}
           sort_by={@sort_by}
           page={@page}
+          authenticated?={@authenticated?}
         />
       <% end %>
 

@@ -19,6 +19,7 @@ defmodule FlixirWeb.MovieDetailsLive do
   def mount(%{"type" => media_type, "id" => media_id} = params, _session, socket) do
     media_id = String.to_integer(media_id)
 
+    # Authentication state is now handled by the on_mount hook
     # Capture search context for back navigation
     search_context = extract_search_context(params)
 

@@ -46,7 +46,7 @@
   - Support authentication flow routes: /auth/login, /auth/callback, /auth/logout
   - _Requirements: 1.1, 1.5, 2.1, 2.3, 3.3, 5.4_
 
-- [ ] 6. Add authentication routes and navigation
+- [x] 6. Add authentication routes and navigation
   - Add authentication routes to router (/auth/login, /auth/callback, /auth/logout)
   - Create protected route pipeline for authenticated-only pages
   - Update main navigation to show login/logout based on auth state

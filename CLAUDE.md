@@ -20,6 +20,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `mix test test/path/to/specific_test.exs` - Run a specific test file
 - `mix test test/path/to/specific_test.exs:line_number` - Run a specific test
 
+### Code Quality
+- `mix format` - Format all Elixir code
+- `mix format --check-formatted` - Check if code is properly formatted
+- Remove debug statements (`IO.puts`, `IO.inspect`) before committing
+- Use `Logger.debug/1` for development debugging instead of `IO.puts`
+
 ### Asset Management
 - `mix assets.build` - Build CSS and JavaScript assets
 - `mix assets.deploy` - Build and minify assets for production
@@ -65,11 +71,28 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Supports authentication flow routes: /auth/login, /auth/callback, /auth/logout
 - Preserves navigation context and handles post-login redirects
 
+**Auth Hooks (`lib/flixir_web/live/auth_hooks.ex`)**
+- LiveView on_mount callback for authentication state management
+- Transfers authentication state from HTTP connection to LiveView socket
+- Enhanced debugging capabilities for troubleshooting authentication issues
+- Validates session consistency between Phoenix sessions and socket assigns
+- Provides comprehensive logging for authentication state debugging
+- Detects potential issues with AuthSession plug integration
+- Ensures authentication context is available in all LiveView components
+
 **Search Live View (`lib/flixir_web/live/search_live.ex`)**
 - Real-time search interface with debounced input (300ms)
 - Handles URL parameters for shareable search links
 - Manages search state including pagination, filtering, and sorting
 - Implements comprehensive error handling and validation
+
+**Main Navigation Component (`lib/flixir_web/components/main_navigation.ex`)**
+- Unified navigation system across search, movies, and reviews sections
+- Authentication-aware navigation with dynamic user menu or login button
+- Active state management with visual indicators for current section
+- Responsive design with mobile-friendly touch targets
+- Comprehensive test coverage for authentication states and user interactions
+- Seamless integration with AuthSession plug for automatic state management
 
 **TMDB Client (`lib/flixir/media/tmdb_client.ex`)**
 - HTTP client for TMDB API interactions
@@ -113,6 +136,32 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 11. LiveView/Controller → access user data from conn assigns
 12. Optional: Redirect to login if authentication required and user not authenticated
 
+**Recent Authentication Improvements:**
+- Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
+- Improved error handling that gracefully processes both direct errors (`{:error, reason}`) and nested error tuples (`{:ok, {:error, reason}}`)
+- More robust authentication flow that handles various response formats from the Auth context
+- Better compatibility with different async operation patterns and future API changes
+
+**Authentication Debugging:**
+The authentication system includes comprehensive debugging support for troubleshooting issues:
+
+- **AuthHooks Debugging**: Enhanced logging in the `on_mount` callback to track authentication state transfer
+- **Session Validation**: Logs session keys and authentication state during LiveView mounting
+- **State Mismatch Detection**: Identifies when session IDs exist but authentication state is false
+- **Plug Integration Monitoring**: Detects potential issues with AuthSession plug integration
+- **Development Logging**: Both Logger and IO.puts output for immediate debugging feedback
+- **Session Consistency Checks**: Validates that Phoenix sessions and socket assigns are properly synchronized
+
+**Debugging Output Examples:**
+```
+=== AuthHooks on_mount - socket.assigns keys: [:authenticated?, :current_user, :current_session] ===
+=== AuthHooks on_mount - session keys: ["tmdb_session_id", "_csrf_token"] ===
+=== AuthHooks on_mount - authenticated?: true, current_user: %{"id" => 123, "username" => "user"} ===
+=== AuthHooks: Found session ID but authenticated? is false - possible plug issue ===
+```
+
+This debugging information helps identify authentication flow issues during development and ensures proper session management across the application.
+
 ### Key Features
 - **Debounced Search**: 300ms delay to reduce API calls
 - **Pagination**: 20 results per page with lazy loading
@@ -136,9 +185,15 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Comprehensive test coverage including integration, performance, and error handling tests
 - Mock-based testing for external API dependencies
 
+### Recent Technical Improvements
+- **Enhanced Authentication Async Handling**: Improved `handle_async/3` functions in AuthLive to support both direct and nested tuple response formats
+- **Robust Error Processing**: Better error handling that works with various async operation result patterns
+- **Future-Proof Design**: More resilient authentication flow that adapts to different Auth context response formats
+
 ### Testing Structure
 - **Unit Tests**: `test/flixir/media/` - Test individual components
 - **LiveView Tests**: `test/flixir_web/live/` - Test user interactions
+- **Component Tests**: `test/flixir_web/components/` - Test UI components including navigation, movie lists, reviews, and search components
 - **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including comprehensive movie lists integration testing
 - **Performance Tests**: Measure search response times, concurrent usage, and system performance under load
 

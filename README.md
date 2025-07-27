@@ -139,6 +139,41 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Infinite scroll pagination with load more functionality
   - Real-time error handling and retry mechanisms
   - Responsive design optimized for all screen sizes
+- **ReviewsLive**: Review browsing interface with filtering capabilities (future implementation)
+  - Supports multiple filter types: recent, popular, movies, TV shows, and top-rated reviews
+  - URL parameter handling for filter type and pagination
+  - Authentication-aware interface with user context integration
+  - Prepared for comprehensive review display and management features
+
+#### LiveView Authentication Hooks (`lib/flixir_web/live/auth_hooks.ex`)
+The `AuthHooks` module ensures authentication state is properly transferred from connection assigns to LiveView socket assigns:
+
+**Core Functionality:**
+- **State Transfer**: Transfers authentication state from HTTP connection to LiveView socket
+- **Session Validation**: Validates session IDs from Phoenix sessions against the database
+- **Debug Support**: Enhanced debugging capabilities for troubleshooting authentication issues
+- **Automatic Assignment**: Ensures authentication assigns are available in all LiveViews
+
+**Debug Features:**
+- **Session Monitoring**: Logs session keys and authentication state during LiveView mounting
+- **State Validation**: Detects mismatches between session data and authentication state
+- **Issue Detection**: Identifies potential problems with the AuthSession plug integration
+- **Comprehensive Logging**: Both Logger and IO.puts output for development debugging
+
+**Usage:**
+```elixir
+# In router.ex - automatically applied to LiveView routes
+live_session :default, on_mount: [{FlixirWeb.AuthHooks, :default}] do
+  live "/", SearchLive, :index
+  live "/movies", MovieListsLive, :index
+  # ... other LiveView routes
+end
+```
+
+**Socket Assigns Set:**
+- `:authenticated?` - Boolean indicating authentication status
+- `:current_user` - User data from TMDB API or nil
+- `:current_session` - Session struct from database or nil
 
 #### Session Management (`lib/flixir_web/plugs/auth_session.ex`)
 The `AuthSession` plug provides comprehensive session management and authentication validation:
@@ -271,17 +306,31 @@ The application features a comprehensive navigation system built around the `Mai
 - **Active State Management**: Visual indicators for current section and subsection
 - **Responsive Design**: Mobile-friendly navigation with proper touch targets and overflow handling
 - **Brand Integration**: Prominent Flixir logo with home page navigation
+- **Authentication Integration**: Dynamic display of login button or user menu based on authentication state
 - **Accessibility**: Proper ARIA labels, semantic HTML, keyboard navigation, and test IDs
 
 **Navigation Components:**
 - **`main_nav/1`**: Primary navigation bar with search, movies, and reviews sections
 - **`sub_nav/1`**: Secondary navigation for subsections within each main section
+- **`user_menu/1`**: Authenticated user menu with username display and logout functionality
+- **`login_button/1`**: Login button for unauthenticated users
 - **`nav_item/1`**: Private component for individual navigation items with icons, labels, and descriptions
+
+**Authentication States:**
+The navigation automatically adapts based on user authentication status:
+- **Unauthenticated**: Shows login button linking to `/auth/login`
+- **Authenticated**: Shows user menu with username, full name (if available), and logout option
+- **User Menu Features**: Dropdown menu with user information and logout functionality
+- **Seamless Integration**: Works with the `AuthSession` plug for automatic state management
 
 **Component Usage:**
 ```heex
-<!-- Main navigation with current section -->
-<.main_nav current_section={:movies} />
+<!-- Main navigation with authentication state -->
+<.main_nav 
+  current_section={:movies}
+  current_user={@current_user}
+  authenticated?={@authenticated?}
+/>
 
 <!-- Sub-navigation for movie lists -->
 <.sub_nav 
@@ -292,6 +341,12 @@ The application features a comprehensive navigation system built around the `Mai
   ]}
   current={:popular}
 />
+
+<!-- Standalone user menu for authenticated users -->
+<.user_menu current_user={@current_user} />
+
+<!-- Standalone login button for unauthenticated users -->
+<.login_button />
 ```
 
 **Visual Design:**
@@ -300,6 +355,7 @@ The application features a comprehensive navigation system built around the `Mai
 - Smooth transitions and hover effects
 - Responsive grid layout that adapts to different screen sizes
 - Consistent spacing and typography throughout
+- User menu with proper dropdown styling and hover states
 
 ### Key Features Implementation
 
@@ -536,6 +592,73 @@ The application provides robust error handling with user-friendly recovery optio
 - Error messages are formatted for user comprehension
 - Authentication errors trigger appropriate login flows
 
+## Recent Updates
+
+### Code Quality Improvements
+
+**Debug Statement Cleanup**
+- **SearchLive Module**: Removed temporary debug statement (`IO.puts authenticated?`) from the mount function
+- **Code Quality**: Implemented development guidelines to prevent debug statements in production code
+- **Best Practices**: Added documentation for proper debugging and logging practices
+
+**ReviewsLive Module Cleanup**
+The `ReviewsLive` module has been cleaned up to remove unused code:
+
+- **Removed Unused Constants**: Eliminated the `@valid_filter_types` module attribute that was not being used in the implementation
+- **Streamlined Code**: Filter type validation is handled directly in the `parse_filter_type/1` function, making the code more maintainable
+- **Improved Readability**: Cleaner module structure with better separation of concerns
+
+**MainNavigation Component Formatting**
+The `MainNavigation` component has been improved with better code formatting:
+
+- **Enhanced Readability**: Improved line breaks and indentation for better code organization
+- **Attribute Formatting**: Better formatting of component attributes with proper line breaks and documentation
+- **Code Structure**: Cleaner HTML comment formatting and consistent indentation throughout
+- **Maintainability**: More readable code structure that follows Elixir and Phoenix formatting conventions
+
+### Authentication System Improvements
+
+**Enhanced Async Result Handling (AuthLive)**
+The authentication system has been improved with more robust async result processing:
+
+- **Flexible Response Format Support**: The `handle_async/3` functions now handle both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
+- **Improved Error Handling**: Enhanced error processing that gracefully handles both direct errors (`{:error, reason}`) and nested error tuples (`{:ok, {:error, reason}}`)
+- **Better Compatibility**: More resilient to different response formats from the Auth context, improving reliability across different async operation patterns
+- **Future-Proof Design**: Better prepared for API changes and different async operation patterns
+
+These improvements ensure the authentication flow remains stable and reliable regardless of how the underlying Auth context returns results from async operations.
+
+## Development Guidelines
+
+### Code Quality & Debugging
+
+**Debug Statement Management:**
+- Remove all `IO.puts`, `IO.inspect`, and similar debug statements before committing
+- Use `Logger.debug/1` for development debugging that can be controlled via configuration
+- Leverage `IEx.pry` for interactive debugging during development
+- Use proper logging levels (`Logger.info/1`, `Logger.warning/1`, `Logger.error/1`) for production logging
+
+**Code Formatting:**
+```bash
+# Format all code before committing
+mix format
+
+# Check formatting in CI
+mix format --check-formatted
+```
+
+**Testing:**
+```bash
+# Run full test suite
+mix test
+
+# Run tests with coverage
+mix test --cover
+
+# Run specific test file
+mix test test/flixir_web/live/search_live_test.exs
+```
+
 ## Configuration
 
 ### Environment Variables
@@ -659,14 +782,33 @@ mix test --cover
 ```
 
 The application includes comprehensive test coverage for:
-- Unit tests for all contexts and modules
-- Integration tests for complete user workflows
-- Performance benchmarks and load testing
-- Error handling and edge cases
-- Mock testing for external API dependencies and context functions
-- Authentication system testing with session management
-- Security testing for authentication flows and session handling
-- Continuous test maintenance with occasional adjustments for improved reliability
+- **Unit Tests**: All contexts, modules, and business logic components
+- **Component Tests**: UI components including navigation, movie lists, reviews, and search
+- **LiveView Tests**: Real-time interactions and state management
+- **Integration Tests**: Complete user workflows and end-to-end scenarios
+- **Authentication Tests**: TMDB authentication flow, session management, and security
+- **Navigation Tests**: Main navigation component with authentication state handling
+- **Performance Tests**: Load testing, concurrent usage, and caching behavior
+- **Error Handling**: Comprehensive error scenarios and recovery mechanisms
+- **Mock Testing**: External API dependencies with reliable test data
+- **Security Testing**: Authentication flows, session handling, and data protection
+
+### Component Test Coverage
+
+**Navigation Component Testing (`test/flixir_web/components/main_navigation_test.exs`):**
+The main navigation component includes comprehensive test coverage for:
+- **Authentication States**: Testing both authenticated and unauthenticated navigation states
+- **User Menu Functionality**: User menu rendering with username display and logout options
+- **Login Button Display**: Proper login button rendering for unauthenticated users
+- **Active Section Highlighting**: Visual indicators for current navigation section
+- **Component Integration**: Seamless integration with authentication system
+
+**Test Scenarios:**
+- Navigation rendering with login button when user is not authenticated
+- Navigation rendering with user menu when user is authenticated
+- Current section highlighting with proper CSS classes
+- User menu display with username and full name handling
+- Login button functionality and correct routing
 
 ### Integration Test Suite
 

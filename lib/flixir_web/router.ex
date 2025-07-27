@@ -48,6 +48,14 @@ defmodule FlixirWeb.Router do
     live "/:type/:id", MovieDetailsLive, :show
   end
 
+  # Protected routes that require authentication
+  scope "/", FlixirWeb do
+    pipe_through :authenticated
+
+    # Future authenticated-only features will go here
+    # Examples: user watchlists, ratings, personal reviews, etc.
+  end
+
   # Other scopes may use custom stacks.
   # scope "/api", FlixirWeb do
   #   pipe_through :api

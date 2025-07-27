@@ -6,6 +6,7 @@ defmodule FlixirWeb.AppLayout do
   use Phoenix.Component
   use Gettext, backend: FlixirWeb.Gettext
   import FlixirWeb.CoreComponents
+  import FlixirWeb.MainNavigation
 
   @doc """
   Renders the main application layout with navigation.
@@ -15,55 +16,20 @@ defmodule FlixirWeb.AppLayout do
   attr :show_sub_nav, :boolean, default: false
   attr :sub_nav_items, :list, default: []
   attr :page_title, :string, required: true
+  attr :current_user, :map, default: nil
+  attr :authenticated?, :boolean, default: false
   slot :inner_block, required: true
 
   def app_layout(assigns) do
     ~H"""
     <div class="min-h-screen bg-gray-50">
       <!-- Main Navigation -->
-      <nav class="bg-white shadow-sm border-b border-gray-200" data-testid="main-navigation">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div class="flex justify-between h-16">
-            <!-- Logo/Brand -->
-            <div class="flex items-center">
-              <.link navigate="/" class="flex items-center space-x-2 text-xl font-bold text-gray-900 hover:text-blue-600 transition-colors">
-                <.icon name="hero-film" class="h-8 w-8 text-blue-600" />
-                <span>Flixir</span>
-              </.link>
-            </div>
-
-            <!-- Main Navigation -->
-            <div class="flex items-center space-x-8">
-              <!-- Search -->
-              <.nav_item
-                navigate="/search"
-                active={@current_section == :search}
-                icon="hero-magnifying-glass"
-                label="Search"
-                description="Find movies & TV shows"
-              />
-
-              <!-- Movies -->
-              <.nav_item
-                navigate="/movies"
-                active={@current_section == :movies}
-                icon="hero-film"
-                label="Movies"
-                description="Browse movie collections"
-              />
-
-              <!-- Reviews -->
-              <.nav_item
-                navigate="/reviews"
-                active={@current_section == :reviews}
-                icon="hero-star"
-                label="Reviews"
-                description="Latest movie reviews"
-              />
-            </div>
-          </div>
-        </div>
-      </nav>
+      <.main_nav
+        current_section={@current_section}
+        current_subsection={@current_subsection}
+        current_user={@current_user}
+        authenticated?={@authenticated?}
+      />
 
       <!-- Sub Navigation (conditional) -->
       <%= if @show_sub_nav and length(@sub_nav_items) > 0 do %>

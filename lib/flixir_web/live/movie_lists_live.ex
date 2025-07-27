@@ -17,6 +17,7 @@ defmodule FlixirWeb.MovieListsLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    # Authentication state is now handled by the on_mount hook
     socket =
       socket
       |> assign(:current_list, @default_list_type)
