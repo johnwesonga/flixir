@@ -27,6 +27,11 @@ config :flixir, FlixirWeb.Endpoint,
   watchers: [
     esbuild: {Esbuild, :install_and_run, [:flixir, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:flixir, ~w(--watch)]}
+  ],
+  # Development session settings (less secure for easier development)
+  session: [
+    secure: false,  # Allow HTTP in development
+    same_site: "Lax"
   ]
 
 # ## SSL Support

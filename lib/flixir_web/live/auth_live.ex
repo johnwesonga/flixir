@@ -32,6 +32,7 @@ defmodule FlixirWeb.AuthLive do
       |> assign(:authenticated?, authenticated?)
       |> assign(:current_user, current_user)
       |> assign(:current_session, current_session)
+      |> assign(:csrf_token, Phoenix.Controller.get_csrf_token())
 
     {:ok, socket}
   end

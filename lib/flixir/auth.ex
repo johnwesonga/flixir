@@ -318,7 +318,7 @@ defmodule Flixir.Auth do
   end
 
   @doc """
-  Validates if a session is still active (not expired).
+  Validates if a session is still active (not expired and not idle).
 
   ## Examples
 
@@ -329,12 +329,22 @@ defmodule Flixir.Auth do
       false
 
   """
-  def session_active?(%Session{expires_at: expires_at}) do
-    DateTime.compare(DateTime.utc_now(), expires_at) == :lt
+  def session_active?(%Session{expires_at: expires_at, last_accessed_at: last_accessed_at}) do
+    now = DateTime.utc_now()
+
+    # Check if session has expired
+    session_not_expired = DateTime.compare(now, expires_at) == :lt
+
+    # Check if session is not idle (last accessed within idle timeout)
+    max_idle_seconds = get_session_max_idle()
+    idle_cutoff = DateTime.add(now, -max_idle_seconds, :second)
+    session_not_idle = DateTime.compare(last_accessed_at, idle_cutoff) == :gt
+
+    session_not_expired and session_not_idle
   end
 
   @doc """
-  Cleans up expired sessions from the database.
+  Cleans up expired and idle sessions from the database.
 
   ## Examples
 
@@ -344,8 +354,12 @@ defmodule Flixir.Auth do
   """
   def cleanup_expired_sessions do
     now = DateTime.utc_now()
+    max_idle_seconds = get_session_max_idle()
+    idle_cutoff = DateTime.add(now, -max_idle_seconds, :second)
 
-    from(s in Session, where: s.expires_at < ^now)
+    from(s in Session,
+      where: s.expires_at < ^now or s.last_accessed_at < ^idle_cutoff
+    )
     |> Repo.delete_all()
   end
 
@@ -394,7 +408,12 @@ defmodule Flixir.Auth do
   end
 
   defp get_session_timeout do
-    # 24 hours
+    # 24 hours default
     Application.get_env(:flixir, :tmdb_auth)[:session_timeout] || 86400
+  end
+
+  defp get_session_max_idle do
+    # 2 hours default idle timeout
+    Application.get_env(:flixir, :tmdb_auth)[:session_max_idle] || 7200
   end
 end

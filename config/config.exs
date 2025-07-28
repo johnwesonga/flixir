@@ -20,7 +20,18 @@ config :flixir, FlixirWeb.Endpoint,
     layout: false
   ],
   pubsub_server: Flixir.PubSub,
-  live_view: [signing_salt: "jFEFR1gc"]
+  live_view: [signing_salt: "jFEFR1gc"],
+  # Session configuration with security settings
+  session: [
+    store: :cookie,
+    key: "_flixir_key",
+    signing_salt: "session_salt_key_change_in_prod",
+    encryption_salt: "session_encrypt_salt_change_in_prod",
+    max_age: 86400,  # 24 hours
+    secure: false,   # Will be overridden in prod
+    http_only: true,
+    same_site: "Lax"
+  ]
 
 # Configures the mailer
 #

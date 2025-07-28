@@ -65,7 +65,14 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0, 0, 0, 0, 0},
       port: port
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    # Production session settings with enhanced security
+    session: [
+      secure: true,        # Require HTTPS in production
+      http_only: true,     # Prevent XSS access to cookies
+      same_site: "Strict", # Enhanced CSRF protection
+      max_age: String.to_integer(System.get_env("SESSION_MAX_AGE") || "86400")
+    ]
 
   # ## SSL Support
   #
@@ -128,10 +135,13 @@ config :flixir, :tmdb,
 
 # TMDB Authentication configuration
 config :flixir, :tmdb_auth,
-  api_key: System.get_env("TMDB_API_KEY"),
-  base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
+  # api_key: System.get_env("TMDB_API_KEY"),
+  # base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
   redirect_url: System.get_env("TMDB_REDIRECT_URL") || "http://localhost:4000/auth/callback",
-  session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400")
+  session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400"),
+  # Session cleanup configuration
+  cleanup_interval: String.to_integer(System.get_env("SESSION_CLEANUP_INTERVAL") || "3600"),  # 1 hour
+  session_max_idle: String.to_integer(System.get_env("SESSION_MAX_IDLE") || "7200")  # 2 hours idle timeout
 
 # Search cache configuration
 config :flixir, :search_cache,

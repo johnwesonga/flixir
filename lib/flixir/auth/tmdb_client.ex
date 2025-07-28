@@ -12,7 +12,6 @@ defmodule Flixir.Auth.TMDBClient do
 
   require Logger
 
-  @base_url "https://api.themoviedb.org/3"
   @default_timeout 5_000
   @default_max_retries 3
 
@@ -270,12 +269,13 @@ defmodule Flixir.Auth.TMDBClient do
   end
 
   defp build_url(path, params \\ %{}) do
+    base_url = get_base_url()
     api_key = get_api_key()
     base_params = %{api_key: api_key}
     all_params = Map.merge(base_params, params)
 
     query_string = URI.encode_query(all_params)
-    "#{@base_url}#{path}?#{query_string}"
+    "#{base_url}#{path}?#{query_string}"
   end
 
   defp headers do
@@ -284,6 +284,10 @@ defmodule Flixir.Auth.TMDBClient do
       {"Content-Type", "application/json"},
       {"User-Agent", "Flixir/1.0"}
     ]
+  end
+
+  defp get_base_url do
+    Application.get_env(:flixir, :tmdb)[:base_url] || "https://api.themoviedb.org/3"
   end
 
   defp get_api_key do

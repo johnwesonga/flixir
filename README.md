@@ -77,6 +77,67 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 5. Visit [`localhost:4000`](http://localhost:4000) in your browser.
 
+### Session Configuration
+
+The application includes comprehensive session management with secure defaults:
+
+#### Development Configuration
+Base configuration in `config/config.exs`:
+```elixir
+config :flixir, FlixirWeb.Endpoint,
+  session: [
+    store: :cookie,
+    key: "_flixir_key",
+    signing_salt: "session_salt_key_change_in_prod",
+    encryption_salt: "session_encrypt_salt_change_in_prod",
+    max_age: 86400,  # 24 hours
+    secure: false,   # Will be overridden in prod
+    http_only: true,
+    same_site: "Lax"
+  ]
+```
+
+Development overrides in `config/dev.exs`:
+```elixir
+config :flixir, FlixirWeb.Endpoint,
+  session: [
+    secure: false,  # Allow HTTP in development
+    same_site: "Lax"
+  ]
+```
+
+#### Production Configuration (`config/runtime.exs`)
+```elixir
+config :flixir, FlixirWeb.Endpoint,
+  session: [
+    secure: true,        # Require HTTPS in production
+    http_only: true,     # Prevent XSS access to cookies
+    same_site: "Strict", # Enhanced CSRF protection
+    max_age: String.to_integer(System.get_env("SESSION_MAX_AGE") || "86400")
+  ]
+```
+
+#### Security Features
+- **Secure Cookies**: HTTP-only cookies prevent XSS attacks
+- **CSRF Protection**: SameSite cookie attribute prevents CSRF attacks
+- **Session Encryption**: All session data is encrypted using Phoenix's signed cookies
+- **Configurable Expiration**: Session lifetime can be configured via environment variables
+- **Production Security**: Enhanced security settings automatically applied in production
+
+#### Important Security Notes
+⚠️ **Production Deployment**: The default signing and encryption salts in `config/config.exs` are for development only. You must change these values in production:
+
+```elixir
+# Generate new salts for production
+signing_salt: System.get_env("SESSION_SIGNING_SALT") || "your_unique_signing_salt"
+encryption_salt: System.get_env("SESSION_ENCRYPTION_SALT") || "your_unique_encryption_salt"
+```
+
+Generate secure salts using:
+```bash
+mix phx.gen.secret
+```
+
 ## Architecture
 
 ### Core Modules
@@ -129,6 +190,9 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - **Security Integration**: Works seamlessly with `AuthSession` plug for session management
   - **User Experience**: Smooth redirects, flash messages, and preserved navigation context
 - **SearchLive**: Real-time search interface with filtering and sorting
+  - **Authentication Integration**: Uses `on_mount` hook pattern for automatic authentication state management
+  - **Simplified State Handling**: Authentication state is automatically injected via `AuthHooks` module
+  - **Clean Architecture**: Removed manual authentication state handling in favor of centralized hook system
 - **MovieDetailsLive**: Movie and TV show detail pages with review management and error recovery
   - Handles dynamic routing for both movies and TV shows
   - Converts string media types from URL parameters to atoms for API compatibility
@@ -146,13 +210,19 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - Prepared for comprehensive review display and management features
 
 #### LiveView Authentication Hooks (`lib/flixir_web/live/auth_hooks.ex`)
-The `AuthHooks` module ensures authentication state is properly transferred from connection assigns to LiveView socket assigns:
+The `AuthHooks` module provides centralized authentication state management for all LiveView components:
 
 **Core Functionality:**
-- **State Transfer**: Transfers authentication state from HTTP connection to LiveView socket
-- **Session Validation**: Validates session IDs from Phoenix sessions against the database
-- **Debug Support**: Enhanced debugging capabilities for troubleshooting authentication issues
-- **Automatic Assignment**: Ensures authentication assigns are available in all LiveViews
+- **Centralized State Management**: Automatically transfers authentication state from HTTP connection to LiveView socket
+- **Session Validation**: Validates session IDs from Phoenix sessions against the database on every LiveView mount
+- **Automatic Assignment**: Ensures authentication assigns are consistently available across all LiveViews
+- **Clean Architecture**: Eliminates the need for manual authentication state handling in individual LiveView modules
+
+**Implementation Benefits:**
+- **DRY Principle**: Removes duplicate authentication code from individual LiveView modules like `SearchLive`
+- **Consistency**: Ensures all LiveViews have the same authentication state structure
+- **Maintainability**: Centralizes authentication logic for easier updates and debugging
+- **Performance**: Efficient session validation with proper error handling and fallbacks
 
 **Debug Features:**
 - **Session Monitoring**: Logs session keys and authentication state during LiveView mounting
@@ -175,6 +245,11 @@ end
 - `:current_user` - User data from TMDB API or nil
 - `:current_session` - Session struct from database or nil
 
+**Recent Improvements:**
+- **SearchLive Integration**: Updated `SearchLive` to use the centralized hook system instead of manual authentication state handling
+- **Code Simplification**: Removed redundant authentication code from individual LiveView modules
+- **Improved Reliability**: Consistent authentication state management across all LiveView components
+
 #### Session Management (`lib/flixir_web/plugs/auth_session.ex`)
 The `AuthSession` plug provides comprehensive session management and authentication validation:
 
@@ -184,6 +259,14 @@ The `AuthSession` plug provides comprehensive session management and authenticat
 - **Automatic Cleanup**: Handles expired sessions with automatic cookie cleanup
 - **Authentication Requirements**: Optional authentication enforcement with configurable redirect behavior
 - **Security Logging**: Comprehensive logging for authentication events and security monitoring
+
+**Session Configuration:**
+The application uses Phoenix's built-in session management with enhanced security settings:
+- **Cookie-based Storage**: Sessions are stored in encrypted, signed cookies
+- **Security Headers**: HTTP-only, secure, and SameSite attributes for CSRF protection
+- **Configurable Expiration**: 24-hour default session lifetime (configurable via environment)
+- **Environment-specific Settings**: Development uses relaxed settings, production enforces HTTPS
+- **Automatic Cleanup**: Expired sessions are automatically cleaned from both cookies and database
 
 **Plug Configuration:**
 ```elixir
@@ -541,11 +624,13 @@ The `AuthSession` plug provides seamless authentication integration across the e
 
 **Security Features:**
 - **Secure Cookies**: HTTP-only, secure, and SameSite cookie configuration
-- **Session Encryption**: All session data is encrypted using Phoenix's signed cookies
-- **Automatic Expiration**: Sessions automatically expire based on TMDB session lifetime
+- **Session Encryption**: All session data is encrypted using Phoenix's signed cookies with configurable salts
+- **Automatic Expiration**: Sessions automatically expire based on TMDB session lifetime (24 hours default)
 - **Background Cleanup**: Expired sessions are cleaned up automatically with database cleanup
-- **CSRF Protection**: Built-in CSRF protection for authentication forms
+- **CSRF Protection**: Built-in CSRF protection for authentication forms with SameSite cookie attributes
 - **Session Invalidation**: Automatic cleanup of invalid or expired sessions from cookies
+- **Environment-specific Security**: Production enforces HTTPS-only cookies and strict SameSite policy
+- **Configurable Session Lifetime**: Session duration can be customized via `SESSION_MAX_AGE` environment variable
 
 **Database Integration:**
 - **Session Persistence**: User sessions are stored in the `auth_sessions` table with proper indexing
@@ -567,6 +652,42 @@ The `AuthSession` plug provides seamless authentication integration across the e
 - **Session Management**: Automatic session refresh and logout functionality with proper cleanup
 - **User Context**: User information is available throughout the application via conn assigns
 - **Redirect Handling**: Preserves intended destination and redirects users after successful authentication
+
+## Configuration
+
+### Environment Variables
+
+The application supports the following environment variables for configuration:
+
+#### Required Variables
+- `TMDB_API_KEY` - Your TMDB API key for accessing movie data
+- `DATABASE_URL` - PostgreSQL database connection string (production)
+- `SECRET_KEY_BASE` - Phoenix secret key base for encryption (production)
+
+#### Optional Variables
+- `SESSION_MAX_AGE` - Session lifetime in seconds (default: 86400 = 24 hours)
+- `TMDB_REDIRECT_URL` - TMDB authentication callback URL (default: http://localhost:4000/auth/callback)
+- `TMDB_SESSION_TIMEOUT` - TMDB session timeout in seconds (default: 86400)
+- `SESSION_CLEANUP_INTERVAL` - Database session cleanup interval in seconds (default: 3600)
+- `SESSION_MAX_IDLE` - Maximum idle time before session expires (default: 7200)
+- `SEARCH_CACHE_TTL` - Search result cache TTL in seconds (default: 300)
+- `TMDB_TIMEOUT` - TMDB API request timeout in milliseconds (default: 5000)
+- `TMDB_MAX_RETRIES` - Maximum retry attempts for TMDB API calls (default: 3)
+
+#### Session Security Configuration
+The session configuration automatically adapts based on the environment:
+
+**Development:**
+- `secure: false` - Allows HTTP connections for local development
+- `same_site: "Lax"` - Relaxed CSRF protection for development workflow
+- `http_only: true` - Prevents XSS access to cookies
+- Fixed signing and encryption salts (should be changed in production)
+
+**Production:**
+- `secure: true` - Requires HTTPS connections for security
+- `same_site: "Strict"` - Enhanced CSRF protection in production
+- `http_only: true` - Prevents XSS access to cookies
+- Environment-based session lifetime configuration via `SESSION_MAX_AGE`
 
 #### Error Handling & Recovery
 The application provides robust error handling with user-friendly recovery options:
@@ -721,16 +842,26 @@ end
 
 **Phoenix Session Configuration:**
 ```elixir
-# config/config.exs
-config :flixir_web, FlixirWeb.Endpoint,
+# config/config.exs - Development defaults
+config :flixir, FlixirWeb.Endpoint,
   session: [
     store: :cookie,
     key: "_flixir_key",
-    signing_salt: "session_salt",
-    max_age: 86400, # 24 hours
-    secure: true,
+    signing_salt: "session_salt_key_change_in_prod",
+    encryption_salt: "session_encrypt_salt_change_in_prod",
+    max_age: 86400,  # 24 hours
+    secure: false,   # Will be overridden in prod
     http_only: true,
     same_site: "Lax"
+  ]
+
+# config/runtime.exs - Production overrides
+config :flixir, FlixirWeb.Endpoint,
+  session: [
+    secure: true,        # Require HTTPS in production
+    http_only: true,     # Prevent XSS access to cookies
+    same_site: "Strict", # Enhanced CSRF protection
+    max_age: String.to_integer(System.get_env("SESSION_MAX_AGE") || "86400")
   ]
 ```
 

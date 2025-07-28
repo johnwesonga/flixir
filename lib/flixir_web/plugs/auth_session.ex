@@ -52,6 +52,7 @@ defmodule FlixirWeb.Plugs.AuthSession do
   require Logger
 
   @session_key "tmdb_session_id"
+  @encrypted_session_key "encrypted_session_data"
 
   def init(opts) do
     %{
@@ -61,7 +62,8 @@ defmodule FlixirWeb.Plugs.AuthSession do
   end
 
   def call(conn, opts) do
-    session_id = get_session(conn, @session_key)
+    # Try to get session ID from encrypted storage first, then fallback to plain
+    session_id = get_encrypted_session_id(conn) || get_session(conn, @session_key)
 
     conn
     |> validate_and_assign_session(session_id)
@@ -125,6 +127,7 @@ defmodule FlixirWeb.Plugs.AuthSession do
   defp clear_session_and_assign_unauthenticated(conn) do
     conn
     |> delete_session(@session_key)
+    |> delete_session(@encrypted_session_key)
     |> assign_unauthenticated()
   end
 
@@ -149,7 +152,7 @@ defmodule FlixirWeb.Plugs.AuthSession do
   end
 
   @doc """
-  Helper function to store session ID in cookie after successful authentication.
+  Helper function to store session ID in encrypted cookie after successful authentication.
 
   ## Examples
 
@@ -158,7 +161,52 @@ defmodule FlixirWeb.Plugs.AuthSession do
 
   """
   def put_session_id(conn, session_id) when is_binary(session_id) do
-    put_session(conn, @session_key, session_id)
+    # Store in encrypted format for security
+    session_data = %{
+      session_id: session_id,
+      created_at: DateTime.utc_now() |> DateTime.to_unix(),
+      csrf_token: generate_csrf_token()
+    }
+
+    conn
+    |> put_session(@encrypted_session_key, session_data)
+    |> delete_session(@session_key)  # Remove any old plain session
+  end
+
+  @doc """
+  Validates CSRF token for authentication operations.
+
+  ## Examples
+
+      iex> validate_csrf_token(conn, token)
+      :ok
+
+      iex> validate_csrf_token(conn, invalid_token)
+      {:error, :invalid_csrf_token}
+  """
+  def validate_csrf_token(conn, provided_token) when is_binary(provided_token) do
+    case get_encrypted_session_id(conn) do
+      nil ->
+        # No session, generate and compare with Phoenix's CSRF token
+        case Phoenix.Controller.get_csrf_token() do
+          ^provided_token -> :ok
+          _ -> {:error, :invalid_csrf_token}
+        end
+
+      _session_id ->
+        # Has session, validate against stored CSRF token
+        case get_session(conn, @encrypted_session_key) do
+          %{csrf_token: stored_token} when stored_token == provided_token ->
+            :ok
+
+          _ ->
+            {:error, :invalid_csrf_token}
+        end
+    end
+  end
+
+  def validate_csrf_token(_conn, _invalid_token) do
+    {:error, :invalid_csrf_token}
   end
 
   @doc """
@@ -171,7 +219,9 @@ defmodule FlixirWeb.Plugs.AuthSession do
 
   """
   def clear_session_id(conn) do
-    delete_session(conn, @session_key)
+    conn
+    |> delete_session(@session_key)
+    |> delete_session(@encrypted_session_key)
   end
 
   @doc """
@@ -201,5 +251,45 @@ defmodule FlixirWeb.Plugs.AuthSession do
   """
   def clear_redirect_after_login(conn) do
     delete_session(conn, :redirect_after_login)
+  end
+
+  # Private helper functions for encrypted session handling
+
+  defp get_encrypted_session_id(conn) do
+    case get_session(conn, @encrypted_session_key) do
+      %{session_id: session_id} = session_data when is_binary(session_id) ->
+        if valid_session_data?(session_data) do
+          session_id
+        else
+          Logger.warning("Invalid encrypted session data, clearing session")
+          nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp valid_session_data?(%{session_id: session_id, created_at: created_at, csrf_token: csrf_token})
+       when is_binary(session_id) and is_integer(created_at) and is_binary(csrf_token) do
+    # Check if session data is not too old (prevent replay attacks)
+    max_age = get_session_max_age()
+    current_time = DateTime.utc_now() |> DateTime.to_unix()
+
+    current_time - created_at <= max_age
+  end
+
+  defp valid_session_data?(_), do: false
+
+  defp generate_csrf_token do
+    :crypto.strong_rand_bytes(32) |> Base.encode64()
+  end
+
+  defp get_session_max_age do
+    # Get max age from endpoint configuration, default to 24 hours
+    case Application.get_env(:flixir, FlixirWeb.Endpoint)[:session] do
+      nil -> 86400
+      session_config -> Keyword.get(session_config, :max_age, 86400)
+    end
   end
 end

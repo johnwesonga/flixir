@@ -9,7 +9,6 @@ defmodule Flixir.Reviews.TMDBClient do
   require Logger
   alias Flixir.Reviews.Review
 
-  @base_url "https://api.themoviedb.org/3"
   @default_timeout 5_000
   @default_max_retries 3
 
@@ -31,7 +30,9 @@ defmodule Flixir.Reviews.TMDBClient do
   """
   def fetch_reviews(media_type, media_id, page \\ 1)
 
-  def fetch_reviews(media_type, media_id, page) when media_type in ["movie", "tv"] and is_integer(media_id) and media_id > 0 and is_integer(page) and page > 0 do
+  def fetch_reviews(media_type, media_id, page)
+      when media_type in ["movie", "tv"] and is_integer(media_id) and media_id > 0 and
+             is_integer(page) and page > 0 do
     url = build_reviews_url(media_type, media_id, page)
 
     case make_request(url) do
@@ -48,7 +49,8 @@ defmodule Flixir.Reviews.TMDBClient do
     {:error, :invalid_media_type}
   end
 
-  def fetch_reviews(_media_type, media_id, _page) when not is_integer(media_id) or media_id <= 0 do
+  def fetch_reviews(_media_type, media_id, _page)
+      when not is_integer(media_id) or media_id <= 0 do
     {:error, :invalid_media_id}
   end
 
@@ -114,11 +116,16 @@ defmodule Flixir.Reviews.TMDBClient do
       "https://api.themoviedb.org/3/movie/550/reviews?api_key=...&page=1"
   """
   def build_reviews_url(media_type, media_id, page) do
+    base_url = get_base_url()
     api_key = get_api_key()
-    "#{@base_url}/#{media_type}/#{media_id}/reviews?api_key=#{api_key}&page=#{page}"
+    "#{base_url}/#{media_type}/#{media_id}/reviews?api_key=#{api_key}&page=#{page}"
   end
 
   # Private functions
+
+  defp get_base_url do
+    Application.get_env(:flixir, :tmdb)[:base_url] || "https://api.themoviedb.org/3"
+  end
 
   defp make_request(url) do
     options = [

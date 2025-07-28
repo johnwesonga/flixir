@@ -72,19 +72,24 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Preserves navigation context and handles post-login redirects
 
 **Auth Hooks (`lib/flixir_web/live/auth_hooks.ex`)**
-- LiveView on_mount callback for authentication state management
+- LiveView on_mount callback for centralized authentication state management
 - Transfers authentication state from HTTP connection to LiveView socket
 - Enhanced debugging capabilities for troubleshooting authentication issues
 - Validates session consistency between Phoenix sessions and socket assigns
 - Provides comprehensive logging for authentication state debugging
 - Detects potential issues with AuthSession plug integration
 - Ensures authentication context is available in all LiveView components
+- **Centralized Architecture**: Eliminates need for manual authentication handling in individual LiveViews
+- **DRY Principle**: Removes duplicate authentication code across LiveView modules
+- **Consistency**: Ensures uniform authentication state structure across all components
 
 **Search Live View (`lib/flixir_web/live/search_live.ex`)**
 - Real-time search interface with debounced input (300ms)
 - Handles URL parameters for shareable search links
 - Manages search state including pagination, filtering, and sorting
 - Implements comprehensive error handling and validation
+- **Authentication Integration**: Uses centralized `on_mount` hook pattern for authentication state management
+- **Clean Architecture**: Removed manual authentication state handling in favor of `AuthHooks` module
 
 **Main Navigation Component (`lib/flixir_web/components/main_navigation.ex`)**
 - Unified navigation system across search, movies, and reviews sections
@@ -171,13 +176,14 @@ This debugging information helps identify authentication flow issues during deve
 - **Error Handling**: Comprehensive error states and recovery
 - **Authentication**: TMDB-based user authentication with automatic session management
 - **Session Management**: Transparent session validation and user context injection across all requests
-- **Security**: Secure session storage, automatic cleanup, and comprehensive logging
+- **Security**: Secure session storage with configurable encryption salts, automatic cleanup, and comprehensive logging
 
 ### Configuration
 - Database: PostgreSQL with Ecto
 - HTTP Client: Req library for TMDB API calls
 - Frontend: Phoenix LiveView with Tailwind CSS
 - Server: Bandit adapter
+- Session Management: Phoenix cookie-based sessions with configurable security settings
 
 ### Development Notes
 - Uses Phoenix 1.8 with LiveView for real-time interactions
