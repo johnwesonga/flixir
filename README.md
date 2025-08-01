@@ -544,7 +544,7 @@ This configuration ensures that development tools are:
 - **Reviews Routes**: 
   - `/reviews` - Recent reviews (default filter)
   - `/reviews/:filter` - Filtered reviews (popular, movies, tv, top-rated)
-- **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details with review integration
+- **Detail Routes**: `/media/:type/:id` - Dynamic LiveView routes for movie and TV show details with review integration
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
 - **Session Management**: All routes automatically validate user sessions via `AuthSession` plug

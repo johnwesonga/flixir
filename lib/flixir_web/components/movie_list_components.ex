@@ -156,7 +156,7 @@ defmodule FlixirWeb.MovieListComponents do
 
     ~H"""
     <.link
-      navigate={~p"/movie/#{@movie.id}?#{@nav_params}"}
+      navigate={~p"/media/movie/#{@movie.id}?#{@nav_params}"}
       class={[
         "block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-all duration-200 group cursor-pointer transform hover:-translate-y-1",
         @class

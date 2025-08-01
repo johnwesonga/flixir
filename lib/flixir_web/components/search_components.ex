@@ -29,7 +29,7 @@ defmodule FlixirWeb.SearchComponents do
 
     ~H"""
     <.link
-      navigate={~p"/#{@result.media_type}/#{@result.id}?#{@search_params}"}
+      navigate={~p"/media/#{@result.media_type}/#{@result.id}?#{@search_params}"}
       class={[
         "block bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-200 group cursor-pointer",
         @class

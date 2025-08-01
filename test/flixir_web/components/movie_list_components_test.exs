@@ -348,7 +348,7 @@ defmodule FlixirWeb.MovieListComponentsTest do
       assert html =~ "Test Movie"
       assert html =~ "2023"
       assert html =~ "A great test movie"
-      assert html =~ "/movie/1"
+      assert html =~ "/media/movie/1"
       assert html =~ "from=popular"
     end
 

@@ -329,7 +329,7 @@ defmodule FlixirWeb.Integration.MovieListsTest do
         |> element("[data-testid='movie-card']")
         |> render()
 
-        assert movie_link =~ "href=\"/movie/238?from=top_rated\""
+        assert movie_link =~ "href=\"/media/movie/238?from=top_rated\""
 
         # Click on movie card
         view
