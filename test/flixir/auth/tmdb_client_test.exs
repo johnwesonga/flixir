@@ -72,7 +72,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :unauthorized} = TMDBClient.create_request_token()
+        assert {:error, :authentication_failed} = TMDBClient.create_request_token()
       end
     end
 
@@ -84,7 +84,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :timeout} = TMDBClient.create_request_token()
+        assert {:error, :network_error} = TMDBClient.create_request_token()
       end
     end
 
@@ -158,7 +158,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :unauthorized} = TMDBClient.create_session("token_123")
+        assert {:error, :authentication_failed} = TMDBClient.create_session("token_123")
       end
     end
 
@@ -170,6 +170,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
+        # Rate limiting should not retry in test environment
         assert {:error, :rate_limited} = TMDBClient.create_session("token_123")
       end
     end
@@ -229,7 +230,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :not_found} = TMDBClient.delete_session("nonexistent_session")
+        assert {:error, :service_unavailable} = TMDBClient.delete_session("nonexistent_session")
       end
     end
   end
@@ -290,7 +291,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :unauthorized} = TMDBClient.get_account_details("invalid_session")
+        assert {:error, :authentication_failed} = TMDBClient.get_account_details("invalid_session")
       end
     end
 
@@ -316,7 +317,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, {:transport_error, :econnrefused}} = TMDBClient.get_account_details("session_123")
+        assert {:error, :network_error} = TMDBClient.get_account_details("session_123")
       end
     end
   end
@@ -330,7 +331,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, {:unexpected_status, 500}} = TMDBClient.create_request_token()
+        assert {:error, :service_unavailable} = TMDBClient.create_request_token()
       end
     end
 
@@ -342,7 +343,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           end
         ]}
       ] do
-        assert {:error, :some_generic_error} = TMDBClient.create_request_token()
+        assert {:error, :unknown} = TMDBClient.create_request_token()
       end
     end
   end
@@ -366,7 +367,7 @@ defmodule Flixir.Auth.TMDBClientTest do
           get_env: fn :flixir, :tmdb -> [api_key: ""] end
         ]}
       ] do
-        assert_raise RuntimeError, ~r/Invalid TMDB API key configuration/, fn ->
+        assert_raise RuntimeError, ~r/Invalid TMDB API key - key appears too short/, fn ->
           TMDBClient.create_request_token()
         end
       end

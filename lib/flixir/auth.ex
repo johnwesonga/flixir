@@ -7,6 +7,7 @@ defmodule Flixir.Auth do
   alias Flixir.Repo
   alias Flixir.Auth.Session
   alias Flixir.Auth.TMDBClient
+  alias Flixir.Auth.ErrorHandler
 
   require Logger
 
@@ -31,13 +32,19 @@ defmodule Flixir.Auth do
       {:error, :token_creation_failed}
   """
   def start_authentication do
+    Logger.info("Starting TMDB authentication flow")
+
     case TMDBClient.create_request_token() do
       {:ok, %{request_token: token}} ->
         auth_url = build_auth_url(token)
+        Logger.info("Successfully created request token, redirecting to TMDB")
         {:ok, auth_url}
 
       {:error, reason} ->
-        Logger.error("Failed to start authentication: #{inspect(reason)}")
+        Logger.error("Failed to start authentication", %{
+          error: inspect(reason),
+          user_message: ErrorHandler.format_user_error({:error, reason})
+        })
         {:error, reason}
     end
   end
@@ -64,25 +71,34 @@ defmodule Flixir.Auth do
       {:error, :session_creation_failed}
   """
   def complete_authentication(request_token) when is_binary(request_token) do
+    Logger.info("Completing TMDB authentication", %{
+      token_length: String.length(request_token)
+    })
+
     with {:ok, %{session_id: session_id}} <- TMDBClient.create_session(request_token),
          {:ok, account_details} <- TMDBClient.get_account_details(session_id),
          {:ok, session} <- create_session_from_account(session_id, account_details) do
-      Logger.info(
-        "Successfully completed authentication for user: #{account_details["username"]}"
-      )
+      Logger.info("Successfully completed authentication", %{
+        user_id: account_details["id"],
+        username: account_details["username"],
+        session_id: session_id
+      })
 
       {:ok, session}
     else
       {:error, reason} ->
-        Logger.error(
-          "Failed to complete authentication with token #{request_token}: #{inspect(reason)}"
-        )
+        Logger.error("Failed to complete authentication", %{
+          error: inspect(reason),
+          token_length: String.length(request_token),
+          user_message: ErrorHandler.format_user_error({:error, reason})
+        })
 
         {:error, reason}
     end
   end
 
   def complete_authentication(_invalid_token) do
+    Logger.warning("Attempted to complete authentication with invalid token format")
     {:error, :invalid_token}
   end
 
@@ -111,25 +127,44 @@ defmodule Flixir.Auth do
       {:error, :not_found}
   """
   def validate_session(session_id) when is_binary(session_id) do
+    Logger.debug("Validating session", %{session_id: session_id})
+
     case get_session(session_id) do
       {:ok, session} ->
         if session_active?(session) do
           case update_last_accessed(session) do
-            {:ok, updated_session} -> {:ok, updated_session}
-            {:error, reason} -> {:error, reason}
+            {:ok, updated_session} ->
+              Logger.debug("Session validated and updated", %{
+                session_id: session_id,
+                username: session.username
+              })
+              {:ok, updated_session}
+            {:error, reason} ->
+              Logger.error("Failed to update session last accessed time", %{
+                session_id: session_id,
+                error: inspect(reason)
+              })
+              {:error, reason}
           end
         else
-          Logger.info("Session #{session_id} has expired, cleaning up")
+          Logger.info("Session expired, cleaning up", %{
+            session_id: session_id,
+            username: session.username,
+            expires_at: session.expires_at,
+            last_accessed_at: session.last_accessed_at
+          })
           delete_session(session)
           {:error, :session_expired}
         end
 
       {:error, :not_found} ->
+        Logger.debug("Session not found", %{session_id: session_id})
         {:error, :not_found}
     end
   end
 
   def validate_session(_invalid_session_id) do
+    Logger.warning("Attempted to validate session with invalid session ID format")
     {:error, :invalid_session_id}
   end
 
@@ -155,34 +190,56 @@ defmodule Flixir.Auth do
       {:error, :not_found}
   """
   def logout(session_id) when is_binary(session_id) do
+    Logger.info("Starting logout process", %{session_id: session_id})
+
     case get_session(session_id) do
       {:ok, session} ->
         # Try to delete from TMDB first, but don't fail if it's already gone
         case TMDBClient.delete_session(session_id) do
           {:ok, _} ->
-            Logger.info("Successfully deleted TMDB session: #{session_id}")
+            Logger.info("Successfully deleted TMDB session", %{
+              session_id: session_id,
+              username: session.username
+            })
 
           {:error, reason} ->
-            Logger.warning("Failed to delete TMDB session #{session_id}: #{inspect(reason)}")
+            # Log but don't fail - session might already be expired on TMDB side
+            Logger.warning("Failed to delete TMDB session (continuing with local cleanup)", %{
+              session_id: session_id,
+              username: session.username,
+              error: inspect(reason),
+              user_message: ErrorHandler.format_user_error({:error, reason})
+            })
         end
 
         # Always delete from local database
         case delete_session(session) do
           {:ok, _} ->
-            Logger.info("Successfully logged out user: #{session.username}")
+            Logger.info("Successfully logged out user", %{
+              session_id: session_id,
+              username: session.username
+            })
             :ok
 
           {:error, reason} ->
-            Logger.error("Failed to delete local session #{session_id}: #{inspect(reason)}")
+            Logger.error("Failed to delete local session", %{
+              session_id: session_id,
+              username: session.username,
+              error: inspect(reason)
+            })
             {:error, reason}
         end
 
       {:error, :not_found} ->
+        Logger.warning("Attempted to logout non-existent session", %{
+          session_id: session_id
+        })
         {:error, :not_found}
     end
   end
 
   def logout(_invalid_session_id) do
+    Logger.warning("Attempted to logout with invalid session ID format")
     {:error, :invalid_session_id}
   end
 
@@ -212,19 +269,39 @@ defmodule Flixir.Auth do
       {:error, :unauthorized}
   """
   def get_current_user(session_id) when is_binary(session_id) do
+    Logger.debug("Getting current user", %{session_id: session_id})
+
     case validate_session(session_id) do
-      {:ok, _session} ->
+      {:ok, session} ->
         case TMDBClient.get_account_details(session_id) do
-          {:ok, user_data} -> {:ok, user_data}
-          {:error, reason} -> {:error, reason}
+          {:ok, user_data} ->
+            Logger.debug("Successfully retrieved user data", %{
+              session_id: session_id,
+              user_id: user_data["id"],
+              username: user_data["username"]
+            })
+            {:ok, user_data}
+          {:error, reason} ->
+            Logger.error("Failed to get current user data", %{
+              session_id: session_id,
+              username: session.username,
+              error: inspect(reason),
+              user_message: ErrorHandler.format_user_error({:error, reason})
+            })
+            {:error, reason}
         end
 
       {:error, reason} ->
+        Logger.debug("Session validation failed for get_current_user", %{
+          session_id: session_id,
+          error: inspect(reason)
+        })
         {:error, reason}
     end
   end
 
   def get_current_user(_invalid_session_id) do
+    Logger.warning("Attempted to get current user with invalid session ID format")
     {:error, :invalid_session_id}
   end
 

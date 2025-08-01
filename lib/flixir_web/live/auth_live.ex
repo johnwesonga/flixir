@@ -13,6 +13,7 @@ defmodule FlixirWeb.AuthLive do
   use FlixirWeb, :live_view
 
   alias Flixir.Auth
+  alias Flixir.Auth.ErrorHandler
 
   require Logger
 
@@ -328,43 +329,31 @@ defmodule FlixirWeb.AuthLive do
 
   # Helper functions
 
-  defp format_authentication_error(:token_creation_failed) do
-    "Unable to connect to TMDB for authentication. Please try again later."
-  end
+  defp format_authentication_error(reason) do
+    # Use the centralized error handler for consistent messaging
+    error_result = {:error, reason}
+    user_message = ErrorHandler.format_user_error(error_result)
 
-  defp format_authentication_error(:session_creation_failed) do
-    "Failed to create authentication session. Please try logging in again."
-  end
+    # Log technical details for debugging
+    Logger.debug("Formatting authentication error for user", %{
+      original_error: inspect(reason),
+      user_message: user_message,
+      api_unavailable: ErrorHandler.api_unavailable?(error_result)
+    })
 
-  defp format_authentication_error(:invalid_token) do
-    "Invalid authentication token. Please try logging in again."
-  end
+    # Add additional context for certain error types
+    case reason do
+      :rate_limited ->
+        "#{user_message} This helps protect the service for all users."
 
-  defp format_authentication_error(:unauthorized) do
-    "Authentication failed. Please check your TMDB credentials and try again."
-  end
+      :network_error ->
+        "#{user_message} You can also try refreshing the page."
 
-  defp format_authentication_error(:timeout) do
-    "Authentication request timed out. Please check your connection and try again."
-  end
+      :service_unavailable ->
+        "#{user_message} We're working to resolve this issue."
 
-  defp format_authentication_error(:rate_limited) do
-    "Too many authentication attempts. Please wait a moment and try again."
-  end
-
-  defp format_authentication_error(:not_found) do
-    "Authentication service not found. Please try again later."
-  end
-
-  defp format_authentication_error({:transport_error, _reason}) do
-    "Network error during authentication. Please check your connection and try again."
-  end
-
-  defp format_authentication_error({:unexpected_status, status}) do
-    "Authentication service returned an unexpected response (#{status}). Please try again later."
-  end
-
-  defp format_authentication_error(_reason) do
-    "An unexpected error occurred during authentication. Please try again."
+      _ ->
+        user_message
+    end
   end
 end

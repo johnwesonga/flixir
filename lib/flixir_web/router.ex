@@ -1,6 +1,7 @@
 defmodule FlixirWeb.Router do
   use FlixirWeb, :router
 
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -19,6 +20,8 @@ defmodule FlixirWeb.Router do
   pipeline :api do
     plug :accepts, ["json"]
   end
+
+  # LiveView socket configuration
 
   scope "/", FlixirWeb do
     pipe_through :browser
@@ -60,6 +63,8 @@ defmodule FlixirWeb.Router do
   # scope "/api", FlixirWeb do
   #   pipe_through :api
   # end
+
+
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:flixir, :dev_routes) do

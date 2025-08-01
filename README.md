@@ -37,6 +37,41 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Loading States**: Smooth loading indicators and transitions
 - **Error Recovery**: One-click retry functionality for failed operations
 
+## Testing
+
+The application includes a comprehensive test suite covering all major components:
+
+### Test Coverage
+- **Unit Tests**: Individual module and function testing
+- **Integration Tests**: End-to-end workflow testing including movie lists, authentication, and search
+- **LiveView Tests**: Interactive component testing with Phoenix LiveViewTest
+- **Component Tests**: UI component rendering and behavior testing
+- **Performance Tests**: Load testing and response time validation
+- **Security Tests**: Authentication flow and session security testing
+
+### Running Tests
+```bash
+# Run all tests
+mix test
+
+# Run tests with coverage report
+mix test --cover
+
+# Run specific test file
+mix test test/flixir_web/live/movie_lists_live_test.exs
+
+# Run tests matching a pattern
+mix test --grep "authentication"
+```
+
+### Test Categories
+- **Authentication Tests**: Complete TMDB authentication flow testing
+- **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
+- **Search Tests**: Real-time search and filtering functionality
+- **Review Tests**: Review display, filtering, and rating statistics
+- **Cache Tests**: Caching behavior and performance validation
+- **Error Handling Tests**: Comprehensive error scenario testing
+
 ## Getting Started
 
 ### Prerequisites
@@ -52,7 +87,15 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
    mix setup
    ```
 
-2. Configure your TMDB API key in `config/dev.exs`:
+2. Configure your TMDB API key. You can either:
+   
+   **Option A: Environment Variable (Recommended)**
+   ```bash
+   export TMDB_API_KEY="your_tmdb_api_key_here"
+   ```
+   
+   **Option B: Configuration File**
+   Add to `config/dev.exs`:
    ```elixir
    config :flixir, :tmdb,
      api_key: "your_tmdb_api_key_here"
@@ -77,21 +120,82 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 5. Visit [`localhost:4000`](http://localhost:4000) in your browser.
 
-### Session Configuration
+### Development Tools
 
-The application includes comprehensive session management with secure defaults:
+The application includes several development and monitoring tools:
+
+#### LiveDashboard
+Access comprehensive application metrics and monitoring at [`localhost:4000/dev/dashboard`](http://localhost:4000/dev/dashboard) in development mode:
+- **Metrics**: Request rates, response times, and system performance
+- **Processes**: Live process monitoring and inspection
+- **ETS Tables**: Database and cache inspection
+- **Applications**: Application tree and supervision hierarchy
+- **Request Logger**: Track and analyze HTTP requests with detailed timing information
+
+The LiveDashboard is automatically configured for development environments using Phoenix's `dev_routes` configuration. It includes integrated telemetry metrics from `FlixirWeb.Telemetry` for comprehensive application monitoring.
+
+#### Email Preview
+View sent emails in development at [`localhost:4000/dev/mailbox`](http://localhost:4000/dev/mailbox) using Swoosh's mailbox preview.
+
+#### Session Cleanup Monitoring
+Monitor session cleanup statistics and manually trigger cleanup operations:
+```elixir
+# Get cleanup statistics
+iex> Flixir.Auth.SessionCleanup.get_stats()
+
+# Manually trigger cleanup
+iex> Flixir.Auth.SessionCleanup.cleanup_expired_sessions()
+```
+
+### Configuration
+
+The application includes comprehensive session management and LiveView configuration with secure defaults:
+
+#### Endpoint Configuration
+The Phoenix endpoint (`lib/flixir_web/endpoint.ex`) is configured with comprehensive LiveView and monitoring support:
+
+**LiveView Socket Configuration:**
+```elixir
+socket "/live", Phoenix.LiveView.Socket,
+  websocket: [connect_info: [session: @session_options]],
+  longpoll: [connect_info: [session: @session_options]]
+```
+
+**Development Tools Integration:**
+- **LiveDashboard**: Integrated request logging for performance monitoring
+- **Live Reload**: Automatic browser refresh during development
+- **Code Reloader**: Hot code reloading for faster development cycles
+
+#### LiveView Configuration
+Phoenix LiveView requires a signing salt for secure WebSocket connections. This is configured within the endpoint configuration:
+
+```elixir
+config :flixir, FlixirWeb.Endpoint,
+  live_view: [signing_salt: "hLMifOvkqjrh1OjtczWMnigpiE95pC0c"]
+```
+
+This salt is used to sign LiveView tokens and should be changed in production for security. **Important**: Ensure there's only one `live_view` configuration per endpoint to avoid conflicts.
+
+#### Session Configuration
 
 #### Development Configuration
 Base configuration in `config/config.exs`:
 ```elixir
 config :flixir, FlixirWeb.Endpoint,
+  url: [host: "localhost"],
+  adapter: Bandit.PhoenixAdapter,
+  pubsub_server: Flixir.PubSub,
+  live_view: [signing_salt: "hLMifOvkqjrh1OjtczWMnigpiE95pC0c"],
+  # Session configuration with security settings
   session: [
     store: :cookie,
     key: "_flixir_key",
     signing_salt: "session_salt_key_change_in_prod",
     encryption_salt: "session_encrypt_salt_change_in_prod",
-    max_age: 86400,  # 24 hours
-    secure: false,   # Will be overridden in prod
+    # 24 hours
+    max_age: 86400,
+    # Will be overridden in prod
+    secure: false,
     http_only: true,
     same_site: "Lax"
   ]
@@ -129,8 +233,12 @@ config :flixir, FlixirWeb.Endpoint,
 
 ```elixir
 # Generate new salts for production
-signing_salt: System.get_env("SESSION_SIGNING_SALT") || "your_unique_signing_salt"
-encryption_salt: System.get_env("SESSION_ENCRYPTION_SALT") || "your_unique_encryption_salt"
+config :flixir, FlixirWeb.Endpoint,
+  live_view: [signing_salt: System.get_env("LIVEVIEW_SIGNING_SALT") || "your_unique_liveview_salt"],
+  session: [
+    signing_salt: System.get_env("SESSION_SIGNING_SALT") || "your_unique_signing_salt",
+    encryption_salt: System.get_env("SESSION_ENCRYPTION_SALT") || "your_unique_encryption_salt"
+  ]
 ```
 
 Generate secure salts using:
@@ -138,12 +246,49 @@ Generate secure salts using:
 mix phx.gen.secret
 ```
 
+**Required Environment Variables for Production:**
+- `TMDB_API_KEY` - Your TMDB API key for movie data access
+- `DATABASE_URL` - PostgreSQL connection string
+- `SECRET_KEY_BASE` - Phoenix secret key base for encryption
+- `LIVEVIEW_SIGNING_SALT` - For LiveView WebSocket security
+- `SESSION_SIGNING_SALT` - For session cookie signing
+- `SESSION_ENCRYPTION_SALT` - For session cookie encryption
+
+**Optional Environment Variables:**
+- `PHX_HOST` - Production hostname (default: "example.com")
+- `PORT` - Server port (default: 4000)
+- `SESSION_MAX_AGE` - Session lifetime in seconds (default: 86400)
+- `TMDB_BASE_URL` - TMDB API base URL (default: "https://api.themoviedb.org/3")
+- `TMDB_IMAGE_BASE_URL` - TMDB image base URL (default: "https://image.tmdb.org/t/p/w500")
+- `TMDB_TIMEOUT` - TMDB API timeout in milliseconds (default: 5000)
+- `TMDB_MAX_RETRIES` - TMDB API retry attempts (default: 3)
+- `TMDB_REDIRECT_URL` - Authentication callback URL (default: "http://localhost:4000/auth/callback")
+- `TMDB_SESSION_TIMEOUT` - TMDB session lifetime (default: 86400)
+- `SESSION_CLEANUP_INTERVAL` - Session cleanup interval in seconds (default: 3600)
+- `SESSION_MAX_IDLE` - Session idle timeout in seconds (default: 7200)
+- `SEARCH_CACHE_TTL` - Search cache TTL in seconds (default: 300)
+- `SEARCH_CACHE_MAX_ENTRIES` - Maximum cache entries (default: 1000)
+- `SEARCH_CACHE_CLEANUP_INTERVAL` - Cache cleanup interval in milliseconds (default: 60000)
+
+#### Configuration Best Practices
+- **Avoid Duplicates**: Ensure each configuration key appears only once per config block
+- **Environment Separation**: Use environment-specific config files for different deployment environments
+- **Secret Management**: Never commit production secrets to version control
+- **Salt Generation**: Generate unique salts for each environment using `mix phx.gen.secret`
+- **Validation**: Test configuration changes in development before deploying to production
+
 ## Architecture
 
 ### Core Modules
 
 #### Auth Context (`lib/flixir/auth/`)
-- **Session**: User session management with TMDB integration
+- **Session**: User session management with TMDB integration and automatic cleanup
+- **SessionCleanup**: Background service for expired session cleanup
+  - Automatic cleanup of expired and idle sessions
+  - Configurable cleanup intervals (default: 1 hour)
+  - Manual cleanup triggers with statistics tracking
+  - Comprehensive logging and error handling
+  - Session idle timeout detection (default: 2 hours)
 - **TMDBClient**: TMDB authentication API client for token and session management
   - `create_request_token/0`: Initiates TMDB authentication flow by creating request tokens
   - `create_session/1`: Converts approved tokens into authenticated sessions
@@ -151,6 +296,13 @@ mix phx.gen.secret
   - `get_account_details/1`: Retrieves user account information from TMDB
   - Comprehensive error handling with retry logic and exponential backoff
   - Secure HTTP client configuration with proper timeouts and headers
+- **ErrorHandler**: Comprehensive error handling for TMDB authentication operations
+  - Classifies errors into user-friendly categories (network, rate limiting, authentication failures, etc.)
+  - Implements retry logic with exponential backoff and jitter to prevent thundering herd
+  - Provides both user-friendly and technical error messages for different audiences
+  - Includes telemetry support for monitoring authentication issues and performance
+  - Handles fallback strategies for different error types with appropriate logging levels
+  - Supports context-aware error handling with operation tracking and attempt counting
 - **Authentication Flow**: Three-step TMDB authentication (token → approval → session)
 - **Security**: Secure session storage with encryption and proper expiration handling
 - **Logging**: Comprehensive logging for authentication events, errors, and security monitoring
@@ -162,10 +314,12 @@ mix phx.gen.secret
 - **Movie Lists**: Five curated movie list functions with caching and error handling
 
 #### Reviews Context (`lib/flixir/reviews/`)
-- **Review**: Individual review data structure
-- **RatingStats**: Aggregated rating statistics
-- **Cache**: Review-specific caching system
-- **TMDBClient**: Review-focused API operations
+- **Review**: Individual review data structure with comprehensive validation
+- **RatingStats**: Aggregated rating statistics with percentage distributions
+- **Cache**: Review-specific caching system with TTL management
+- **TMDBClient**: Review-focused API operations with error handling
+- **ErrorHandler**: Centralized error handling for review operations
+- **Future Implementation**: Comprehensive review system ready for TMDB reviews API integration
 
 #### Web Components (`lib/flixir_web/components/`)
 - **SearchComponents**: Interactive search interface with clickable result cards
@@ -321,7 +475,7 @@ The plug sets the following assigns on every request:
 - **Comprehensive Logging**: Tracks authentication events for security monitoring
 
 #### Routing & Navigation (`lib/flixir_web/router.ex`)
-The application uses Phoenix pipelines with integrated authentication middleware:
+The application uses Phoenix pipelines with integrated authentication middleware and clean LiveView socket configuration:
 
 **Pipeline Configuration:**
 ```elixir
@@ -339,7 +493,40 @@ pipeline :authenticated do
   plug :browser
   plug FlixirWeb.Plugs.AuthSession, require_auth: true  # Required authentication
 end
+
+pipeline :api do
+  plug :accepts, ["json"]
+end
 ```
+
+**Development Tools Configuration:**
+The router includes proper configuration for development tools using Phoenix's recommended approach:
+
+```elixir
+# Enable LiveDashboard and Swoosh mailbox preview in development
+if Application.compile_env(:flixir, :dev_routes) do
+  import Phoenix.LiveDashboard.Router
+
+  scope "/dev" do
+    pipe_through :browser
+
+    live_dashboard "/dashboard", metrics: FlixirWeb.Telemetry
+    forward "/mailbox", Plug.Swoosh.MailboxPreview
+  end
+end
+```
+
+This configuration ensures that development tools are:
+- **Environment-Specific**: Only available when `:dev_routes` is enabled in configuration
+- **Secure**: Automatically excluded from production builds
+- **Integrated**: Includes telemetry metrics and email preview functionality
+- **Properly Scoped**: Uses the `/dev` path prefix for clear separation from application routes
+
+**Recent Router Improvements:**
+- Cleaned up unused imports for better maintainability
+- Streamlined route organization with consistent formatting
+- Removed unnecessary whitespace for improved code clarity
+- Consolidated development tools configuration using Phoenix best practices
 
 **Application Routes:**
 - **Home Route**: `/` - Landing page with SearchLive for immediate search functionality
@@ -348,16 +535,24 @@ end
   - `/auth/login` - User login interface with TMDB authentication initiation
   - `/auth/callback` - TMDB authentication callback handler with token processing
   - `/auth/logout` - User logout interface with session cleanup confirmation
+  - `/auth/store_session` - Session storage endpoint for post-authentication handling
+  - `/auth/clear_session` - Session cleanup endpoint for logout processing
 - **Movie Lists Routes**: 
   - `/movies` - Popular movies (default list)
   - `/movies/:list_type` - Specific movie lists (trending, top-rated, upcoming, now-playing)
   - URL parameters: `?page=N` for pagination support
-- **Reviews Route**: `/reviews` - Review browsing interface with filtering capabilities
-- **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details
+- **Reviews Routes**: 
+  - `/reviews` - Recent reviews (default filter)
+  - `/reviews/:filter` - Filtered reviews (popular, movies, tv, top-rated)
+- **Detail Routes**: `/:type/:id` - Dynamic LiveView routes for movie and TV show details with review integration
 - **URL Parameters**: Shareable search states with query, filter, and sort parameters
 - **Mixed Navigation**: Combines HTTP GET routes and LiveView for optimal performance and user experience
 - **Session Management**: All routes automatically validate user sessions via `AuthSession` plug
 - **Protected Routes**: Future authenticated-only features can use the `:authenticated` pipeline
+- **Development Tools**: 
+  - LiveDashboard available at `/dev/dashboard` with comprehensive telemetry metrics
+  - Email preview available at `/dev/mailbox` for development email testing
+  - Both tools are automatically configured via Phoenix's `dev_routes` system
 
 **Movie Lists Routing:**
 The router now includes dedicated routes for the movie lists functionality:
@@ -439,6 +634,36 @@ The navigation automatically adapts based on user authentication status:
 - Responsive grid layout that adapts to different screen sizes
 - Consistent spacing and typography throughout
 - User menu with proper dropdown styling and hover states
+
+## Error Handling & Monitoring
+
+The application includes comprehensive error handling and monitoring systems:
+
+### Error Handling Strategy
+- **Graceful Degradation**: Application continues to function even when external services are unavailable
+- **User-Friendly Messages**: Technical errors are translated into actionable user messages
+- **Retry Mechanisms**: Automatic retry logic for transient failures with exponential backoff
+- **Fallback Behavior**: Cached data and alternative flows when primary services fail
+
+### Error Types & Handling
+- **Network Errors**: Connection timeouts, DNS failures, and network unreachability
+- **API Errors**: TMDB API rate limiting, authentication failures, and service unavailability
+- **Authentication Errors**: Session expiration, invalid tokens, and authorization failures
+- **Data Errors**: Malformed responses, missing data, and transformation failures
+- **Cache Errors**: Cache misses, serialization failures, and cleanup errors
+
+### Monitoring & Observability
+- **Comprehensive Logging**: Structured logging for all major operations and errors
+- **Performance Metrics**: Response times, cache hit rates, and API call statistics
+- **Session Monitoring**: Authentication events, session lifecycle, and security alerts
+- **Error Tracking**: Detailed error context with request IDs and user information
+- **Health Checks**: Application health monitoring and dependency status
+
+### Development Debugging
+- **Debug Logging**: Enhanced logging in development mode with detailed context
+- **Authentication Debugging**: Specialized debugging for authentication flow issues
+- **Session State Inspection**: Tools for inspecting session state and authentication context
+- **Cache Statistics**: Real-time cache performance and hit rate monitoring
 
 ### Key Features Implementation
 
@@ -589,6 +814,102 @@ The `MovieListComponents` module provides a complete UI system for displaying mo
 <!-- Navigation tabs -->
 <.list_navigation current_list={:top_rated} />
 ```
+
+## Deployment
+
+### Production Deployment
+The application is designed for production deployment with comprehensive security and performance optimizations:
+
+#### Security Considerations
+- **HTTPS Enforcement**: All production traffic must use HTTPS
+- **Secure Headers**: Comprehensive security headers including CSP, HSTS, and X-Frame-Options
+- **Session Security**: Encrypted sessions with secure cookies and CSRF protection
+- **API Key Management**: Secure environment variable handling for sensitive credentials
+- **Database Security**: Connection encryption and proper access controls
+
+#### Performance Optimizations
+- **Asset Optimization**: Minified CSS and JavaScript with proper caching headers
+- **Database Optimization**: Connection pooling and query optimization
+- **Caching Strategy**: Multi-layer caching with configurable TTL values
+- **CDN Integration**: Ready for CDN deployment of static assets
+- **Monitoring**: Built-in telemetry and metrics collection
+
+#### Scaling Considerations
+- **Horizontal Scaling**: Stateless design supports multiple application instances
+- **Database Scaling**: Connection pooling and read replica support
+- **Cache Scaling**: Distributed caching support for multi-instance deployments
+- **Session Management**: Database-backed sessions for multi-instance compatibility
+
+### Docker Deployment
+The application can be containerized for Docker deployment:
+
+```dockerfile
+# Example Dockerfile structure
+FROM elixir:1.15-alpine AS build
+# Build steps...
+
+FROM alpine:3.18 AS runtime
+# Runtime configuration...
+```
+
+### Environment Setup
+Ensure all required environment variables are configured in your production environment:
+- Use secure secret generation for all salt values
+- Configure proper database connection strings
+- Set up monitoring and logging infrastructure
+- Implement backup and disaster recovery procedures
+
+## Development Workflow
+
+### Code Quality
+The project maintains high code quality standards:
+
+```bash
+# Format code according to Elixir standards
+mix format
+
+# Check code formatting
+mix format --check-formatted
+
+# Run comprehensive test suite
+mix test --cover
+
+# Run specific test categories
+mix test --grep "authentication"
+mix test --grep "movie_lists"
+```
+
+### Development Guidelines
+- **Testing**: All new features must include comprehensive tests
+- **Documentation**: Update README.md and inline documentation for significant changes
+- **Error Handling**: Implement proper error handling with user-friendly messages
+- **Security**: Follow security best practices for authentication and data handling
+- **Performance**: Consider caching and optimization for user-facing features
+
+### Architecture Decisions
+- **Phoenix LiveView**: Used for real-time, interactive user interfaces
+- **Context Pattern**: Business logic organized in bounded contexts (Auth, Media, Reviews)
+- **Component-Based UI**: Reusable components for consistent user experience
+- **Comprehensive Testing**: Unit, integration, and performance testing strategies
+- **Security-First**: Authentication and session management with security as a priority
+
+### Contributing
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes with proper tests and documentation
+4. Ensure all tests pass (`mix test`)
+5. Format your code (`mix format`)
+6. Commit your changes (`git commit -m 'Add amazing feature'`)
+7. Push to the branch (`git push origin feature/amazing-feature`)
+8. Open a Pull Request
+
+## License
+
+This project is built with Phoenix Framework and follows standard Elixir/Phoenix conventions. See the Phoenix Framework documentation for more information about the underlying technologies.
+
+---
+
+**Built with ❤️ using Phoenix LiveView and Elixir**
 
 #### Authentication System Implementation
 The application implements a comprehensive TMDB-based authentication system with seamless session management:

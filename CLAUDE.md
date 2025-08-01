@@ -51,6 +51,14 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Implements complete authentication flow with proper error handling and logging
 - Includes session validation, user data retrieval, and secure logout functionality
 
+**Auth Error Handler (`lib/flixir/auth/error_handler.ex`)**
+- Comprehensive error handling for TMDB authentication operations
+- Classifies errors into user-friendly categories (network, rate limiting, authentication failures, etc.)
+- Implements retry logic with exponential backoff and jitter
+- Provides both user-friendly and technical error messages
+- Includes telemetry support for monitoring authentication issues
+- Handles fallback strategies for different error types
+
 **Auth Session Plug (`lib/flixir_web/plugs/auth_session.ex`)**
 - Middleware for automatic session validation and user context injection
 - Validates TMDB session IDs from cookies against the database on every request
@@ -204,6 +212,19 @@ This debugging information helps identify authentication flow issues during deve
 - **Performance Tests**: Measure search response times, concurrent usage, and system performance under load
 
 ### Environment-Specific Configuration
-- Development: Live reloading, debug logging, local mailbox
-- Test: Quiet database setup, mocked external dependencies
-- Production: Optimized assets, secure headers, proper error handling
+- Development: Live reloading, debug logging, local mailbox, relaxed security settings
+- Test: Quiet database setup, mocked external dependencies, test-specific configurations
+- Production: Optimized assets, secure headers, HTTPS enforcement, proper error handling
+
+### Configuration Structure
+- **Base Configuration** (`config/config.exs`): Core application settings including LiveView signing salt and session configuration
+- **Development** (`config/dev.exs`): Development-specific overrides with relaxed security
+- **Production** (`config/prod.exs`): Production optimizations and security settings
+- **Runtime** (`config/runtime.exs`): Environment variable-based configuration for deployment
+- **Test** (`config/test.exs`): Test environment settings with mocked services
+
+### Configuration Notes
+- **LiveView Configuration**: The endpoint includes a `live_view` signing salt for WebSocket security
+- **Session Security**: Comprehensive session configuration with encryption, signing, and security headers
+- **Environment Variables**: Production uses environment variables for sensitive configuration values
+- **Duplicate Prevention**: Ensure configuration keys don't appear multiple times in the same config block
