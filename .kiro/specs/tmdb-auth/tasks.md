@@ -70,7 +70,7 @@
   - Add logging for authentication events and errors
   - _Requirements: 1.3, 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 9. Create authentication tests
+- [x] 9. Create authentication tests
   - Write unit tests for Auth context functions
   - Write unit tests for TMDBClient authentication methods
   - Write unit tests for Session schema and validations

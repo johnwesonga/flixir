@@ -133,16 +133,16 @@ defmodule Flixir.Auth.ErrorHandler do
   def format_user_error({:error, error_type}) do
     case error_type do
       :network_error ->
-        "Unable to connect to TMDB for authentication. Please check your internet connection and try again."
+        "Network error during authentication"
 
       :rate_limited ->
-        "Too many authentication attempts. Please wait a moment and try again."
+        "Too many authentication attempts"
 
       :service_unavailable ->
-        "TMDB authentication service is temporarily unavailable. Please try again in a few minutes."
+        "Authentication service not found"
 
       :authentication_failed ->
-        "Authentication failed. Please check your TMDB credentials and try again."
+        "Authentication failed"
 
       :session_expired ->
         "Your session has expired. Please log in again."
@@ -155,6 +155,33 @@ defmodule Flixir.Auth.ErrorHandler do
 
       :api_key_invalid ->
         "Authentication service configuration error. Please contact support."
+
+      :token_creation_failed ->
+        "Unable to connect to TMDB"
+
+      :session_creation_failed ->
+        "Failed to create authentication session"
+
+      :invalid_token ->
+        "Invalid authentication token"
+
+      :unauthorized ->
+        "Authentication failed"
+
+      :timeout ->
+        "Authentication request timed out"
+
+      :not_found ->
+        "Authentication service not found"
+
+      {:transport_error, :nxdomain} ->
+        "Network error during authentication"
+
+      {:unexpected_status, status} ->
+        "Authentication service returned an unexpected response (#{status})"
+
+      :unknown_error ->
+        "An unexpected error occurred during authentication"
 
       :unknown ->
         "An unexpected error occurred during authentication. Please try again."

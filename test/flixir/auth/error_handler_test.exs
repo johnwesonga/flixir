@@ -160,9 +160,9 @@ defmodule Flixir.Auth.ErrorHandlerTest do
 
   describe "format_user_error/1" do
     test "provides user-friendly messages for all error types" do
-      assert ErrorHandler.format_user_error({:error, :network_error}) =~ "Unable to connect"
-      assert ErrorHandler.format_user_error({:error, :rate_limited}) =~ "Too many"
-      assert ErrorHandler.format_user_error({:error, :service_unavailable}) =~ "temporarily unavailable"
+      assert ErrorHandler.format_user_error({:error, :network_error}) =~ "Network error during authentication"
+      assert ErrorHandler.format_user_error({:error, :rate_limited}) =~ "Too many authentication attempts"
+      assert ErrorHandler.format_user_error({:error, :service_unavailable}) =~ "Authentication service not found"
       assert ErrorHandler.format_user_error({:error, :authentication_failed}) =~ "Authentication failed"
       assert ErrorHandler.format_user_error({:error, :session_expired}) =~ "session has expired"
       assert ErrorHandler.format_user_error({:error, :invalid_credentials}) =~ "Invalid TMDB credentials"
