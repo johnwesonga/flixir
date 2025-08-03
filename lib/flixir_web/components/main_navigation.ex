@@ -20,6 +20,14 @@ defmodule FlixirWeb.MainNavigation do
   attr :authenticated?, :boolean, default: false, doc: "Whether user is authenticated"
 
   def main_nav(assigns) do
+    # Debug logging to see what authentication state we're receiving
+    require Logger
+    Logger.debug("Main navigation rendering", %{
+      authenticated?: assigns[:authenticated?],
+      has_current_user: not is_nil(assigns[:current_user]),
+      current_user: inspect(assigns[:current_user])
+    })
+
     ~H"""
     <nav class={["bg-white shadow-sm border-b border-gray-200", @class]} data-testid="main-navigation">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
