@@ -4,12 +4,7 @@ defmodule FlixirWeb.Endpoint do
   # The session will be stored in the cookie and signed,
   # this means its contents can be read but not tampered with.
   # Set :encryption_salt if you would also like to encrypt it.
-  @session_options [
-    store: :cookie,
-    key: "_flixir_key",
-    signing_salt: "xcuXIL6q",
-    same_site: "Lax"
-  ]
+  @session_options Application.compile_env(:flixir, FlixirWeb.Endpoint)[:session]
 
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [session: @session_options]],

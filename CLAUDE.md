@@ -203,12 +203,61 @@ This debugging information helps identify authentication flow issues during deve
 - **Enhanced Authentication Async Handling**: Improved `handle_async/3` functions in AuthLive to support both direct and nested tuple response formats
 - **Robust Error Processing**: Better error handling that works with various async operation result patterns
 - **Future-Proof Design**: More resilient authentication flow that adapts to different Auth context response formats
+- **Comprehensive Integration Testing**: Added complete authentication flow integration tests covering end-to-end workflows
+
+### Authentication Flow Integration Testing
+
+The application includes comprehensive integration testing for the complete TMDB authentication system in `test/flixir_web/integration/auth_flow_test.exs`:
+
+**Complete Authentication Flow Tests:**
+- **Successful Login Flow**: End-to-end testing from login initiation to authenticated session
+  - Login page rendering and user interaction
+  - TMDB API token creation and external redirect handling
+  - Authentication callback processing with approved tokens
+  - Session storage in both database and encrypted cookies
+  - User authentication state validation across subsequent requests
+- **Successful Logout Flow**: Complete logout process verification
+  - Logout confirmation page and user interaction
+  - TMDB session deletion and local session cleanup
+  - Cookie clearing and authentication state reset
+  - Post-logout redirect handling and flash message display
+- **Protected Route Redirect**: Authentication-required route handling
+  - Unauthenticated access attempts to protected routes
+  - Redirect path storage and post-login navigation preservation
+  - Session storage with preserved redirect destinations
+
+**Error Handling Integration Tests:**
+- **Token Creation Failures**: TMDB API token creation error handling
+- **Session Creation Failures**: Invalid or expired token error processing
+- **User Authentication Denial**: User cancellation of TMDB authentication
+- **Invalid Callback Parameters**: Malformed or missing callback data handling
+- **Network Error Recovery**: Network failure scenarios and user feedback
+
+**Session Management Integration Tests:**
+- **Expired Session Cleanup**: Automatic cleanup of expired sessions
+- **Session Activity Tracking**: Last accessed time updates and validation
+- **Invalid Session Handling**: Cleanup of non-existent or corrupted sessions
+
+**Security Integration Tests:**
+- **CSRF Protection**: CSRF token inclusion and validation in authentication forms
+- **Encrypted Session Storage**: Secure session data handling and cookie encryption
+
+**Test Implementation Features:**
+- **Mock Integration**: Comprehensive TMDB API mocking for reliable testing
+- **Database Integration**: Actual database operations with session lifecycle testing
+- **Cookie Management**: Phoenix session handling and encrypted cookie verification
+- **Async Operation Testing**: LiveView async operations with proper timing
+- **State Verification**: Authentication state validation across multiple request cycles
 
 ### Testing Structure
-- **Unit Tests**: `test/flixir/media/` - Test individual components
-- **LiveView Tests**: `test/flixir_web/live/` - Test user interactions
+- **Unit Tests**: `test/flixir/media/` and `test/flixir/auth/` - Test individual components and business logic
+- **LiveView Tests**: `test/flixir_web/live/` - Test user interactions and real-time features
 - **Component Tests**: `test/flixir_web/components/` - Test UI components including navigation, movie lists, reviews, and search components
-- **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including comprehensive movie lists integration testing
+- **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including:
+  - **Authentication Flow** (`auth_flow_test.exs`): Complete TMDB authentication process testing
+  - **Movie Lists** (`movie_lists_test.exs`): Comprehensive movie browsing and pagination workflows
+  - **Error Handling**: End-to-end error scenarios and recovery mechanisms
+- **Security Tests**: Authentication security, session management, and CSRF protection
 - **Performance Tests**: Measure search response times, concurrent usage, and system performance under load
 
 ### Environment-Specific Configuration
@@ -220,7 +269,7 @@ This debugging information helps identify authentication flow issues during deve
 - **Base Configuration** (`config/config.exs`): Core application settings including LiveView signing salt and session configuration
 - **Development** (`config/dev.exs`): Development-specific overrides with relaxed security
 - **Production** (`config/prod.exs`): Production optimizations and security settings
-- **Runtime** (`config/runtime.exs`): Environment variable-based configuration for deployment
+- **Runtime** (`config/runtime.exs`): Environment variable-based configuration for deployment with **enabled TMDB authentication by default**
 - **Test** (`config/test.exs`): Test environment settings with mocked services
 
 ### Configuration Notes

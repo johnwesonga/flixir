@@ -25,10 +25,13 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 ### 🔐 Authentication System
 - **TMDB Authentication**: Secure user authentication using TMDB's session-based system
+- **Three-Step Flow**: Token creation → User approval → Session establishment
 - **Session Management**: Persistent user sessions with automatic expiration handling
 - **Secure Storage**: Encrypted session data with proper security measures
 - **User Context**: Seamless integration of user authentication across the application
 - **Privacy Protection**: GDPR-compliant session handling and data protection
+- **Automatic Cleanup**: Background session cleanup for expired and idle sessions
+- **Error Recovery**: Comprehensive error handling with retry mechanisms
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -65,7 +68,12 @@ mix test --grep "authentication"
 ```
 
 ### Test Categories
-- **Authentication Tests**: Complete TMDB authentication flow testing
+- **Authentication Tests**: Complete TMDB authentication flow testing including:
+  - **End-to-End Flow**: Full authentication process from login initiation to session storage
+  - **Error Scenarios**: Token creation failures, session creation errors, and network issues
+  - **Session Management**: Session validation, expiration handling, and cleanup processes
+  - **Security Testing**: CSRF protection, encrypted session storage, and logout verification
+  - **Integration Testing**: Complete workflows with database operations and cookie management
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
@@ -87,19 +95,14 @@ mix test --grep "authentication"
    mix setup
    ```
 
-2. Configure your TMDB API key. You can either:
+2. Configure your TMDB API key (authentication is now enabled by default):
    
-   **Option A: Environment Variable (Recommended)**
+   **Environment Variable (Required)**
    ```bash
    export TMDB_API_KEY="your_tmdb_api_key_here"
    ```
    
-   **Option B: Configuration File**
-   Add to `config/dev.exs`:
-   ```elixir
-   config :flixir, :tmdb,
-     api_key: "your_tmdb_api_key_here"
-   ```
+   The TMDB authentication configuration is now active in `config/runtime.exs` and will automatically use your API key for both movie data access and user authentication.
 
 3. Run database migrations (includes authentication tables):
    ```bash
@@ -119,6 +122,201 @@ mix test --grep "authentication"
    ```
 
 5. Visit [`localhost:4000`](http://localhost:4000) in your browser.
+
+### Quick Start with Authentication
+
+For a quick setup with authentication enabled:
+
+```bash
+# 1. Set up the project
+mix setup
+
+# 2. Set your TMDB API key
+export TMDB_API_KEY="your_tmdb_api_key_here"
+
+# 3. Start the server
+mix phx.server
+
+# 4. Visit http://localhost:4000 and click "Login" to test authentication
+```
+
+The authentication system will automatically:
+- Create the necessary database tables
+- Configure secure session management
+- Handle TMDB authentication flow
+- Provide user context throughout the application
+
+### Authentication Setup
+
+The application includes a comprehensive TMDB authentication system that allows users to log in with their TMDB credentials.
+
+#### Authentication Flow
+
+The authentication process follows TMDB's three-step authentication flow:
+
+1. **Token Request**: Application requests a request token from TMDB
+2. **User Approval**: User is redirected to TMDB to approve the token with their credentials
+3. **Session Creation**: Approved token is exchanged for an authenticated session
+
+#### Authentication Routes
+
+- **Login**: `/auth/login` - Initiates the TMDB authentication flow
+- **Callback**: `/auth/callback` - Handles the return from TMDB after user approval
+- **Logout**: `/auth/logout` - Ends the user session and cleans up stored data
+
+#### Authentication Configuration
+
+The authentication system is configured through environment variables and is now **enabled by default** in the runtime configuration:
+
+**Required Variables:**
+```bash
+# TMDB API key (required for all TMDB operations)
+export TMDB_API_KEY="your_tmdb_api_key_here"
+```
+
+**Optional Variables:**
+```bash
+# TMDB API configuration
+export TMDB_BASE_URL="https://api.themoviedb.org/3"  # Default TMDB API base URL
+export TMDB_REDIRECT_URL="http://localhost:4000/auth/callback"  # Authentication callback URL
+
+# Session configuration
+export TMDB_SESSION_TIMEOUT="86400"  # Session lifetime in seconds (24 hours)
+export SESSION_MAX_AGE="86400"  # Phoenix session cookie lifetime (24 hours)
+
+# Session cleanup configuration
+export SESSION_CLEANUP_INTERVAL="3600"  # Cleanup interval in seconds (1 hour)
+export SESSION_MAX_IDLE="7200"  # Maximum idle time before session cleanup (2 hours)
+```
+
+#### Database Schema
+
+The authentication system requires the `auth_sessions` table, which is created by running migrations:
+
+```sql
+CREATE TABLE auth_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tmdb_session_id VARCHAR(255) NOT NULL UNIQUE,
+  tmdb_user_id INTEGER NOT NULL,
+  username VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  last_accessed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+```
+
+#### Session Management
+
+The application includes comprehensive session management features:
+
+**Session Security:**
+- **Encrypted Cookies**: All session data is stored in encrypted, signed cookies
+- **HTTP-Only**: Cookies are marked HTTP-only to prevent XSS attacks
+- **Secure Flag**: HTTPS-only cookies in production environments
+- **SameSite Protection**: CSRF protection through SameSite cookie attributes
+
+**Session Lifecycle:**
+- **Automatic Validation**: Sessions are validated on every request
+- **Expiration Handling**: Expired sessions are automatically cleaned up
+- **Idle Timeout**: Sessions expire after periods of inactivity
+- **Background Cleanup**: Periodic cleanup of expired sessions from the database
+
+**Session Monitoring:**
+```elixir
+# Get session cleanup statistics
+iex> Flixir.Auth.SessionCleanup.get_stats()
+
+# Manually trigger session cleanup
+iex> Flixir.Auth.SessionCleanup.cleanup_expired_sessions()
+```
+
+#### Authentication API
+
+The authentication system provides a clean API for managing user sessions:
+
+**Auth Context (`Flixir.Auth`):**
+```elixir
+# Start authentication flow
+{:ok, auth_url} = Flixir.Auth.start_authentication()
+
+# Complete authentication with approved token
+{:ok, session} = Flixir.Auth.complete_authentication(approved_token)
+
+# Validate existing session
+{:ok, session} = Flixir.Auth.validate_session(session_id)
+
+# Get current user information
+{:ok, user} = Flixir.Auth.get_current_user(session_id)
+
+# Logout and cleanup session
+:ok = Flixir.Auth.logout(session_id)
+```
+
+**Session Plug (`FlixirWeb.Plugs.AuthSession`):**
+The session plug automatically handles authentication state for all requests:
+
+```elixir
+# Conn assigns set by the plug
+conn.assigns.current_user      # User data from TMDB or nil
+conn.assigns.current_session   # Session struct or nil
+conn.assigns.authenticated?    # Boolean authentication status
+```
+
+**LiveView Integration:**
+Authentication state is automatically available in all LiveView components through the `AuthHooks` module:
+
+```elixir
+# Socket assigns available in LiveView
+socket.assigns.current_user      # User data from TMDB or nil
+socket.assigns.current_session   # Session struct or nil
+socket.assigns.authenticated?    # Boolean authentication status
+```
+
+#### Error Handling
+
+The authentication system includes comprehensive error handling:
+
+**Error Types:**
+- **Network Errors**: Automatic retry with exponential backoff
+- **Rate Limiting**: Graceful handling of TMDB API rate limits
+- **Token Expiration**: Automatic cleanup and re-authentication prompts
+- **Session Expiration**: Transparent session renewal or re-authentication
+
+**Error Recovery:**
+- **User-Friendly Messages**: Clear error messages for different failure scenarios
+- **Retry Mechanisms**: Automatic retry for transient failures
+- **Fallback Strategies**: Graceful degradation when TMDB API is unavailable
+- **Comprehensive Logging**: Detailed logging for debugging and monitoring
+
+#### Security Considerations
+
+**Production Security:**
+- **HTTPS Only**: All authentication flows require HTTPS in production
+- **Secure Cookies**: Production cookies are marked secure and HTTP-only
+- **Session Encryption**: All session data is encrypted using Phoenix's secure session storage
+- **CSRF Protection**: SameSite cookie attributes prevent CSRF attacks
+
+**Secret Management:**
+Generate secure secrets for production:
+```bash
+# Generate Phoenix secret key base
+mix phx.gen.secret
+
+# Generate session signing salt
+mix phx.gen.secret
+
+# Generate session encryption salt
+mix phx.gen.secret
+```
+
+**Required Production Environment Variables:**
+```bash
+export SECRET_KEY_BASE="your_generated_secret_key_base"
+export SESSION_SIGNING_SALT="your_generated_signing_salt"
+export SESSION_ENCRYPTION_SALT="your_generated_encryption_salt"
+export LIVEVIEW_SIGNING_SALT="your_generated_liveview_salt"
+```
 
 ### Development Tools
 
@@ -211,7 +409,18 @@ config :flixir, FlixirWeb.Endpoint,
 ```
 
 #### Production Configuration (`config/runtime.exs`)
+
+The runtime configuration now includes **enabled TMDB authentication** by default:
+
 ```elixir
+# TMDB Authentication configuration (now enabled)
+config :flixir, :tmdb_auth,
+  api_key: System.get_env("TMDB_API_KEY"),
+  base_url: System.get_env("TMDB_BASE_URL") || "https://api.themoviedb.org/3",
+  redirect_url: System.get_env("TMDB_REDIRECT_URL") || "http://localhost:4000/auth/callback",
+  session_timeout: String.to_integer(System.get_env("TMDB_SESSION_TIMEOUT") || "86400")
+
+# Session configuration
 config :flixir, FlixirWeb.Endpoint,
   session: [
     secure: true,        # Require HTTPS in production
@@ -247,7 +456,7 @@ mix phx.gen.secret
 ```
 
 **Required Environment Variables for Production:**
-- `TMDB_API_KEY` - Your TMDB API key for movie data access
+- `TMDB_API_KEY` - **Required**: Your TMDB API key for movie data access and authentication (now enabled by default)
 - `DATABASE_URL` - PostgreSQL connection string
 - `SECRET_KEY_BASE` - Phoenix secret key base for encryption
 - `LIVEVIEW_SIGNING_SALT` - For LiveView WebSocket security
@@ -255,20 +464,36 @@ mix phx.gen.secret
 - `SESSION_ENCRYPTION_SALT` - For session cookie encryption
 
 **Optional Environment Variables:**
+
+*Server Configuration:*
 - `PHX_HOST` - Production hostname (default: "example.com")
 - `PORT` - Server port (default: 4000)
-- `SESSION_MAX_AGE` - Session lifetime in seconds (default: 86400)
-- `TMDB_BASE_URL` - TMDB API base URL (default: "https://api.themoviedb.org/3")
+- `PHX_SERVER` - Set to "true" to start server in releases
+
+*Session Configuration:*
+- `SESSION_MAX_AGE` - Phoenix session cookie lifetime in seconds (default: 86400)
+- `TMDB_SESSION_TIMEOUT` - TMDB session lifetime in seconds (default: 86400)
+- `SESSION_CLEANUP_INTERVAL` - Session cleanup interval in seconds (default: 3600)
+- `SESSION_MAX_IDLE` - Session idle timeout in seconds (default: 7200)
+
+*TMDB API Configuration:*
+- `TMDB_BASE_URL` - TMDB API base URL (default: "https://api.themoviedb.org/3") - **Now enabled by default**
 - `TMDB_IMAGE_BASE_URL` - TMDB image base URL (default: "https://image.tmdb.org/t/p/w500")
 - `TMDB_TIMEOUT` - TMDB API timeout in milliseconds (default: 5000)
 - `TMDB_MAX_RETRIES` - TMDB API retry attempts (default: 3)
-- `TMDB_REDIRECT_URL` - Authentication callback URL (default: "http://localhost:4000/auth/callback")
-- `TMDB_SESSION_TIMEOUT` - TMDB session lifetime (default: 86400)
-- `SESSION_CLEANUP_INTERVAL` - Session cleanup interval in seconds (default: 3600)
-- `SESSION_MAX_IDLE` - Session idle timeout in seconds (default: 7200)
+
+*Authentication Configuration:*
+- `TMDB_REDIRECT_URL` - Authentication callback URL (default: "http://localhost:4000/auth/callback") - **Now enabled by default**
+
+*Cache Configuration:*
 - `SEARCH_CACHE_TTL` - Search cache TTL in seconds (default: 300)
 - `SEARCH_CACHE_MAX_ENTRIES` - Maximum cache entries (default: 1000)
 - `SEARCH_CACHE_CLEANUP_INTERVAL` - Cache cleanup interval in milliseconds (default: 60000)
+
+*Database Configuration:*
+- `POOL_SIZE` - Database connection pool size (default: 10)
+- `ECTO_IPV6` - Set to "true" or "1" to enable IPv6 for database connections
+- `DNS_CLUSTER_QUERY` - DNS cluster query for distributed deployments
 
 #### Configuration Best Practices
 - **Avoid Duplicates**: Ensure each configuration key appears only once per config block
@@ -306,6 +531,134 @@ mix phx.gen.secret
 - **Authentication Flow**: Three-step TMDB authentication (token → approval → session)
 - **Security**: Secure session storage with encryption and proper expiration handling
 - **Logging**: Comprehensive logging for authentication events, errors, and security monitoring
+
+#### Authentication API Usage Patterns
+
+**Basic Authentication Flow:**
+```elixir
+# 1. Start authentication (in LiveView or Controller)
+case Flixir.Auth.start_authentication() do
+  {:ok, auth_url} -> 
+    # Redirect user to TMDB for approval
+    {:noreply, redirect(socket, external: auth_url)}
+  {:error, reason} -> 
+    # Handle error (network issues, API unavailable, etc.)
+    {:noreply, put_flash(socket, :error, "Authentication unavailable")}
+end
+
+# 2. Handle callback (after user approves on TMDB)
+case Flixir.Auth.complete_authentication(approved_token) do
+  {:ok, session} ->
+    # Store session and redirect to intended destination
+    conn = FlixirWeb.Plugs.AuthSession.put_session_id(conn, session.id)
+    redirect(conn, to: "/dashboard")
+  {:error, :token_denied} ->
+    # User denied the request
+    redirect(conn, to: "/auth/login?error=denied")
+  {:error, reason} ->
+    # Handle other errors
+    redirect(conn, to: "/auth/login?error=failed")
+end
+
+# 3. Logout
+case Flixir.Auth.logout(session_id) do
+  :ok ->
+    conn = FlixirWeb.Plugs.AuthSession.clear_session_id(conn)
+    redirect(conn, to: "/")
+  {:error, reason} ->
+    # Log error but still clear local session
+    Logger.warning("Logout error: #{inspect(reason)}")
+    conn = FlixirWeb.Plugs.AuthSession.clear_session_id(conn)
+    redirect(conn, to: "/")
+end
+```
+
+**Session Validation:**
+```elixir
+# Validate session (automatically done by AuthSession plug)
+case Flixir.Auth.validate_session(session_id) do
+  {:ok, session} -> 
+    # Session is valid, user is authenticated
+    {:ok, user} = Flixir.Auth.get_current_user(session.tmdb_session_id)
+  {:error, :session_expired} -> 
+    # Session expired, clear and prompt re-authentication
+    clear_session_and_redirect()
+  {:error, :session_not_found} -> 
+    # Invalid session, clear and continue as unauthenticated
+    clear_session()
+end
+```
+
+**Error Handling Patterns:**
+```elixir
+# Using the ErrorHandler for consistent error handling
+case Flixir.Auth.TMDBClient.create_request_token() do
+  {:ok, token_data} -> 
+    # Success case
+    handle_token(token_data)
+  {:error, error} -> 
+    # Use ErrorHandler for consistent error processing
+    case Flixir.Auth.ErrorHandler.handle_error(error, :token_creation) do
+      {:retry, delay} -> 
+        # Schedule retry after delay
+        Process.send_after(self(), :retry_token_creation, delay)
+      {:user_error, message} -> 
+        # Show user-friendly error
+        put_flash(socket, :error, message)
+      {:system_error, message} -> 
+        # Log technical error, show generic message
+        Logger.error("Token creation failed: #{message}")
+        put_flash(socket, :error, "Authentication temporarily unavailable")
+    end
+end
+```
+
+**LiveView Authentication Patterns:**
+```elixir
+# Authentication state is automatically available via AuthHooks
+defmodule MyAppWeb.SomeLive do
+  use MyAppWeb, :live_view
+
+  def mount(_params, _session, socket) do
+    # Authentication state is automatically set by AuthHooks
+    if socket.assigns.authenticated? do
+      # User is authenticated, show authenticated content
+      {:ok, assign(socket, :user_content, load_user_content(socket.assigns.current_user))}
+    else
+      # User not authenticated, show public content
+      {:ok, assign(socket, :public_content, load_public_content())}
+    end
+  end
+
+  def handle_event("login", _params, socket) do
+    case Flixir.Auth.start_authentication() do
+      {:ok, auth_url} -> {:noreply, redirect(socket, external: auth_url)}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Login unavailable")}
+    end
+  end
+end
+```
+
+**Session Monitoring and Cleanup:**
+```elixir
+# Monitor session statistics
+iex> Flixir.Auth.SessionCleanup.get_stats()
+%{
+  total_sessions: 150,
+  expired_sessions: 12,
+  idle_sessions: 8,
+  last_cleanup: ~U[2024-01-15 10:30:00Z],
+  cleanup_interval: 3600
+}
+
+# Manual cleanup (useful for maintenance)
+iex> Flixir.Auth.SessionCleanup.cleanup_expired_sessions()
+{:ok, %{cleaned: 20, errors: 0}}
+
+# Check specific session
+iex> Flixir.Auth.validate_session("session-uuid")
+{:ok, %Flixir.Auth.Session{username: "user123", expires_at: ~U[2024-01-16 10:00:00Z]}}
+```
 
 #### Media Context (`lib/flixir/media/`)
 - **SearchResult**: Data structure for search results and movie lists
