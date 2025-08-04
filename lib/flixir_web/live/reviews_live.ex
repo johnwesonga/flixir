@@ -8,9 +8,8 @@ defmodule FlixirWeb.ReviewsLive do
 
   use FlixirWeb, :live_view
   import FlixirWeb.{AppLayout}
-  #alias Flixir.Reviews
+  # alias Flixir.Reviews
   require Logger
-
 
   @default_filter_type :recent
 
