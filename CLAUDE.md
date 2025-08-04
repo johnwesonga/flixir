@@ -43,6 +43,14 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Handles search parameters, filtering, and sorting
 - Provides caching layer for performance optimization
 
+**Lists Context (`lib/flixir/lists.ex`)** (Planned)
+- Manages user-created movie lists and collections
+- Provides CRUD operations for personal movie lists
+- Handles movie addition/removal from lists with duplicate prevention
+- Implements privacy controls for public/private lists
+- Integrates with TMDB user authentication for data isolation
+- Supports list statistics and user collection analytics
+
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling
 - Integrates with TMDB's session-based authentication system through TMDBClient
@@ -185,6 +193,12 @@ This debugging information helps identify authentication flow issues during deve
 - **Authentication**: TMDB-based user authentication with automatic session management
 - **Session Management**: Transparent session validation and user context injection across all requests
 - **Security**: Secure session storage with configurable encryption salts, automatic cleanup, and comprehensive logging
+- **User Movie Lists**: Personal movie collections with privacy controls (planned)
+  - Create, edit, and delete custom movie lists
+  - Add and remove movies from lists with duplicate prevention
+  - Public and private list visibility settings
+  - List statistics and user collection analytics
+  - Seamless integration with TMDB user authentication
 
 ### Configuration
 - Database: PostgreSQL with Ecto

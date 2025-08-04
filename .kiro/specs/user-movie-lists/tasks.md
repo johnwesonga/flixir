@@ -6,7 +6,7 @@
   - Add appropriate indexes for performance and unique constraints to prevent duplicate movies per list
   - _Requirements: 1.1, 2.1, 5.1, 9.1_
 
-- [ ] 2. Implement Ecto schemas for user movie lists
+- [x] 2. Implement Ecto schemas for user movie lists
   - Create `Flixir.Lists.UserMovieList` schema with validations for name length, description, and privacy settings
   - Create `Flixir.Lists.UserMovieListItem` schema with movie and list associations
   - Implement changeset functions with proper validation rules and constraint handling

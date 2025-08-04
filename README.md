@@ -81,6 +81,13 @@ mix test --grep "authentication"
   - **Session Management**: Session validation, expiration handling, and cleanup processes
   - **Security Testing**: CSRF protection, encrypted session storage, and logout verification
   - **Integration Testing**: Complete workflows with database operations and cookie management
+- **User Movie Lists Tests**: Personal movie list management testing (planned):
+  - **CRUD Operations**: List creation, editing, deletion, and clearing functionality
+  - **Movie Management**: Adding and removing movies from lists with duplicate prevention
+  - **Privacy Controls**: Public and private list visibility and access control
+  - **User Authorization**: Ensuring users can only access and modify their own lists
+  - **Data Persistence**: List and movie data integrity across sessions
+  - **UI Components**: List display, forms, modals, and responsive behavior
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
@@ -532,6 +539,15 @@ mix phx.gen.secret
 
 ### Core Modules
 
+#### Lists Context (`lib/flixir/lists/`)
+- **UserMovieList**: Schema for user-created movie lists with privacy controls
+- **UserMovieListItem**: Junction table for movies within lists
+- **List Management**: CRUD operations for personal movie collections
+- **Movie Operations**: Add/remove movies from lists with duplicate prevention
+- **Privacy Controls**: Public and private list visibility settings
+- **Statistics**: List summaries and user collection analytics
+- **User Integration**: Seamless integration with TMDB user authentication
+
 #### Auth Context (`lib/flixir/auth/`)
 - **Session**: User session management with TMDB integration and automatic cleanup
 - **SessionCleanup**: Background service for expired session cleanup
@@ -712,6 +728,13 @@ iex> Flixir.Auth.validate_session("session-uuid")
   - Features brand logo with navigation to home page
 
 #### LiveView Modules (`lib/flixir_web/live/`)
+- **UserMovieListsLive**: Personal movie list management interface (planned)
+  - **List Management**: Create, edit, and delete personal movie collections
+  - **Movie Operations**: Add and remove movies from lists with real-time updates
+  - **Privacy Controls**: Toggle between public and private list visibility
+  - **Statistics Display**: Show list summaries and collection analytics
+  - **Authentication Integration**: Seamless integration with TMDB user sessions
+  - **Responsive Design**: Mobile-optimized interface for list management
 - **AuthLive**: Comprehensive user authentication interface with TMDB integration
   - **Authentication Flow**: Complete TMDB three-step authentication (token → approval → session)
   - **Route Handling**: Supports login, callback, and logout routes with parameter validation
