@@ -1,0 +1,49 @@
+<.app_layout 
+current_user={@current_user} 
+page_title={@page_title} 
+current_section={@current_section}
+authenticated?={@authenticated?}
+>
+  <!-- Main Content -->
+  <.user_lists_container
+    lists={@lists}
+    loading={@loading}
+    error={@error}
+    current_user={@current_user}
+  />
+
+  <!-- Create/Edit Form Modal -->
+  <%= if @show_form do %>
+    <div class="fixed inset-0 z-50 overflow-y-auto" data-testid="form-modal">
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+      <!-- Modal -->
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
+          <.list_form
+            form={@form_data}
+            action={@show_form}
+            title={if @show_form == :create, do: "Create New List", else: "Edit List"}
+          />
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Delete Confirmation Modal -->
+  <%= if @show_delete_confirmation and @selected_list do %>
+    <.delete_confirmation_modal
+      show={@show_delete_confirmation}
+      list={@selected_list}
+    />
+  <% end %>
+
+  <!-- Clear Confirmation Modal -->
+  <%= if @show_clear_confirmation and @selected_list do %>
+    <.clear_confirmation_modal
+      show={@show_clear_confirmation}
+      list={@selected_list}
+    />
+  <% end %>
+</.app_layout>

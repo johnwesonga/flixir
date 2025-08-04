@@ -71,8 +71,9 @@ defmodule FlixirWeb.Router do
   scope "/", FlixirWeb do
     pipe_through :authenticated
 
-    # Future authenticated-only features will go here
-    # Examples: user watchlists, ratings, personal reviews, etc.
+    # User movie lists management
+    live "/my-lists", UserMovieListsLive, :index
+    # live "/my-lists/:id", UserMovieListLive, :show  # Task 7
   end
 
   # Other scopes may use custom stacks.

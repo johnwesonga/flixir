@@ -65,6 +65,32 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Internationalization**: Support for multiple languages with proper pluralization using `ngettext`
 - **Testing Support**: Comprehensive `data-testid` attributes for reliable component testing
 
+**User Movie Lists LiveView (`lib/flixir_web/live/user_movie_lists_live.ex`)**
+- Complete LiveView implementation for managing user movie lists with comprehensive functionality
+- **Authentication Integration**: Automatic authentication checks with redirect handling for unauthenticated users
+- **List Management Interface**: Full CRUD operations for movie lists with real-time updates
+  - **Create Lists**: Modal-based list creation with form validation and error handling
+  - **Edit Lists**: In-place editing with dynamic form management and validation feedback
+  - **Delete Lists**: Safe deletion with confirmation modals and proper cleanup
+  - **Clear Lists**: Remove all movies from lists while preserving list metadata
+- **Form State Management**: Comprehensive form handling with validation, error display, and state persistence
+  - **Dynamic Forms**: Context-aware forms that adapt for create vs. edit operations
+  - **Validation Integration**: Real-time validation with user-friendly error messages
+  - **Form Lifecycle**: Proper form initialization, submission, and cleanup
+- **Modal Operations**: Safe destructive operations with detailed confirmation dialogs
+  - **Delete Confirmation**: Shows list details and movie count before deletion
+  - **Clear Confirmation**: Confirms removal of all movies with impact information
+  - **Cancel Handling**: Easy cancellation of all modal operations with state cleanup
+- **Real-time Updates**: Live updates for all operations without page refreshes
+- **Statistics Integration**: Real-time display of list statistics and user collection analytics
+- **Error Handling**: Comprehensive error handling with retry mechanisms and user feedback
+- **Loading States**: Smooth loading indicators during all operations with proper state management
+- **User Authorization**: Ensures users can only access and modify their own lists with proper security
+- **Logging Integration**: Comprehensive logging for all user actions, system events, and error conditions
+- **Component Integration**: Seamless integration with UserMovieListComponents for consistent UI
+- **Template Structure**: Clean HEEx template with modal overlays and app layout integration
+- **Modal Management**: Multiple modal types (form, delete confirmation, clear confirmation) with proper z-index stacking
+
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling
 - Integrates with TMDB's session-based authentication system through TMDBClient
@@ -122,12 +148,13 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Clean Architecture**: Removed manual authentication state handling in favor of `AuthHooks` module
 
 **Main Navigation Component (`lib/flixir_web/components/main_navigation.ex`)**
-- Unified navigation system across search, movies, and reviews sections
+- Unified navigation system across search, movies, reviews, and user lists sections
 - Authentication-aware navigation with dynamic user menu or login button
 - Active state management with visual indicators for current section
 - Responsive design with mobile-friendly touch targets
 - Comprehensive test coverage for authentication states and user interactions
 - Seamless integration with AuthSession plug for automatic state management
+- **User Lists Integration**: Direct access to personal movie lists for authenticated users
 
 **TMDB Client (`lib/flixir/media/tmdb_client.ex`)**
 - HTTP client for TMDB API interactions
@@ -172,13 +199,13 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 12. Optional: Redirect to login if authentication required and user not authenticated
 
 **Lists Flow:**
-1. User action → LiveView (create/edit/delete list or add/remove movie)
-2. LiveView → Lists context (validate user authorization)
+1. User action → UserMovieListsLive (create/edit/delete list or add/remove movie)
+2. UserMovieListsLive → Lists context (validate user authorization)
 3. Lists context → Database (CRUD operations with constraints)
 4. Lists context → Media context (fetch TMDB movie data when needed)
 5. Media context → TMDB API (get movie details for display)
-6. Lists context → LiveView (return results with error handling)
-7. LiveView → User (display updated lists with feedback messages)
+6. Lists context → UserMovieListsLive (return results with error handling)
+7. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
 
 **Recent Authentication Improvements:**
 - Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
@@ -227,6 +254,13 @@ This debugging information helps identify authentication flow issues during deve
   - Rich UI component library with responsive design and accessibility features
   - Modal-based interactions for safe destructive operations
   - Skeleton loading states and smooth transitions for better UX
+  - **User Lists Dashboard**: Complete LiveView interface for managing all user movie lists
+    - Real-time list management with live updates
+    - Authentication-protected access with automatic redirects
+    - Form-based list creation and editing with validation
+    - Confirmation modals for safe destructive operations
+    - Statistics display and user collection analytics
+    - Comprehensive error handling with retry mechanisms
 
 ### Configuration
 - Database: PostgreSQL with Ecto

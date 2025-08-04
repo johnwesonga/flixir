@@ -22,6 +22,7 @@ defmodule FlixirWeb.MainNavigation do
   def main_nav(assigns) do
     # Debug logging to see what authentication state we're receiving
     require Logger
+
     Logger.debug("Main navigation rendering", %{
       authenticated?: assigns[:authenticated?],
       has_current_user: not is_nil(assigns[:current_user]),

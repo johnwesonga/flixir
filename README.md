@@ -107,6 +107,14 @@ mix test --grep "authentication"
   - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics testing
   - **Error Scenarios**: Comprehensive error handling including unauthorized access and validation failures
   - **Integration Testing**: Full workflow testing with TMDB authentication and Media context integration
+  - **LiveView Testing**: Complete testing of the UserMovieListsLive module:
+    - **Authentication Flow**: Testing authentication requirements and redirect behavior
+    - **List Management**: Testing all CRUD operations through the LiveView interface
+    - **Form Interactions**: Testing create and edit forms with validation and error handling
+    - **Modal Operations**: Testing confirmation dialogs for delete and clear operations
+    - **Real-time Updates**: Testing live updates and state management
+    - **Error Recovery**: Testing retry mechanisms and error state handling
+    - **User Experience**: Testing loading states, success messages, and user feedback
   - **Component Testing**: UI component rendering and interaction testing:
     - **List Card Rendering**: Testing list display with various data states and privacy settings
     - **Form Validation**: Testing creation and editing forms with validation feedback
@@ -203,6 +211,12 @@ The authentication process follows TMDB's three-step authentication flow:
 - **Login**: `/auth/login` - Initiates the TMDB authentication flow
 - **Callback**: `/auth/callback` - Handles the return from TMDB after user approval
 - **Logout**: `/auth/logout` - Ends the user session and cleans up stored data
+
+#### User Movie Lists Routes
+
+- **My Lists**: `/my-lists` - User movie lists overview and management dashboard (requires authentication)
+- **List Details**: `/my-lists/:id` - Individual list view with movie management (planned)
+- **List Sharing**: `/lists/:id/public` - Public list view for shared lists (planned)
 
 #### Authentication Configuration
 
@@ -580,6 +594,36 @@ mix phx.gen.secret
 - **Salt Generation**: Generate unique salts for each environment using `mix phx.gen.secret`
 - **Validation**: Test configuration changes in development before deploying to production
 
+### User Movie Lists Interface
+
+The user movie lists feature provides a comprehensive interface for managing personal movie collections:
+
+#### Main Dashboard (`/my-lists`)
+- **Authentication Required**: Automatically redirects unauthenticated users to login
+- **List Overview**: Grid display of all user movie lists with statistics
+- **Quick Actions**: Create new lists, edit existing lists, and manage list contents
+- **Real-time Updates**: All operations update the interface without page refreshes
+
+#### List Management Features
+- **Create Lists**: Modal form with name, description, and privacy settings
+- **Edit Lists**: In-place editing with form validation and error feedback
+- **Delete Lists**: Confirmation modal showing list details and movie count
+- **Clear Lists**: Remove all movies while preserving list metadata
+- **Statistics Display**: Movie counts, creation dates, and privacy status
+
+#### User Experience
+- **Loading States**: Skeleton animations during data loading
+- **Error Handling**: User-friendly error messages with retry options
+- **Success Feedback**: Toast notifications for successful operations
+- **Responsive Design**: Optimized for desktop, tablet, and mobile devices
+- **Accessibility**: Full keyboard navigation and screen reader support
+
+#### Modal Interactions
+- **Form Modals**: Create and edit forms with validation feedback
+- **Confirmation Modals**: Safe destructive operations with detailed information
+- **Easy Cancellation**: Click outside or use cancel buttons to close modals
+- **Focus Management**: Proper focus handling for accessibility
+
 ### Component Development Guidelines
 
 #### Creating New Components
@@ -713,6 +757,29 @@ The application follows a component-based architecture with reusable UI componen
 - **Privacy Controls**: Public and private list visibility with access control
 - **User Integration**: Seamless integration with TMDB user authentication and session management
 - **Error Handling**: Comprehensive error handling with user-friendly messages and proper logging
+
+#### User Movie Lists LiveView (`lib/flixir_web/live/user_movie_lists_live.ex`)
+- **List Overview Interface**: Comprehensive dashboard for managing all user movie lists
+- **Authentication Integration**: Automatic authentication checks with redirect to login for unauthenticated users
+- **Real-time List Management**: Live updates for all list operations without page refreshes
+- **CRUD Operations**: Complete create, read, update, delete functionality for movie lists
+  - **Create Lists**: Modal form for creating new lists with validation feedback
+  - **Edit Lists**: In-place editing with form validation and error handling
+  - **Delete Lists**: Safe deletion with confirmation modal and cascade cleanup
+  - **Clear Lists**: Remove all movies from lists while preserving list metadata
+- **Form Handling**: Comprehensive form management with validation and error display
+  - **Dynamic Forms**: Context-aware forms for create vs. edit operations
+  - **Validation Feedback**: Real-time validation with user-friendly error messages
+  - **Form State Management**: Proper form state handling with cancel and retry functionality
+- **Confirmation Modals**: Safe destructive operations with detailed confirmation dialogs
+  - **Delete Confirmation**: Shows list details and movie count before deletion
+  - **Clear Confirmation**: Confirms removal of all movies from list
+  - **Cancel Operations**: Easy cancellation of all modal operations
+- **Statistics Display**: Real-time list statistics and user collection analytics
+- **Error Handling**: Comprehensive error handling with retry mechanisms and user feedback
+- **Loading States**: Smooth loading indicators during all operations
+- **User Authorization**: Ensures users can only access and modify their own lists
+- **Logging Integration**: Comprehensive logging for all user actions and system events
 
 #### User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)
 - **Container Components**: Main layout components for organizing list displays

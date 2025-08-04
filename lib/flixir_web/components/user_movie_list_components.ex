@@ -157,12 +157,14 @@ defmodule FlixirWeb.UserMovieListComponents do
       <!-- Action Buttons -->
       <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
         <div class="flex items-center justify-between">
-          <.link
-            navigate={~p"/my-lists/#{@list.id}"}
+          <button
+            type="button"
+            phx-click="view_list"
+            phx-value-list-id={@list.id}
             class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
           >
             View List
-          </.link>
+          </button>
 
           <div class="flex items-center space-x-3">
             <button
