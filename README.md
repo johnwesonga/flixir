@@ -33,6 +33,13 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Automatic Cleanup**: Background session cleanup for expired and idle sessions
 - **Error Recovery**: Comprehensive error handling with retry mechanisms
 
+### 📝 User Movie Lists
+- **Personal Collections**: Create and manage custom movie lists with TMDB authentication
+- **List Management**: Add, edit, and organize personal movie collections
+- **Privacy Controls**: Public and private list visibility settings
+- **User Integration**: Seamlessly integrated with TMDB user accounts
+- **Persistent Storage**: Secure database storage with user association
+
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
 - **Responsive Design**: Tailwind CSS for mobile-first design
@@ -204,6 +211,25 @@ CREATE TABLE auth_sessions (
   inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
+```
+
+The user movie lists feature requires the `user_movie_lists` table:
+
+```sql
+CREATE TABLE user_movie_lists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  tmdb_user_id INTEGER NOT NULL,
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Indexes for efficient querying
+CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists (tmdb_user_id);
+CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists (updated_at);
+CREATE INDEX idx_user_movie_lists_user_updated ON user_movie_lists (tmdb_user_id, updated_at);
 ```
 
 #### Session Management
