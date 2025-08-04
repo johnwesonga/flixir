@@ -43,13 +43,15 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Handles search parameters, filtering, and sorting
 - Provides caching layer for performance optimization
 
-**Lists Context (`lib/flixir/lists.ex`)** (Planned)
-- Manages user-created movie lists and collections
-- Provides CRUD operations for personal movie lists
-- Handles movie addition/removal from lists with duplicate prevention
-- Implements privacy controls for public/private lists
+**Lists Context (`lib/flixir/lists.ex`)**
+- Manages user-created movie lists and collections with comprehensive validation
+- Provides full CRUD operations for personal movie lists with user authorization
+- Handles movie addition/removal from lists with duplicate prevention and error handling
+- Implements privacy controls for public/private lists with access control
 - Integrates with TMDB user authentication for data isolation
 - Supports list statistics and user collection analytics
+- Includes comprehensive error handling with user-friendly messages
+- Features proper logging for debugging and monitoring
 
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling
@@ -157,6 +159,15 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 11. LiveView/Controller → access user data from conn assigns
 12. Optional: Redirect to login if authentication required and user not authenticated
 
+**Lists Flow:**
+1. User action → LiveView (create/edit/delete list or add/remove movie)
+2. LiveView → Lists context (validate user authorization)
+3. Lists context → Database (CRUD operations with constraints)
+4. Lists context → Media context (fetch TMDB movie data when needed)
+5. Media context → TMDB API (get movie details for display)
+6. Lists context → LiveView (return results with error handling)
+7. LiveView → User (display updated lists with feedback messages)
+
 **Recent Authentication Improvements:**
 - Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
 - Improved error handling that gracefully processes both direct errors (`{:error, reason}`) and nested error tuples (`{:ok, {:error, reason}}`)
@@ -193,12 +204,14 @@ This debugging information helps identify authentication flow issues during deve
 - **Authentication**: TMDB-based user authentication with automatic session management
 - **Session Management**: Transparent session validation and user context injection across all requests
 - **Security**: Secure session storage with configurable encryption salts, automatic cleanup, and comprehensive logging
-- **User Movie Lists**: Personal movie collections with privacy controls (planned)
-  - Create, edit, and delete custom movie lists
-  - Add and remove movies from lists with duplicate prevention
-  - Public and private list visibility settings
+- **User Movie Lists**: Personal movie collections with privacy controls
+  - Create, edit, and delete custom movie lists with comprehensive validation
+  - Add and remove movies from lists with duplicate prevention and error handling
+  - Public and private list visibility settings with user authorization
   - List statistics and user collection analytics
-  - Seamless integration with TMDB user authentication
+  - Seamless integration with TMDB user authentication and session management
+  - Comprehensive error handling with user-friendly messages
+  - Proper logging for debugging and monitoring
 
 ### Configuration
 - Database: PostgreSQL with Ecto
@@ -264,12 +277,13 @@ The application includes comprehensive integration testing for the complete TMDB
 - **State Verification**: Authentication state validation across multiple request cycles
 
 ### Testing Structure
-- **Unit Tests**: `test/flixir/media/` and `test/flixir/auth/` - Test individual components and business logic
+- **Unit Tests**: `test/flixir/media/`, `test/flixir/auth/`, and `test/flixir/lists/` - Test individual components and business logic
 - **LiveView Tests**: `test/flixir_web/live/` - Test user interactions and real-time features
 - **Component Tests**: `test/flixir_web/components/` - Test UI components including navigation, movie lists, reviews, and search components
 - **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including:
   - **Authentication Flow** (`auth_flow_test.exs`): Complete TMDB authentication process testing
   - **Movie Lists** (`movie_lists_test.exs`): Comprehensive movie browsing and pagination workflows
+  - **User Lists** (`user_lists_test.exs`): Personal movie list management and operations (planned)
   - **Error Handling**: End-to-end error scenarios and recovery mechanisms
 - **Security Tests**: Authentication security, session management, and CSRF protection
 - **Performance Tests**: Measure search response times, concurrent usage, and system performance under load

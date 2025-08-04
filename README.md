@@ -739,6 +739,194 @@ iex> Flixir.Auth.validate_session("session-uuid")
 {:ok, %Flixir.Auth.Session{username: "user123", expires_at: ~U[2024-01-16 10:00:00Z]}}
 ```
 
+#### Lists API Usage Patterns
+
+**Basic List Management:**
+```elixir
+# Create a new movie list
+case Flixir.Lists.create_list(tmdb_user_id, %{
+  name: "My Watchlist",
+  description: "Movies I want to watch",
+  is_public: false
+}) do
+  {:ok, list} -> 
+    # List created successfully
+    IO.puts("Created list: #{list.name}")
+  {:error, changeset} -> 
+    # Handle validation errors
+    IO.inspect(changeset.errors)
+end
+
+# Get all lists for a user
+user_lists = Flixir.Lists.get_user_lists(tmdb_user_id)
+IO.puts("User has #{length(user_lists)} lists")
+
+# Get a specific list with authorization
+case Flixir.Lists.get_list(list_id, tmdb_user_id) do
+  {:ok, list} -> 
+    # User authorized and list found
+    IO.puts("List '#{list.name}' has #{length(list.list_items)} movies")
+  {:error, :not_found} -> 
+    # List doesn't exist
+    IO.puts("List not found")
+  {:error, :unauthorized} -> 
+    # User doesn't own this list
+    IO.puts("Access denied")
+end
+
+# Update list metadata
+case Flixir.Lists.update_list(list, %{name: "Updated Name", is_public: true}) do
+  {:ok, updated_list} -> 
+    IO.puts("List updated: #{updated_list.name}")
+  {:error, changeset} -> 
+    IO.inspect(changeset.errors)
+end
+
+# Delete a list and all its movies
+case Flixir.Lists.delete_list(list) do
+  {:ok, deleted_list} -> 
+    IO.puts("Deleted list: #{deleted_list.name}")
+  {:error, changeset} -> 
+    IO.puts("Failed to delete list")
+end
+
+# Clear all movies from a list
+case Flixir.Lists.clear_list(list) do
+  {:ok, {count, nil}} -> 
+    IO.puts("Removed #{count} movies from list")
+  {:error, reason} -> 
+    IO.puts("Failed to clear list: #{inspect(reason)}")
+end
+```
+
+**Movie Management in Lists:**
+```elixir
+# Add a movie to a list
+case Flixir.Lists.add_movie_to_list(list_id, tmdb_movie_id, tmdb_user_id) do
+  {:ok, list_item} -> 
+    # Movie added successfully
+    IO.puts("Added movie #{tmdb_movie_id} to list")
+  {:error, :duplicate_movie} -> 
+    # Movie already in list
+    IO.puts("Movie already in this list")
+  {:error, :unauthorized} -> 
+    # User doesn't own the list
+    IO.puts("Cannot add to this list")
+  {:error, :not_found} -> 
+    # List doesn't exist
+    IO.puts("List not found")
+end
+
+# Remove a movie from a list
+case Flixir.Lists.remove_movie_from_list(list_id, tmdb_movie_id, tmdb_user_id) do
+  {:ok, deleted_item} -> 
+    IO.puts("Removed movie #{tmdb_movie_id} from list")
+  {:error, :not_found} -> 
+    IO.puts("Movie not in list or list not found")
+  {:error, :unauthorized} -> 
+    IO.puts("Cannot modify this list")
+end
+
+# Get all movies in a list with TMDB data
+case Flixir.Lists.get_list_movies(list_id, tmdb_user_id) do
+  {:ok, movies} -> 
+    # Movies with TMDB data and list metadata
+    Enum.each(movies, fn movie ->
+      IO.puts("#{movie["title"]} (added: #{movie["added_at"]})")
+    end)
+  {:error, reason} -> 
+    IO.puts("Failed to get movies: #{inspect(reason)}")
+end
+
+# Check if a movie is in a list
+if Flixir.Lists.movie_in_list?(list_id, tmdb_movie_id) do
+  IO.puts("Movie is in the list")
+else
+  IO.puts("Movie not in list")
+end
+```
+
+**Statistics and Analytics:**
+```elixir
+# Get statistics for a specific list
+stats = Flixir.Lists.get_list_stats(list_id)
+IO.puts("List has #{stats.movie_count} movies")
+IO.puts("Created: #{stats.created_at}")
+IO.puts("Public: #{stats.is_public}")
+
+# Get user's collection summary
+summary = Flixir.Lists.get_user_lists_summary(tmdb_user_id)
+IO.puts("User has #{summary.total_lists} lists with #{summary.total_movies} total movies")
+IO.puts("#{summary.public_lists} public, #{summary.private_lists} private")
+
+if summary.largest_list do
+  IO.puts("Largest list: '#{summary.largest_list.name}' (#{summary.largest_list.movie_count} movies)")
+end
+
+if summary.most_recent_list do
+  IO.puts("Most recent: '#{summary.most_recent_list.name}'")
+end
+```
+
+**Error Handling Patterns:**
+```elixir
+# Comprehensive error handling for list operations
+defp handle_list_operation(operation_result) do
+  case operation_result do
+    {:ok, result} -> 
+      # Success - handle the result
+      {:ok, result}
+    
+    {:error, %Ecto.Changeset{} = changeset} -> 
+      # Validation errors
+      errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+        Enum.reduce(opts, msg, fn {key, value}, acc ->
+          String.replace(acc, "%{#{key}}", to_string(value))
+        end)
+      end)
+      {:error, :validation_failed, errors}
+    
+    {:error, :duplicate_movie} -> 
+      # Movie already in list
+      {:error, :duplicate, "This movie is already in your list"}
+    
+    {:error, :unauthorized} -> 
+      # User doesn't own the resource
+      {:error, :access_denied, "You don't have permission to modify this list"}
+    
+    {:error, :not_found} -> 
+      # Resource doesn't exist
+      {:error, :not_found, "The requested list or movie was not found"}
+    
+    {:error, reason} -> 
+      # Other errors
+      Logger.error("Unexpected list operation error: #{inspect(reason)}")
+      {:error, :system_error, "An unexpected error occurred"}
+  end
+end
+
+# Usage in LiveView
+def handle_event("add_movie", %{"movie_id" => movie_id}, socket) do
+  case Flixir.Lists.add_movie_to_list(socket.assigns.list_id, movie_id, socket.assigns.current_user["id"]) do
+    {:ok, _list_item} ->
+      {:noreply, 
+       socket
+       |> put_flash(:info, "Movie added to your list!")
+       |> push_patch(to: ~p"/lists/#{socket.assigns.list_id}")}
+    
+    {:error, :duplicate_movie} ->
+      {:noreply, put_flash(socket, :error, "This movie is already in your list")}
+    
+    {:error, :unauthorized} ->
+      {:noreply, put_flash(socket, :error, "You can't modify this list")}
+    
+    {:error, reason} ->
+      Logger.error("Failed to add movie to list: #{inspect(reason)}")
+      {:noreply, put_flash(socket, :error, "Failed to add movie. Please try again.")}
+  end
+end
+```
+
 #### Media Context (`lib/flixir/media/`)
 - **SearchResult**: Data structure for search results and movie lists
 - **TMDBClient**: API client for The Movie Database with movie list endpoints
