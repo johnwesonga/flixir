@@ -7,7 +7,7 @@ defmodule FlixirWeb.ReviewsLive do
   """
 
   use FlixirWeb, :live_view
-  import FlixirWeb.{AppLayout, ReviewComponents}
+  import FlixirWeb.{AppLayout}
   #alias Flixir.Reviews
   require Logger
 

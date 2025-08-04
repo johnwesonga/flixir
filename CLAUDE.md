@@ -53,6 +53,18 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Includes comprehensive error handling with user-friendly messages
 - Features proper logging for debugging and monitoring
 
+**User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)**
+- Comprehensive UI component library for user movie list management
+- **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1`
+- **Display Components**: Rich `list_card/1` components showing list details, movie counts, and privacy status
+- **Interactive Forms**: Validated `list_form/1` for creating and editing lists with privacy controls
+- **Modal Components**: Confirmation dialogs for safe deletion (`delete_confirmation_modal/1`), list clearing (`clear_confirmation_modal/1`), and movie addition (`add_to_list_selector/1`)
+- **State Management**: Loading states with skeleton animations, empty states with call-to-action buttons, and error states with retry functionality
+- **Accessibility Features**: Proper ARIA labels, semantic HTML, keyboard navigation, and screen reader support
+- **Responsive Design**: Mobile-first design with Tailwind CSS responsive utilities
+- **Internationalization**: Support for multiple languages with proper pluralization using `ngettext`
+- **Testing Support**: Comprehensive `data-testid` attributes for reliable component testing
+
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling
 - Integrates with TMDB's session-based authentication system through TMDBClient
@@ -212,6 +224,9 @@ This debugging information helps identify authentication flow issues during deve
   - Seamless integration with TMDB user authentication and session management
   - Comprehensive error handling with user-friendly messages
   - Proper logging for debugging and monitoring
+  - Rich UI component library with responsive design and accessibility features
+  - Modal-based interactions for safe destructive operations
+  - Skeleton loading states and smooth transitions for better UX
 
 ### Configuration
 - Database: PostgreSQL with Ecto
@@ -225,6 +240,55 @@ This debugging information helps identify authentication flow issues during deve
 - Built with Kiro framework principles
 - Comprehensive test coverage including integration, performance, and error handling tests
 - Mock-based testing for external API dependencies
+
+### Component Development Patterns
+
+**Component Structure:**
+- All UI components are organized by feature in `lib/flixir_web/components/`
+- Each component module includes comprehensive documentation with examples
+- Components use `attr` declarations for type safety and documentation
+- All components include `data-testid` attributes for reliable testing
+
+**Component Usage in LiveViews:**
+```elixir
+# Import component modules
+import FlixirWeb.UserMovieListComponents
+
+# Use components in templates
+<.user_lists_container
+  lists={@user_lists}
+  loading={@loading}
+  error={@error}
+  current_user={@current_user}
+/>
+
+<.list_form
+  :if={@show_form}
+  form={@form}
+  action={@form_action}
+  title="Create New List"
+/>
+```
+
+**Component Testing Patterns:**
+```elixir
+# Component tests use Phoenix.LiveViewTest
+import Phoenix.LiveViewTest
+import FlixirWeb.UserMovieListComponents
+
+test "renders component with data" do
+  html = render_component(&list_card/1, %{list: sample_list()})
+  assert html =~ "expected content"
+  assert html =~ "data-testid=\"list-card\""
+end
+```
+
+**Accessibility and Responsive Design:**
+- All components include proper ARIA labels and semantic HTML
+- Mobile-first responsive design using Tailwind CSS utilities
+- Keyboard navigation support for interactive elements
+- Screen reader compatibility with descriptive text and labels
+- High contrast color schemes for better visibility
 
 ### Recent Technical Improvements
 - **Enhanced Authentication Async Handling**: Improved `handle_async/3` functions in AuthLive to support both direct and nested tuple response formats

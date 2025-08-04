@@ -53,10 +53,16 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
-- **Responsive Design**: Tailwind CSS for mobile-first design
+- **Responsive Design**: Tailwind CSS for mobile-first design with consistent spacing and typography
 - **Error Handling**: Graceful error handling with retry mechanisms
-- **Loading States**: Smooth loading indicators and transitions
+- **Loading States**: Smooth loading indicators and skeleton animations for better perceived performance
 - **Error Recovery**: One-click retry functionality for failed operations
+- **Design System**: Consistent component library with:
+  - **Color Palette**: Semantic color system for different states (success, warning, error, info)
+  - **Typography**: Consistent font sizes, weights, and line heights across components
+  - **Spacing**: Standardized padding and margin scales using Tailwind's spacing system
+  - **Interactive Elements**: Hover states, focus indicators, and smooth transitions
+  - **Accessibility**: High contrast ratios, proper focus management, and screen reader support
 
 ## Testing
 
@@ -574,6 +580,96 @@ mix phx.gen.secret
 - **Salt Generation**: Generate unique salts for each environment using `mix phx.gen.secret`
 - **Validation**: Test configuration changes in development before deploying to production
 
+### Component Development Guidelines
+
+#### Creating New Components
+
+When adding new UI components to the application, follow these established patterns:
+
+**Component Structure:**
+```elixir
+defmodule FlixirWeb.MyFeatureComponents do
+  @moduledoc """
+  Components for [feature description].
+  
+  This module contains reusable components for [specific functionality].
+  """
+  
+  use FlixirWeb, :html
+  import FlixirWeb.CoreComponents
+  
+  @doc """
+  Renders [component description].
+  
+  ## Examples
+  
+      <.my_component
+        data={data}
+        loading={false}
+        error={nil}
+      />
+  """
+  attr :data, :list, required: true, doc: "Component data"
+  attr :loading, :boolean, default: false, doc: "Loading state"
+  attr :error, :string, default: nil, doc: "Error message"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+  
+  def my_component(assigns) do
+    ~H"""
+    <div class={["base-classes", @class]} data-testid="my-component">
+      <!-- Component content -->
+    </div>
+    """
+  end
+end
+```
+
+**Component Best Practices:**
+- **Documentation**: Include comprehensive `@doc` strings with examples
+- **Attributes**: Use `attr` declarations with proper types and documentation
+- **Testing**: Add `data-testid` attributes for reliable testing
+- **Accessibility**: Include proper ARIA labels and semantic HTML
+- **Responsive**: Use Tailwind's responsive prefixes for mobile-first design
+- **State Handling**: Support loading, error, and empty states consistently
+- **Internationalization**: Use `gettext` and `ngettext` for translatable content
+
+**Component Testing Patterns:**
+```elixir
+defmodule FlixirWeb.MyFeatureComponentsTest do
+  use FlixirWeb.ConnCase, async: true
+  import Phoenix.LiveViewTest
+  import FlixirWeb.MyFeatureComponents
+
+  describe "my_component/1" do
+    test "renders with required data" do
+      html = render_component(&my_component/1, %{data: sample_data()})
+      
+      assert html =~ "expected content"
+      assert html =~ "data-testid=\"my-component\""
+    end
+    
+    test "handles loading state" do
+      html = render_component(&my_component/1, %{
+        data: [],
+        loading: true
+      })
+      
+      assert html =~ "loading indicator"
+    end
+    
+    test "handles error state" do
+      html = render_component(&my_component/1, %{
+        data: [],
+        error: "Test error"
+      })
+      
+      assert html =~ "Test error"
+      assert html =~ "retry"
+    end
+  end
+end
+```
+
 ## Architecture
 
 ### Core Modules
@@ -1088,9 +1184,12 @@ end
   - Infinite scroll pagination with load more functionality
   - Real-time error handling and retry mechanisms
   - Responsive design optimized for all screen sizes
-- **ReviewsLive**: Review browsing interface with filtering capabilities (future implementation)
+- **ReviewsLive**: Review browsing interface with comprehensive filtering capabilities
   - Supports multiple filter types: recent, popular, movies, TV shows, and top-rated reviews
-  - URL parameter handling for filter type and pagination
+  - URL parameter handling for filter type and pagination with proper parsing
+  - Authentication state management through centralized `on_mount` hook pattern
+  - Error handling, loading states, and future pagination support
+  - Clean architecture with removed unused imports for optimal performance
   - Authentication-aware interface with user context integration
   - Prepared for comprehensive review display and management features
 
