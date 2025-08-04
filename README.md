@@ -57,6 +57,11 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Error Handling**: Graceful error handling with retry mechanisms
 - **Loading States**: Smooth loading indicators and skeleton animations for better perceived performance
 - **Error Recovery**: One-click retry functionality for failed operations
+- **Navigation System**: Unified navigation with authentication state management:
+  - **Main Navigation**: Context-aware navigation with authentication status
+  - **Sub Navigation**: Dynamic sub-navigation for different sections
+  - **User Menu**: Dropdown menu for authenticated users with logout functionality
+  - **Breadcrumbs**: Contextual breadcrumb navigation for better user orientation
 - **Design System**: Consistent component library with:
   - **Color Palette**: Semantic color system for different states (success, warning, error, info)
   - **Typography**: Consistent font sizes, weights, and line heights across components
@@ -98,6 +103,8 @@ mix test --grep "authentication"
   - **Session Management**: Session validation, expiration handling, and cleanup processes
   - **Security Testing**: CSRF protection, encrypted session storage, and logout verification
   - **Integration Testing**: Complete workflows with database operations and cookie management
+  - **Navigation Tests**: Authentication state management in navigation components
+  - **LiveView Integration**: Authentication hooks and state synchronization testing
 - **User Movie Lists Tests**: Personal movie list management testing:
   - **CRUD Operations**: List creation, editing, deletion, and clearing functionality with comprehensive validation
   - **Movie Management**: Adding and removing movies from lists with duplicate prevention and error handling
@@ -427,6 +434,36 @@ The LiveDashboard is automatically configured for development environments using
 #### Email Preview
 View sent emails in development at [`localhost:4000/dev/mailbox`](http://localhost:4000/dev/mailbox) using Swoosh's mailbox preview.
 
+#### Debug Logging
+The application includes comprehensive debug logging for troubleshooting:
+
+**Authentication State Logging:**
+```elixir
+# Main navigation authentication state debugging
+Logger.debug("Main navigation rendering", %{
+  authenticated?: assigns[:authenticated?],
+  has_current_user: not is_nil(assigns[:current_user]),
+  current_user: inspect(assigns[:current_user])
+})
+```
+
+**Session Management Logging:**
+```elixir
+# Session validation and user data retrieval
+Logger.debug("Successfully validated session for user: #{user_data["username"]}")
+Logger.warning("Failed to get user data for session #{session_id}: #{inspect(reason)}")
+```
+
+**API Client Logging:**
+```elixir
+# TMDB API request debugging
+Logger.debug("Making TMDB API request", %{
+  method: method,
+  operation: context.operation,
+  attempt: context.attempt
+})
+```
+
 #### Session Cleanup Monitoring
 Monitor session cleanup statistics and manually trigger cleanup operations:
 ```elixir
@@ -721,6 +758,111 @@ end
 #### UI Component Architecture
 
 The application follows a component-based architecture with reusable UI components organized by feature:
+
+**Core Components (`lib/flixir_web/components/`):**
+- **`core_components.ex`**: Base UI components (buttons, forms, modals, icons)
+- **`app_layout.ex`**: Main application layout with navigation integration
+- **`main_navigation.ex`**: Primary navigation bar with authentication state management
+- **`search_components.ex`**: Search interface and result display components
+- **`movie_list_components.ex`**: Movie list display and navigation components
+- **`review_components.ex`**: Review cards, rating displays, and review filters
+- **`user_movie_list_components.ex`**: Personal movie list management components
+- **`loading_components.ex`**: Loading states and skeleton animations
+- **`empty_state_components.ex`**: Empty state displays with call-to-action elements
+
+**Component Features:**
+- **Consistent API**: All components follow the same attribute and slot patterns
+- **State Management**: Built-in support for loading, error, and empty states
+- **Accessibility**: ARIA labels, keyboard navigation, and screen reader support
+- **Responsive Design**: Mobile-first design with Tailwind CSS responsive utilities
+- **Testing Support**: Data attributes for reliable test targeting
+- **Documentation**: Comprehensive documentation with usage examples
+
+#### Context Architecture
+
+The application uses Phoenix contexts to organize business logic:
+
+**Authentication Context (`lib/flixir/auth/`):**
+- **`auth.ex`**: Main authentication API and session management
+- **`session.ex`**: Session schema and validation
+- **`tmdb_client.ex`**: TMDB API client for authentication operations
+- **`error_handler.ex`**: Centralized error handling and user message formatting
+- **`session_cleanup.ex`**: Background session cleanup and maintenance
+
+**Media Context (`lib/flixir/media/`):**
+- **`media.ex`**: Movie and TV show search and discovery API
+- **`tmdb_client.ex`**: TMDB API client for media operations
+- **`cache.ex`**: Intelligent caching layer for API responses
+- **`search_result.ex`**: Search result data structure and transformations
+- **`search_params.ex`**: Search parameter validation and processing
+
+**Reviews Context (`lib/flixir/reviews/`):**
+- **`reviews.ex`**: Review and rating management API
+- **`review.ex`**: Review schema and data structure
+- **`rating_stats.ex`**: Rating statistics and aggregation
+- **`tmdb_client.ex`**: TMDB API client for review operations
+- **`cache.ex`**: Review data caching and performance optimization
+- **`error_handler.ex`**: Review-specific error handling
+
+**Lists Context (`lib/flixir/lists/`):**
+- **`lists.ex`**: User movie list management API
+- **`user_movie_list.ex`**: Movie list schema and validation
+- **`user_movie_list_item.ex`**: List item schema and relationships
+
+#### LiveView Architecture
+
+The application uses Phoenix LiveView for interactive, real-time user interfaces:
+
+**Core LiveViews (`lib/flixir_web/live/`):**
+- **`search_live.ex`**: Real-time search with filtering and sorting
+- **`movie_lists_live.ex`**: Curated movie list browsing with pagination
+- **`movie_details_live.ex`**: Detailed movie/TV show pages with reviews
+- **`reviews_live.ex`**: Review browsing with advanced filtering
+- **`user_movie_lists_live.ex`**: Personal movie list management dashboard
+- **`auth_live.ex`**: Authentication flow handling (login, callback, logout)
+
+**LiveView Features:**
+- **Real-time Updates**: Instant UI updates without page refreshes
+- **State Management**: Comprehensive state handling for complex interactions
+- **Error Recovery**: Built-in retry mechanisms and error state management
+- **Authentication Integration**: Seamless authentication state across all LiveViews
+- **Performance Optimization**: Efficient rendering and minimal data transfer
+
+#### Navigation System
+
+The application features a comprehensive navigation system with authentication-aware components:
+
+**Main Navigation (`FlixirWeb.MainNavigation`):**
+- **Authentication State**: Displays different UI based on user authentication status
+- **User Menu**: Dropdown menu for authenticated users with profile and logout options
+- **Login Button**: Prominent login button for unauthenticated users
+- **Section Highlighting**: Visual indication of current application section
+- **Responsive Design**: Mobile-optimized navigation with proper touch targets
+
+**App Layout (`FlixirWeb.AppLayout`):**
+- **Unified Layout**: Consistent layout wrapper for all application pages
+- **Sub Navigation**: Contextual sub-navigation for different sections
+- **Breadcrumbs**: Hierarchical navigation breadcrumbs
+- **Footer**: Application footer with additional navigation links
+
+**Navigation Features:**
+- **Real-time Updates**: Navigation state updates instantly with authentication changes
+- **Debug Logging**: Comprehensive logging for authentication state debugging
+- **Accessibility**: Full keyboard navigation and screen reader support
+- **SEO Friendly**: Proper semantic HTML structure for search engines
+
+#### Authentication Integration
+
+**Session Management:**
+- **`auth_hooks.ex`**: LiveView authentication hooks for session state
+- **`auth_session.ex`**: Plug for HTTP request authentication handling
+- **Unified State**: Consistent authentication state across HTTP and LiveView contexts
+
+**Security Features:**
+- **Encrypted Sessions**: Secure session storage with encryption
+- **CSRF Protection**: Cross-site request forgery prevention
+- **Session Cleanup**: Automatic cleanup of expired sessions
+- **Rate Limiting**: Protection against authentication abusee with reusable UI components organized by feature:
 
 **Component Organization:**
 - **Feature-Specific Components**: Components grouped by functionality (user lists, reviews, search, etc.)
