@@ -1,0 +1,386 @@
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+  <%= if @error do %>
+    <!-- Error State -->
+    <div class="text-center py-16 px-4" data-testid="error-state">
+      <div class="mx-auto w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6">
+        <.icon name="hero-exclamation-triangle" class="w-12 h-12 text-red-500" />
+      </div>
+      <h3 class="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h3>
+      <p class="text-gray-600 mb-6 max-w-md mx-auto">{@error}</p>
+      <button
+        phx-click="retry"
+        class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
+      >
+        Try Again
+      </button>
+    </div>
+  <% else %>
+    <%= if @loading do %>
+      <!-- Loading State -->
+      <div class="text-center py-8 mb-8" data-testid="loading-state">
+        <div class="inline-flex items-center px-6 py-3 text-gray-600">
+          <svg
+            class="animate-spin -ml-1 mr-3 h-6 w-6"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+            </circle>
+            <path
+              class="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            >
+            </path>
+          </svg>
+          <span class="text-lg font-medium">Loading list...</span>
+        </div>
+      </div>
+    <% else %>
+      <%= if @list do %>
+        <!-- List Header -->
+        <div class="mb-8">
+          <div class="flex items-center justify-between mb-4">
+            <button
+              phx-click="back_to_lists"
+              class="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <.icon name="hero-arrow-left" class="w-5 h-5 mr-2" />
+              Back to My Lists
+            </button>
+          </div>
+
+          <%= if @editing do %>
+            <!-- Edit Form -->
+            <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mb-8" data-testid="edit-list-form">
+              <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Edit List</h2>
+                <p class="text-sm text-gray-600 mt-1">
+                  Update your list details and privacy settings.
+                </p>
+              </div>
+
+              <.form for={@form_data} phx-submit="update_list">
+                <!-- List Name -->
+                <.input
+                  field={@form_data[:name]}
+                  type="text"
+                  label="List Name"
+                  placeholder="e.g., My Watchlist, Favorite Comedies"
+                  required
+                  maxlength="100"
+                />
+
+                <!-- Description -->
+                <.input
+                  field={@form_data[:description]}
+                  type="textarea"
+                  label="Description (Optional)"
+                  placeholder="Describe what this list is about..."
+                  rows="3"
+                  maxlength="500"
+                />
+
+                <!-- Privacy Setting -->
+                <.input
+                  field={@form_data[:is_public]}
+                  type="checkbox"
+                  label="Make this list public"
+                />
+
+                <div class="text-xs text-gray-500 mt-1 mb-4">
+                  Public lists can be viewed by other users, but only you can edit them.
+                </div>
+
+                <!-- Form Actions -->
+                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
+                  <button
+                    type="button"
+                    phx-click="cancel_edit"
+                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+                    data-testid="submit-edit-form"
+                  >
+                    Update List
+                  </button>
+                </div>
+              </.form>
+            </div>
+          <% else %>
+            <!-- List Header Display -->
+            <.header>
+              {@list.name}
+              <:subtitle>
+                <%= if @list.description && String.trim(@list.description) != "" do %>
+                  {@list.description}
+                <% else %>
+                  <span class="text-gray-500 italic">No description</span>
+                <% end %>
+              </:subtitle>
+              <:actions>
+                <button
+                  phx-click="show_add_movie_modal"
+                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+                  data-testid="add-movie-button"
+                >
+                  <.icon name="hero-plus" class="w-4 h-4 mr-2" />
+                  Add Movie
+                </button>
+                <button
+                  phx-click="edit_list"
+                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                  data-testid="edit-list-button"
+                >
+                  <.icon name="hero-pencil" class="w-4 h-4 mr-2" />
+                  Edit List
+                </button>
+              </:actions>
+            </.header>
+
+            <!-- List Statistics -->
+            <div class="mt-6">
+              <.list_stats stats={@stats} compact={true} />
+            </div>
+          <% end %>
+        </div>
+
+        <!-- Movies Section -->
+        <div class="mb-8">
+          <%= if Enum.empty?(@movies) do %>
+            <!-- Empty State -->
+            <div class="text-center py-16 px-4" data-testid="empty-movies-state">
+              <div class="mx-auto w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                <.icon name="hero-film" class="w-12 h-12 text-gray-400" />
+              </div>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">No movies in this list yet</h3>
+              <p class="text-gray-600 mb-6 max-w-md mx-auto">
+                Start building your collection by adding movies to this list.
+                You can add movies by their TMDB ID or browse from the search page.
+              </p>
+              <button
+                phx-click="show_add_movie_modal"
+                class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                data-testid="add-first-movie-button"
+              >
+                Add Your First Movie
+              </button>
+            </div>
+          <% else %>
+            <!-- Movies Grid -->
+            <div class="mb-6">
+              <h2 class="text-lg font-semibold text-gray-900 mb-4">
+                Movies ({length(@movies)})
+              </h2>
+            </div>
+
+            <div
+              class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+              data-testid="movies-grid"
+            >
+              <%= for movie <- @movies do %>
+                <div class="group relative" data-testid={"movie-card-#{movie["id"]}"}>
+                  <!-- Movie Poster -->
+                  <div class="aspect-[2/3] bg-gray-200 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
+                    <%= if movie["poster_path"] do %>
+                      <img
+                        src={"https://image.tmdb.org/t/p/w500#{movie["poster_path"]}"}
+                        alt={movie["title"]}
+                        class="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    <% else %>
+                      <div class="w-full h-full flex items-center justify-center bg-gray-300">
+                        <.icon name="hero-film" class="w-12 h-12 text-gray-500" />
+                      </div>
+                    <% end %>
+
+                    <!-- Loading Overlay -->
+                    <%= if Map.get(movie, "_loading") do %>
+                      <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                        <svg
+                          class="animate-spin h-8 w-8 text-white"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+                          </circle>
+                          <path
+                            class="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          >
+                          </path>
+                        </svg>
+                      </div>
+                    <% end %>
+
+                    <!-- Remove Button -->
+                    <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        phx-click="show_remove_confirmation"
+                        phx-value-movie-id={movie["id"]}
+                        class="p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors shadow-lg"
+                        data-testid={"remove-movie-#{movie["id"]}"}
+                        title="Remove from list"
+                      >
+                        <.icon name="hero-x-mark" class="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Movie Info -->
+                  <div class="mt-2">
+                    <h3 class="text-sm font-medium text-gray-900 truncate" title={movie["title"]}>
+                      {movie["title"]}
+                    </h3>
+                    <%= if movie["release_date"] do %>
+                      <p class="text-xs text-gray-500">
+                        {String.slice(movie["release_date"], 0, 4)}
+                      </p>
+                    <% end %>
+                    <%= if movie["vote_average"] && movie["vote_average"] > 0 do %>
+                      <div class="flex items-center mt-1">
+                        <.icon name="hero-star" class="w-3 h-3 text-yellow-400 mr-1" />
+                        <span class="text-xs text-gray-600">
+                          {Float.round(movie["vote_average"], 1)}
+                        </span>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
+    <% end %>
+  <% end %>
+
+  <!-- Add Movie Modal -->
+  <%= if @show_add_movie_modal do %>
+    <div class="fixed inset-0 z-50 overflow-y-auto" data-testid="add-movie-modal">
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+      <!-- Modal -->
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
+          <div class="p-6">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">
+                Add Movie to List
+              </h3>
+              <button
+                type="button"
+                phx-click="cancel_add_movie"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="h-5 w-5" />
+              </button>
+            </div>
+
+            <!-- Form -->
+            <form phx-submit="add_movie_by_id">
+              <div class="mb-4">
+                <label for="movie_id" class="block text-sm font-medium text-gray-700 mb-2">
+                  TMDB Movie ID
+                </label>
+                <input
+                  type="number"
+                  id="movie_id"
+                  name="movie_id"
+                  placeholder="e.g., 550 for Fight Club"
+                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                  data-testid="movie-id-input"
+                />
+                <p class="text-xs text-gray-500 mt-1">
+                  You can find the TMDB ID in the movie's URL on themoviedb.org
+                </p>
+              </div>
+
+              <div class="flex items-center justify-end space-x-3">
+                <button
+                  type="button"
+                  phx-click="cancel_add_movie"
+                  class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+                  data-testid="add-movie-submit"
+                >
+                  Add Movie
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Remove Movie Confirmation Modal -->
+  <%= if @show_remove_confirmation && @selected_movie do %>
+    <div class="fixed inset-0 z-50 overflow-y-auto" data-testid="remove-movie-modal">
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+      <!-- Modal -->
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
+          <div class="p-6">
+            <!-- Icon -->
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mb-4">
+              <.icon name="hero-trash" class="h-6 w-6 text-red-600" />
+            </div>
+
+            <!-- Content -->
+            <div class="text-center">
+              <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                Remove Movie
+              </h3>
+              <p class="text-sm text-gray-600 mb-4">
+                Are you sure you want to remove "<strong>{@selected_movie["title"]}</strong>" from this list?
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-end space-x-3 mt-6">
+              <button
+                type="button"
+                phx-click="cancel_remove_movie"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                phx-click="confirm_remove_movie"
+                phx-value-movie-id={@selected_movie["id"]}
+                class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 transition-colors"
+                data-testid="confirm-remove-movie"
+              >
+                Remove Movie
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+</div>

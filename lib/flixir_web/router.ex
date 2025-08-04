@@ -73,7 +73,7 @@ defmodule FlixirWeb.Router do
 
     # User movie lists management
     live "/my-lists", UserMovieListsLive, :index
-    # live "/my-lists/:id", UserMovieListLive, :show  # Task 7
+    live "/my-lists/:id", UserMovieListLive, :show
   end
 
   # Other scopes may use custom stacks.

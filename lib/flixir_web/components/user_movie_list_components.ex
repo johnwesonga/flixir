@@ -471,6 +471,118 @@ defmodule FlixirWeb.UserMovieListComponents do
   end
 
   @doc """
+  Renders a grid of movies within a list with poster images and basic info.
+
+  ## Examples
+
+      <.list_movies_grid movies={movies} />
+  """
+  attr :movies, :list, required: true, doc: "List of movies with TMDB data"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def list_movies_grid(assigns) do
+    ~H"""
+    <div
+      class={[
+        "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4",
+        @class
+      ]}
+      data-testid="list-movies-grid"
+    >
+      <%= for movie <- @movies do %>
+        <.movie_card movie={movie} />
+      <% end %>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders an individual movie card with poster, title, and remove button.
+
+  ## Examples
+
+      <.movie_card movie={movie} />
+  """
+  attr :movie, :map, required: true, doc: "Movie data with TMDB information"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def movie_card(assigns) do
+    ~H"""
+    <div class={["group relative", @class]} data-testid={"movie-card-#{@movie["id"]}"}>
+      <!-- Movie Poster -->
+      <div class="aspect-[2/3] bg-gray-200 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
+        <%= if @movie["poster_path"] do %>
+          <img
+            src={"https://image.tmdb.org/t/p/w500#{@movie["poster_path"]}"}
+            alt={@movie["title"]}
+            class="w-full h-full object-cover"
+            loading="lazy"
+          />
+        <% else %>
+          <div class="w-full h-full flex items-center justify-center bg-gray-300">
+            <.icon name="hero-film" class="w-12 h-12 text-gray-500" />
+          </div>
+        <% end %>
+
+        <!-- Loading Overlay -->
+        <%= if Map.get(@movie, "_loading") do %>
+          <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <svg
+              class="animate-spin h-8 w-8 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+              </circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              >
+              </path>
+            </svg>
+          </div>
+        <% end %>
+
+        <!-- Remove Button -->
+        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            phx-click="show_remove_confirmation"
+            phx-value-movie-id={@movie["id"]}
+            class="p-1 bg-red-600 text-white rounded-full hover:bg-red-700 transition-colors shadow-lg"
+            data-testid={"remove-movie-#{@movie["id"]}"}
+            title="Remove from list"
+          >
+            <.icon name="hero-x-mark" class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Movie Info -->
+      <div class="mt-2">
+        <h3 class="text-sm font-medium text-gray-900 truncate" title={@movie["title"]}>
+          {@movie["title"]}
+        </h3>
+        <%= if @movie["release_date"] do %>
+          <p class="text-xs text-gray-500">
+            {String.slice(@movie["release_date"], 0, 4)}
+          </p>
+        <% end %>
+        <%= if @movie["vote_average"] && @movie["vote_average"] > 0 do %>
+          <div class="flex items-center mt-1">
+            <.icon name="hero-star" class="w-3 h-3 text-yellow-400 mr-1" />
+            <span class="text-xs text-gray-600">
+              {Float.round(@movie["vote_average"], 1)}
+            </span>
+          </div>
+        <% end %>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders an "Add to List" selector component for choosing which list to add a movie to.
 
   ## Examples

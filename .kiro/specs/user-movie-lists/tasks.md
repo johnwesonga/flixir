@@ -41,7 +41,7 @@
   - Add real-time updates and error handling with user feedback
   - _Requirements: 1.1, 1.5, 2.1, 2.5, 3.1, 3.4, 4.1, 4.4, 7.5, 8.1, 8.3, 8.5, 9.2_
 
-- [ ] 7. Create UserMovieListLive for individual list management
+- [x] 7. Create UserMovieListLive for individual list management
   - Implement `FlixirWeb.UserMovieListLive` for viewing and managing a single list
   - Add movie display with integration to TMDB data through Media context
   - Handle adding and removing movies from the list with optimistic updates

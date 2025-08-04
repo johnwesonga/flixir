@@ -339,7 +339,6 @@ defmodule FlixirWeb.UserMovieListsLive do
 
   @impl true
   def handle_event("view_list", %{"list-id" => list_id}, socket) do
-    # For now, just show a message since individual list view is task 7
     case find_list_by_id(socket.assigns.lists, list_id) do
       nil ->
         socket =
@@ -348,12 +347,8 @@ defmodule FlixirWeb.UserMovieListsLive do
 
         {:noreply, socket}
 
-      list ->
-        socket =
-          socket
-          |> put_flash(:info, "Individual list view coming soon! List: \"#{list.name}\"")
-
-        {:noreply, socket}
+      _list ->
+        {:noreply, redirect(socket, to: ~p"/my-lists/#{list_id}")}
     end
   end
 
