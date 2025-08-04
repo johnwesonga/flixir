@@ -35,10 +35,13 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 
 ### 📝 User Movie Lists
 - **Personal Collections**: Create and manage custom movie lists with TMDB authentication
-- **List Management**: Add, edit, and organize personal movie collections
-- **Privacy Controls**: Public and private list visibility settings
-- **User Integration**: Seamlessly integrated with TMDB user accounts
-- **Persistent Storage**: Secure database storage with user association
+- **List Management**: Full CRUD operations for personal movie collections with comprehensive validation
+- **Movie Operations**: Add and remove movies from lists with duplicate prevention and real-time updates
+- **Privacy Controls**: Public and private list visibility settings with user authorization
+- **User Integration**: Seamlessly integrated with TMDB user accounts and session management
+- **Statistics & Analytics**: List summaries, movie counts, and user collection analytics
+- **Data Persistence**: Secure database storage with proper user isolation and access control
+- **Error Handling**: Comprehensive error handling with user-friendly messages and retry mechanisms
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -81,13 +84,15 @@ mix test --grep "authentication"
   - **Session Management**: Session validation, expiration handling, and cleanup processes
   - **Security Testing**: CSRF protection, encrypted session storage, and logout verification
   - **Integration Testing**: Complete workflows with database operations and cookie management
-- **User Movie Lists Tests**: Personal movie list management testing (planned):
-  - **CRUD Operations**: List creation, editing, deletion, and clearing functionality
-  - **Movie Management**: Adding and removing movies from lists with duplicate prevention
-  - **Privacy Controls**: Public and private list visibility and access control
-  - **User Authorization**: Ensuring users can only access and modify their own lists
-  - **Data Persistence**: List and movie data integrity across sessions
-  - **UI Components**: List display, forms, modals, and responsive behavior
+- **User Movie Lists Tests**: Personal movie list management testing:
+  - **CRUD Operations**: List creation, editing, deletion, and clearing functionality with comprehensive validation
+  - **Movie Management**: Adding and removing movies from lists with duplicate prevention and error handling
+  - **Privacy Controls**: Public and private list visibility and access control with user authorization
+  - **User Authorization**: Ensuring users can only access and modify their own lists with proper security
+  - **Data Persistence**: List and movie data integrity across sessions with database constraints
+  - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics testing
+  - **Error Scenarios**: Comprehensive error handling including unauthorized access and validation failures
+  - **Integration Testing**: Full workflow testing with TMDB authentication and Media context integration
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
@@ -220,9 +225,10 @@ CREATE TABLE auth_sessions (
 );
 ```
 
-The user movie lists feature requires the `user_movie_lists` table:
+The user movie lists feature requires the `user_movie_lists` and `user_movie_list_items` tables:
 
 ```sql
+-- User movie lists table
 CREATE TABLE user_movie_lists (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(100) NOT NULL,
@@ -233,10 +239,28 @@ CREATE TABLE user_movie_lists (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- User movie list items table (junction table for movies in lists)
+CREATE TABLE user_movie_list_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  list_id UUID NOT NULL REFERENCES user_movie_lists(id) ON DELETE CASCADE,
+  tmdb_movie_id INTEGER NOT NULL,
+  added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for efficient querying
 CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists (tmdb_user_id);
 CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists (updated_at);
 CREATE INDEX idx_user_movie_lists_user_updated ON user_movie_lists (tmdb_user_id, updated_at);
+
+-- Indexes for list items
+CREATE INDEX idx_user_movie_list_items_list_id ON user_movie_list_items (list_id);
+CREATE INDEX idx_user_movie_list_items_tmdb_movie_id ON user_movie_list_items (tmdb_movie_id);
+CREATE INDEX idx_user_movie_list_items_added_at ON user_movie_list_items (added_at);
+
+-- Unique constraint to prevent duplicate movies in the same list
+CREATE UNIQUE INDEX idx_unique_movie_per_list ON user_movie_list_items (list_id, tmdb_movie_id);
 ```
 
 #### Session Management
@@ -540,13 +564,26 @@ mix phx.gen.secret
 ### Core Modules
 
 #### Lists Context (`lib/flixir/lists/`)
-- **UserMovieList**: Schema for user-created movie lists with privacy controls
-- **UserMovieListItem**: Junction table for movies within lists
-- **List Management**: CRUD operations for personal movie collections
-- **Movie Operations**: Add/remove movies from lists with duplicate prevention
-- **Privacy Controls**: Public and private list visibility settings
-- **Statistics**: List summaries and user collection analytics
-- **User Integration**: Seamless integration with TMDB user authentication
+- **UserMovieList**: Schema for user-created movie lists with privacy controls and comprehensive validation
+- **UserMovieListItem**: Junction table for movies within lists with duplicate prevention constraints
+- **List Management**: Full CRUD operations for personal movie collections with user authorization
+  - `create_list/2`: Create new movie lists with validation and user association
+  - `get_user_lists/1`: Retrieve all lists for a user with preloaded items
+  - `get_list/2`: Get specific list with authorization checks
+  - `update_list/2`: Update list metadata with validation
+  - `delete_list/1`: Delete lists and cascade to all associated items
+  - `clear_list/1`: Remove all movies from a list while preserving metadata
+- **Movie Operations**: Add/remove movies from lists with comprehensive error handling
+  - `add_movie_to_list/3`: Add movies with duplicate prevention and authorization
+  - `remove_movie_from_list/3`: Remove movies with proper cleanup
+  - `get_list_movies/2`: Retrieve movies with TMDB data integration
+  - `movie_in_list?/2`: Check movie membership in lists
+- **Statistics & Analytics**: Comprehensive list and user statistics
+  - `get_list_stats/1`: Individual list statistics and metadata
+  - `get_user_lists_summary/1`: User collection analytics and summaries
+- **Privacy Controls**: Public and private list visibility with access control
+- **User Integration**: Seamless integration with TMDB user authentication and session management
+- **Error Handling**: Comprehensive error handling with user-friendly messages and proper logging
 
 #### Auth Context (`lib/flixir/auth/`)
 - **Session**: User session management with TMDB integration and automatic cleanup
@@ -729,12 +766,13 @@ iex> Flixir.Auth.validate_session("session-uuid")
 
 #### LiveView Modules (`lib/flixir_web/live/`)
 - **UserMovieListsLive**: Personal movie list management interface (planned)
-  - **List Management**: Create, edit, and delete personal movie collections
-  - **Movie Operations**: Add and remove movies from lists with real-time updates
-  - **Privacy Controls**: Toggle between public and private list visibility
-  - **Statistics Display**: Show list summaries and collection analytics
-  - **Authentication Integration**: Seamless integration with TMDB user sessions
-  - **Responsive Design**: Mobile-optimized interface for list management
+  - **List Management**: Create, edit, and delete personal movie collections with real-time validation
+  - **Movie Operations**: Add and remove movies from lists with duplicate prevention and instant feedback
+  - **Privacy Controls**: Toggle between public and private list visibility with authorization checks
+  - **Statistics Display**: Show list summaries, movie counts, and collection analytics
+  - **Authentication Integration**: Seamless integration with TMDB user sessions and authorization
+  - **Error Handling**: User-friendly error messages with retry mechanisms
+  - **Responsive Design**: Mobile-first design with touch-friendly interactions: Mobile-optimized interface for list management
 - **AuthLive**: Comprehensive user authentication interface with TMDB integration
   - **Authentication Flow**: Complete TMDB three-step authentication (token → approval → session)
   - **Route Handling**: Supports login, callback, and logout routes with parameter validation
