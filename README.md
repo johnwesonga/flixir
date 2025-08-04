@@ -42,6 +42,14 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics
 - **Data Persistence**: Secure database storage with proper user isolation and access control
 - **Error Handling**: Comprehensive error handling with user-friendly messages and retry mechanisms
+- **Rich UI Components**: Comprehensive component library for list management including:
+  - **List Cards**: Visual cards showing list details, movie counts, and privacy status
+  - **Creation Forms**: Validated forms for creating and editing lists with privacy controls
+  - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations
+  - **Add to List Selector**: Modal interface for adding movies to existing lists
+  - **Statistics Display**: Both compact and detailed list statistics views
+  - **Loading States**: Skeleton loading animations and progress indicators
+  - **Empty States**: Helpful empty state messages with call-to-action buttons
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -93,6 +101,13 @@ mix test --grep "authentication"
   - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics testing
   - **Error Scenarios**: Comprehensive error handling including unauthorized access and validation failures
   - **Integration Testing**: Full workflow testing with TMDB authentication and Media context integration
+  - **Component Testing**: UI component rendering and interaction testing:
+    - **List Card Rendering**: Testing list display with various data states and privacy settings
+    - **Form Validation**: Testing creation and editing forms with validation feedback
+    - **Modal Interactions**: Testing confirmation dialogs and add-to-list selectors
+    - **State Management**: Testing loading, empty, and error states with proper user feedback
+    - **Responsive Design**: Testing component behavior across different screen sizes
+    - **Accessibility**: Testing ARIA labels, keyboard navigation, and screen reader compatibility
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
@@ -563,6 +578,24 @@ mix phx.gen.secret
 
 ### Core Modules
 
+#### UI Component Architecture
+
+The application follows a component-based architecture with reusable UI components organized by feature:
+
+**Component Organization:**
+- **Feature-Specific Components**: Components grouped by functionality (user lists, reviews, search, etc.)
+- **Shared Components**: Common UI elements in `FlixirWeb.CoreComponents`
+- **Layout Components**: Application-wide layout and navigation components
+- **Responsive Design**: All components built with mobile-first responsive design principles
+
+**Component Design Principles:**
+- **Composability**: Components can be easily combined and nested
+- **Accessibility**: Built-in ARIA labels, semantic HTML, and keyboard navigation
+- **Internationalization**: Support for multiple languages with proper pluralization
+- **State Management**: Clear separation between stateful and stateless components
+- **Error Handling**: Consistent error states and user feedback across all components
+- **Performance**: Optimized rendering with minimal re-renders and efficient DOM updates
+
 #### Lists Context (`lib/flixir/lists/`)
 - **UserMovieList**: Schema for user-created movie lists with privacy controls and comprehensive validation
 - **UserMovieListItem**: Junction table for movies within lists with duplicate prevention constraints
@@ -584,6 +617,31 @@ mix phx.gen.secret
 - **Privacy Controls**: Public and private list visibility with access control
 - **User Integration**: Seamless integration with TMDB user authentication and session management
 - **Error Handling**: Comprehensive error handling with user-friendly messages and proper logging
+
+#### User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)
+- **Container Components**: Main layout components for organizing list displays
+  - `user_lists_container/1`: Primary container with header, actions, and content areas
+  - `lists_grid/1`: Responsive grid layout for displaying multiple list cards
+- **List Display Components**: Visual components for showing list information
+  - `list_card/1`: Individual list cards with name, description, movie count, and privacy status
+  - `list_stats/1`: Statistics display with both compact and detailed views
+- **Interactive Forms**: Form components for list creation and editing
+  - `list_form/1`: Comprehensive form with validation for creating and editing lists
+  - Privacy controls with checkbox for public/private settings
+  - Character limits and validation feedback
+- **Modal Components**: Confirmation dialogs for destructive operations
+  - `delete_confirmation_modal/1`: Safe deletion with detailed confirmation messages
+  - `clear_confirmation_modal/1`: List clearing confirmation with movie count display
+  - `add_to_list_selector/1`: Movie addition interface with list selection
+- **State Management Components**: Loading, empty, and error state displays
+  - Loading states with skeleton animations for smooth UX
+  - Empty state messages with call-to-action buttons
+  - Error state handling with retry functionality
+- **Utility Features**: Helper functions and responsive design
+  - Relative date formatting for "updated X days ago" displays
+  - Responsive grid layouts that adapt to different screen sizes
+  - Accessibility features with proper ARIA labels and semantic HTML
+  - Internationalization support with `ngettext` for pluralization
 
 #### Auth Context (`lib/flixir/auth/`)
 - **Session**: User session management with TMDB integration and automatic cleanup
@@ -690,6 +748,51 @@ case Flixir.Auth.TMDBClient.create_request_token() do
         put_flash(socket, :error, "Authentication temporarily unavailable")
     end
 end
+```
+
+**User Movie List Component Usage:**
+```elixir
+# Using the main container component in a LiveView
+defmodule MyAppWeb.UserListsLive do
+  use MyAppWeb, :live_view
+  import FlixirWeb.UserMovieListComponents
+
+  def render(assigns) do
+    ~H"""
+    <.user_lists_container
+      lists={@user_lists}
+      loading={@loading}
+      error={@error}
+      current_user={@current_user}
+    />
+    
+    <!-- Form modal for creating/editing lists -->
+    <.list_form
+      :if={@show_form}
+      form={@form}
+      action={@form_action}
+      title={if @form_action == :create, do: "Create New List", else: "Edit List"}
+    />
+    
+    <!-- Confirmation modals -->
+    <.delete_confirmation_modal
+      show={@show_delete_modal}
+      list={@selected_list}
+    />
+    
+    <!-- Add to list selector -->
+    <.add_to_list_selector
+      show={@show_add_modal}
+      lists={@user_lists}
+      movie_id={@selected_movie_id}
+    />
+    """
+  end
+end
+
+# Individual component usage
+<.list_card list={list} />
+<.list_stats stats={list_stats} compact={true} />
 ```
 
 **LiveView Authentication Patterns:**
