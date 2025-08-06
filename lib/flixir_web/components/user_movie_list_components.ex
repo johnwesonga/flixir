@@ -148,8 +148,8 @@ defmodule FlixirWeb.UserMovieListComponents do
               <%= ngettext("1 movie", "%{count} movies", @movie_count) %>
             </span>
           </div>
-          <time datetime={DateTime.to_iso8601(@list.updated_at)}>
-            Updated {format_relative_date(@list.updated_at)}
+          <time datetime={NaiveDateTime.to_iso8601(@list.updated_at, :extended)}>
+            Updated {format_relative_date(DateTime.from_naive!(@list.updated_at, "Etc/UTC"))}
           </time>
         </div>
       </div>
@@ -727,7 +727,7 @@ defmodule FlixirWeb.UserMovieListComponents do
 
         <div class="text-right">
           <div class="text-xs text-gray-500">
-            Updated {format_relative_date(@stats.updated_at)}
+            Updated {format_relative_date(DateTime.from_naive!(@stats.updated_at, "Etc/UTC"))}
           </div>
         </div>
       </div>
@@ -789,7 +789,7 @@ defmodule FlixirWeb.UserMovieListComponents do
           <div>
             <span class="text-gray-500">Last updated:</span>
             <span class="ml-2 text-gray-900">
-              {format_relative_date(@stats.updated_at)}
+              {format_relative_date(DateTime.from_naive!(@stats.updated_at, "Etc/UTC"))}
             </span>
           </div>
         </div>

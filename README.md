@@ -213,16 +213,32 @@ The authentication process follows TMDB's three-step authentication flow:
 2. **User Approval**: User is redirected to TMDB to approve the token with their credentials
 3. **Session Creation**: Approved token is exchanged for an authenticated session
 
-#### Authentication Routes
+#### Application Routes
 
+**Public Routes (no authentication required):**
+- **Home/Search**: `/` and `/search` - Movie and TV show search functionality
+- **Movie Lists**: `/movies` and `/movies/:list_type` - Browse curated movie collections
+- **Reviews**: `/reviews` and `/reviews/:filter` - Browse movie and TV show reviews
+- **Media Details**: `/media/:type/:id` - Detailed view of movies and TV shows with reviews
+
+**Authentication Routes:**
 - **Login**: `/auth/login` - Initiates the TMDB authentication flow
 - **Callback**: `/auth/callback` - Handles the return from TMDB after user approval
 - **Logout**: `/auth/logout` - Ends the user session and cleans up stored data
+- **Session Management**: `/auth/store_session` and `/auth/clear_session` - Internal session handling
+
+**Protected Routes (authentication required):**
+- **My Lists Dashboard**: `/my-lists` - User movie lists overview and management
+- **Create New List**: `/my-lists/new` - Create a new movie list
+- **List Details**: `/my-lists/:id` - View and manage individual movie list
+- **Edit List**: `/my-lists/:id/edit` - Edit existing list details
 
 #### User Movie Lists Routes
 
 - **My Lists**: `/my-lists` - User movie lists overview and management dashboard (requires authentication)
-- **List Details**: `/my-lists/:id` - Individual list view with movie management (planned)
+- **Create New List**: `/my-lists/new` - Create a new movie list with form validation (requires authentication)
+- **List Details**: `/my-lists/:id` - Individual list view with movie management and statistics (requires authentication)
+- **Edit List**: `/my-lists/:id/edit` - Edit existing list details including name, description, and privacy settings (requires authentication)
 - **List Sharing**: `/lists/:id/public` - Public list view for shared lists (planned)
 
 #### Authentication Configuration
@@ -624,12 +640,42 @@ mix phx.gen.secret
 - `ECTO_IPV6` - Set to "true" or "1" to enable IPv6 for database connections
 - `DNS_CLUSTER_QUERY` - DNS cluster query for distributed deployments
 
+#### Router Configuration
+
+The application uses Phoenix's router with two main pipelines:
+
+**Browser Pipeline** (`pipeline :browser`):
+- Handles all public routes including search, movie lists, and authentication
+- Includes the `AuthSession` plug for automatic authentication state management
+- Provides session management and CSRF protection
+
+**Authenticated Pipeline** (`pipeline :authenticated`):
+- Extends the browser pipeline with required authentication
+- Automatically redirects unauthenticated users to the login page
+- Protects sensitive routes like user movie list management
+
+**Route Organization:**
+```elixir
+# Public routes (no authentication required)
+scope "/", FlixirWeb do
+  pipe_through :browser
+  # Search, movies, reviews, authentication routes
+end
+
+# Protected routes (authentication required)
+scope "/", FlixirWeb do
+  pipe_through :authenticated
+  # User movie lists management routes
+end
+```
+
 #### Configuration Best Practices
 - **Avoid Duplicates**: Ensure each configuration key appears only once per config block
 - **Environment Separation**: Use environment-specific config files for different deployment environments
 - **Secret Management**: Never commit production secrets to version control
 - **Salt Generation**: Generate unique salts for each environment using `mix phx.gen.secret`
 - **Validation**: Test configuration changes in development before deploying to production
+- **Route Protection**: Use the `:authenticated` pipeline for routes requiring user authentication
 
 ### User Movie Lists Interface
 
@@ -641,9 +687,30 @@ The user movie lists feature provides a comprehensive interface for managing per
 - **Quick Actions**: Create new lists, edit existing lists, and manage list contents
 - **Real-time Updates**: All operations update the interface without page refreshes
 
+#### Create New List (`/my-lists/new`)
+- **Dedicated Creation Page**: Full-page form for creating new movie lists
+- **Form Validation**: Real-time validation with error feedback
+- **Privacy Controls**: Set list visibility (public/private) during creation
+- **Rich Input Fields**: Name, description, and privacy settings with proper validation
+- **Cancel/Save Actions**: Easy navigation back to dashboard or save new list
+
+#### Individual List View (`/my-lists/:id`)
+- **List Details**: Complete view of a single movie list with all movies
+- **Movie Management**: Add and remove movies from the list
+- **List Statistics**: Movie count, creation date, and last updated information
+- **Edit Access**: Quick access to edit list details
+- **Movie Grid**: Visual display of all movies in the list with poster images
+
+#### Edit List (`/my-lists/:id/edit`)
+- **Dedicated Edit Page**: Full-page form for editing existing list details
+- **Pre-populated Fields**: Current list data loaded into form fields
+- **Validation**: Real-time validation with error feedback for changes
+- **Privacy Toggle**: Change list visibility between public and private
+- **Save/Cancel**: Save changes or cancel and return to list view
+
 #### List Management Features
-- **Create Lists**: Modal form with name, description, and privacy settings
-- **Edit Lists**: In-place editing with form validation and error feedback
+- **Create Lists**: Both modal and dedicated page options for list creation
+- **Edit Lists**: Dedicated edit pages with comprehensive form validation
 - **Delete Lists**: Confirmation modal showing list details and movie count
 - **Clear Lists**: Remove all movies while preserving list metadata
 - **Statistics Display**: Movie counts, creation dates, and privacy status

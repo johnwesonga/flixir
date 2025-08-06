@@ -13,7 +13,6 @@ config :flixir,
 
 # Configures the endpoint
 config :flixir, FlixirWeb.Endpoint,
-  url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
     formats: [html: FlixirWeb.ErrorHTML, json: FlixirWeb.ErrorJSON],
@@ -21,19 +20,7 @@ config :flixir, FlixirWeb.Endpoint,
   ],
   pubsub_server: Flixir.PubSub,
   live_view: [signing_salt: "hLMifOvkqjrh1OjtczWMnigpiE95pC0c"],
-  # Session configuration with security settings
-  session: [
-    store: :cookie,
-    key: "_flixir_key",
-    signing_salt: "session_salt_key_change_in_prod",
-    encryption_salt: "session_encrypt_salt_change_in_prod",
-    # 24 hours
-    max_age: 86400,
-    # Will be overridden in prod
-    secure: false,
-    http_only: true,
-    same_site: "Lax"
-  ]
+  cache_static_manifest: "priv/static/cache_manifest.json"
 
 # Configures the mailer
 #
