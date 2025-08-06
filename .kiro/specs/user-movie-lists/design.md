@@ -2,9 +2,9 @@
 
 ## Overview
 
-The user movie lists feature will enable authenticated users to create and manage personal movie collections within the Flixir application. This feature builds upon the existing authentication system and integrates with the TMDB API to provide rich movie data while storing user-specific list information in the local database.
+The user movie lists feature will enable authenticated users to create and manage personal movie collections using TMDB's native list management API. This feature builds upon the existing authentication system and integrates directly with TMDB's list endpoints to provide synchronized, persistent movie lists that work across the entire TMDB ecosystem.
 
-The design follows Phoenix conventions and leverages the existing authentication infrastructure, introducing new database schemas for lists and list items, along with a new context for managing user-generated content. The feature will be implemented using Phoenix LiveView for real-time interactions and responsive user experience.
+The design follows Phoenix conventions and leverages the existing authentication infrastructure, introducing a new TMDB Lists API client and context for managing user-generated content. The feature will be implemented using Phoenix LiveView for real-time interactions with optimistic updates, local caching for performance, and comprehensive error handling for API reliability.
 
 ## Architecture
 
@@ -18,225 +18,316 @@ The design follows Phoenix conventions and leverages the existing authentication
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Components    │    │   Database      │    │  Media Context  │
-│   (UI Elements) │    │   (PostgreSQL)  │    │  (Movie Data)   │
+│   Components    │    │ TMDB Lists API  │    │  Cache Layer    │
+│   (UI Elements) │    │    Client       │    │ (ETS/GenServer) │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                       │
+                                ▼                       ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │  TMDB Lists     │    │  Local Storage  │
+                       │     API         │    │  (Fallback)     │
+                       └─────────────────┘    └─────────────────┘
 ```
 
 ### Context Integration
 
 The user movie lists feature will introduce a new `Flixir.Lists` context that manages user-generated movie lists while integrating with:
-- `Flixir.Auth` - For user authentication and session management
-- `Flixir.Media` - For movie data and TMDB integration
-- Database schemas for persistent storage of lists and list items
+- `Flixir.Auth` - For user authentication and session management with TMDB
+- `Flixir.Lists.TMDBClient` - For direct integration with TMDB's list management API
+- `Flixir.Lists.Cache` - For local caching and optimistic updates
+- `Flixir.Lists.Queue` - For operation queuing when TMDB API is unavailable
 
 ## Components and Interfaces
 
-### 1. Database Schema Design
+### 1. TMDB Lists API Integration
 
-**New Tables:**
+**Primary Data Source:** TMDB Lists API endpoints
+
+The system will primarily use TMDB's native list management API for all list operations:
+
+- `POST /list` - Create a new list
+- `GET /list/{list_id}` - Get list details
+- `POST /list/{list_id}/add_item` - Add movie to list
+- `POST /list/{list_id}/remove_item` - Remove movie from list
+- `DELETE /list/{list_id}` - Delete list
+- `POST /list/{list_id}/clear` - Clear all items from list
+- `GET /account/{account_id}/lists` - Get user's lists
+
+### 2. Local Cache Schema (Optional)
+
+**Cache Tables for Performance:**
 
 ```sql
--- User movie lists
-CREATE TABLE user_movie_lists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+-- Cached list metadata for quick access
+CREATE TABLE cached_user_lists (
+  tmdb_list_id INTEGER PRIMARY KEY,
+  tmdb_user_id INTEGER NOT NULL,
   name VARCHAR(100) NOT NULL,
   description TEXT,
   is_public BOOLEAN DEFAULT false,
-  tmdb_user_id INTEGER NOT NULL,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  item_count INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE,
+  updated_at TIMESTAMP WITH TIME ZONE,
+  cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  cache_expires_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() + INTERVAL '1 hour'
 );
 
--- Movies in lists (junction table)
-CREATE TABLE user_movie_list_items (
+-- Cached list items for offline access
+CREATE TABLE cached_list_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  list_id UUID NOT NULL REFERENCES user_movie_lists(id) ON DELETE CASCADE,
+  tmdb_list_id INTEGER NOT NULL,
   tmdb_movie_id INTEGER NOT NULL,
-  added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  added_at TIMESTAMP WITH TIME ZONE,
+  cached_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(tmdb_list_id, tmdb_movie_id)
+);
+
+-- Operation queue for when TMDB API is unavailable
+CREATE TABLE queued_list_operations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation_type VARCHAR(50) NOT NULL, -- 'create', 'update', 'delete', 'add_item', 'remove_item'
+  tmdb_user_id INTEGER NOT NULL,
+  tmdb_list_id INTEGER,
+  operation_data JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  retry_count INTEGER DEFAULT 0,
+  last_retry_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(20) DEFAULT 'pending' -- 'pending', 'processing', 'completed', 'failed'
 );
 
 -- Indexes for performance
-CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists(tmdb_user_id);
-CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists(updated_at DESC);
-CREATE INDEX idx_user_movie_list_items_list_id ON user_movie_list_items(list_id);
-CREATE INDEX idx_user_movie_list_items_tmdb_movie_id ON user_movie_list_items(tmdb_movie_id);
-CREATE UNIQUE INDEX idx_unique_movie_per_list ON user_movie_list_items(list_id, tmdb_movie_id);
+CREATE INDEX idx_cached_user_lists_user_id ON cached_user_lists(tmdb_user_id);
+CREATE INDEX idx_cached_user_lists_expires ON cached_user_lists(cache_expires_at);
+CREATE INDEX idx_cached_list_items_list_id ON cached_list_items(tmdb_list_id);
+CREATE INDEX idx_queued_operations_status ON queued_list_operations(status, created_at);
+CREATE INDEX idx_queued_operations_user ON queued_list_operations(tmdb_user_id);
 ```
 
-### 2. Ecto Schemas
+### 3. TMDB Lists API Client
 
-**UserMovieList Schema:**
+**New TMDB Client Module:**
 
 ```elixir
-defmodule Flixir.Lists.UserMovieList do
+defmodule Flixir.Lists.TMDBClient do
+  @moduledoc """
+  Client for TMDB Lists API integration.
+  
+  Handles all list management operations through TMDB's native API,
+  including error handling, retry logic, and response parsing.
+  """
+
+  @doc "Create a new list on TMDB"
+  def create_list(session_id, attrs) do
+    params = %{
+      name: attrs.name,
+      description: attrs.description || "",
+      public: attrs.is_public || false
+    }
+    
+    post("/list", params, session_id)
+  end
+
+  @doc "Get list details from TMDB"
+  def get_list(list_id, session_id) do
+    get("/list/#{list_id}", %{}, session_id)
+  end
+
+  @doc "Add movie to TMDB list"
+  def add_movie_to_list(list_id, movie_id, session_id) do
+    params = %{media_id: movie_id}
+    post("/list/#{list_id}/add_item", params, session_id)
+  end
+
+  @doc "Remove movie from TMDB list"
+  def remove_movie_from_list(list_id, movie_id, session_id) do
+    params = %{media_id: movie_id}
+    post("/list/#{list_id}/remove_item", params, session_id)
+  end
+
+  @doc "Delete TMDB list"
+  def delete_list(list_id, session_id) do
+    delete("/list/#{list_id}", %{}, session_id)
+  end
+
+  @doc "Get user's lists from TMDB"
+  def get_user_lists(account_id, session_id) do
+    get("/account/#{account_id}/lists", %{}, session_id)
+  end
+
+  @doc "Clear all items from TMDB list"
+  def clear_list(list_id, session_id) do
+    post("/list/#{list_id}/clear", %{confirm: true}, session_id)
+  end
+
+  # Private HTTP client functions
+  defp get(path, params, session_id), do: request(:get, path, params, session_id)
+  defp post(path, params, session_id), do: request(:post, path, params, session_id)
+  defp delete(path, params, session_id), do: request(:delete, path, params, session_id)
+
+  defp request(method, path, params, session_id) do
+    # Implementation with error handling, retries, and response parsing
+  end
+end
+```
+
+### 4. Cache Schemas (Optional)
+
+**CachedUserList Schema:**
+
+```elixir
+defmodule Flixir.Lists.CachedUserList do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @primary_key {:tmdb_list_id, :integer, autogenerate: false}
 
-  schema "user_movie_lists" do
+  schema "cached_user_lists" do
+    field :tmdb_user_id, :integer
     field :name, :string
     field :description, :string
-    field :is_public, :boolean, default: false
-    field :tmdb_user_id, :integer
+    field :is_public, :boolean
+    field :item_count, :integer
+    field :created_at, :utc_datetime
+    field :updated_at, :utc_datetime
+    field :cached_at, :utc_datetime
+    field :cache_expires_at, :utc_datetime
 
-    has_many :list_items, Flixir.Lists.UserMovieListItem, foreign_key: :list_id
-    has_many :movies, through: [:list_items, :movie]
-
-    timestamps()
+    has_many :cached_items, Flixir.Lists.CachedListItem, foreign_key: :tmdb_list_id
   end
 
-  def changeset(list, attrs) do
-    list
-    |> cast(attrs, [:name, :description, :is_public, :tmdb_user_id])
-    |> validate_required([:name, :tmdb_user_id])
-    |> validate_length(:name, min: 3, max: 100)
-    |> validate_length(:description, max: 500)
-    |> validate_number(:tmdb_user_id, greater_than: 0)
-  end
-end
-```
-
-**UserMovieListItem Schema:**
-
-```elixir
-defmodule Flixir.Lists.UserMovieListItem do
-  use Ecto.Schema
-  import Ecto.Changeset
-
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
-
-  schema "user_movie_list_items" do
-    field :tmdb_movie_id, :integer
-    field :added_at, :utc_datetime
-
-    belongs_to :list, Flixir.Lists.UserMovieList, foreign_key: :list_id, type: :binary_id
-
-    timestamps(updated_at: false)
-  end
-
-  def changeset(item, attrs) do
-    item
-    |> cast(attrs, [:tmdb_movie_id, :list_id, :added_at])
-    |> validate_required([:tmdb_movie_id, :list_id])
-    |> validate_number(:tmdb_movie_id, greater_than: 0)
-    |> maybe_set_added_at()
-    |> unique_constraint([:list_id, :tmdb_movie_id], name: :idx_unique_movie_per_list)
-  end
-
-  defp maybe_set_added_at(changeset) do
-    case get_field(changeset, :added_at) do
-      nil -> put_change(changeset, :added_at, DateTime.utc_now() |> DateTime.truncate(:second))
-      _ -> changeset
-    end
+  def changeset(cached_list, attrs) do
+    cached_list
+    |> cast(attrs, [:tmdb_user_id, :name, :description, :is_public, :item_count, 
+                    :created_at, :updated_at, :cached_at, :cache_expires_at])
+    |> validate_required([:tmdb_list_id, :tmdb_user_id, :name])
   end
 end
 ```
 
-### 3. Lists Context
+### 5. Lists Context with TMDB Integration
 
-**New Context: `Flixir.Lists`**
+**Updated Context: `Flixir.Lists`**
 
 ```elixir
 defmodule Flixir.Lists do
   @moduledoc """
-  Context for managing user movie lists.
+  Context for managing user movie lists through TMDB API integration.
+  
+  Provides high-level functions for list management with optimistic updates,
+  caching, and error handling. All operations are performed against TMDB's
+  native list API with local caching for performance.
   """
 
-  import Ecto.Query, warn: false
-  alias Flixir.Repo
-  alias Flixir.Lists.{UserMovieList, UserMovieListItem}
-  alias Flixir.Media
+  alias Flixir.Lists.{TMDBClient, Cache, Queue}
+  alias Flixir.Auth
 
   # List Management Functions
 
-  @spec create_list(integer(), map()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
-  def create_list(tmdb_user_id, attrs)
+  @spec create_list(integer(), map()) :: {:ok, map()} | {:error, term()}
+  def create_list(tmdb_user_id, attrs) do
+    with {:ok, session_id} <- get_user_session(tmdb_user_id),
+         {:ok, tmdb_response} <- TMDBClient.create_list(session_id, attrs) do
+      
+      # Cache the new list locally
+      Cache.put_list(tmdb_response)
+      
+      {:ok, tmdb_response}
+    else
+      {:error, :api_unavailable} ->
+        # Queue operation for later
+        Queue.enqueue_operation(:create_list, tmdb_user_id, nil, attrs)
+        {:ok, :queued}
+      
+      error -> error
+    end
+  end
 
-  @spec get_user_lists(integer()) :: [UserMovieList.t()]
-  def get_user_lists(tmdb_user_id)
+  @spec get_user_lists(integer()) :: {:ok, [map()]} | {:error, term()}
+  def get_user_lists(tmdb_user_id) do
+    # Try cache first
+    case Cache.get_user_lists(tmdb_user_id) do
+      {:ok, cached_lists} when cached_lists != [] ->
+        {:ok, cached_lists}
+      
+      _ ->
+        # Fetch from TMDB API
+        with {:ok, session_id} <- get_user_session(tmdb_user_id),
+             {:ok, account_id} <- get_account_id(tmdb_user_id),
+             {:ok, tmdb_lists} <- TMDBClient.get_user_lists(account_id, session_id) do
+          
+          # Cache the results
+          Cache.put_user_lists(tmdb_user_id, tmdb_lists)
+          
+          {:ok, tmdb_lists}
+        end
+    end
+  end
 
-  @spec get_list(binary(), integer()) :: {:ok, UserMovieList.t()} | {:error, :not_found}
-  def get_list(list_id, tmdb_user_id)
+  # Helper functions
+  defp get_user_session(tmdb_user_id) do
+    Auth.get_user_session(tmdb_user_id)
+  end
 
-  @spec update_list(UserMovieList.t(), map()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
-  def update_list(list, attrs)
-
-  @spec delete_list(UserMovieList.t()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
-  def delete_list(list)
-
-  @spec clear_list(UserMovieList.t()) :: {:ok, {integer(), nil}} | {:error, term()}
-  def clear_list(list)
-
-  # Movie Management Functions
-
-  @spec add_movie_to_list(binary(), integer(), integer()) :: {:ok, UserMovieListItem.t()} | {:error, term()}
-  def add_movie_to_list(list_id, tmdb_movie_id, tmdb_user_id)
-
-  @spec remove_movie_from_list(binary(), integer(), integer()) :: {:ok, UserMovieListItem.t()} | {:error, term()}
-  def remove_movie_from_list(list_id, tmdb_movie_id, tmdb_user_id)
-
-  @spec get_list_movies(binary(), integer()) :: {:ok, [map()]} | {:error, term()}
-  def get_list_movies(list_id, tmdb_user_id)
-
-  @spec movie_in_list?(binary(), integer()) :: boolean()
-  def movie_in_list?(list_id, tmdb_movie_id)
-
-  # Statistics Functions
-
-  @spec get_list_stats(binary()) :: map()
-  def get_list_stats(list_id)
-
-  @spec get_user_lists_summary(integer()) :: map()
-  def get_user_lists_summary(tmdb_user_id)
+  defp get_account_id(tmdb_user_id) do
+    Auth.get_account_id(tmdb_user_id)
+  end
 end
 ```
 
-### 4. LiveView Implementation
+### 6. LiveView Implementation with TMDB Integration
 
-**New LiveView: `FlixirWeb.UserMovieListsLive`**
+**Updated LiveView: `FlixirWeb.UserMovieListsLive`**
 
-State management:
 ```elixir
 %{
   current_user: map() | nil,
-  lists: [UserMovieList.t()],
-  selected_list: UserMovieList.t() | nil,
+  lists: [map()],  # TMDB list objects
+  selected_list: map() | nil,
   list_movies: [map()],
   loading: boolean(),
   error: String.t() | nil,
   show_form: :create | :edit | nil,
   form_data: map(),
-  lists_summary: map()
+  lists_summary: map(),
+  # New TMDB-specific state
+  tmdb_session_id: String.t() | nil,
+  optimistic_updates: [map()],  # Track pending operations
+  queued_operations: [map()],   # Operations waiting for API
+  sync_status: :synced | :syncing | :error | :offline
 }
 ```
 
-**Events handled:**
-- `"create_list"` - Create a new movie list
-- `"edit_list"` - Edit existing list details
-- `"delete_list"` - Delete a movie list
-- `"clear_list"` - Remove all movies from a list
-- `"select_list"` - View a specific list
-- `"add_movie"` - Add a movie to a list
-- `"remove_movie"` - Remove a movie from a list
-- `"toggle_privacy"` - Change list privacy setting
+**Events handled with optimistic updates:**
+- `"create_list"` - Create a new TMDB list with optimistic UI update
+- `"edit_list"` - Edit existing TMDB list details
+- `"delete_list"` - Delete a TMDB list with confirmation
+- `"clear_list"` - Remove all movies from TMDB list
+- `"select_list"` - View a specific TMDB list
+- `"add_movie"` - Add a movie to TMDB list with optimistic update
+- `"remove_movie"` - Remove a movie from TMDB list with optimistic update
+- `"toggle_privacy"` - Change TMDB list privacy setting
+- `"retry_failed_operations"` - Retry queued operations when API is available
+- `"sync_with_tmdb"` - Force synchronization with TMDB API
 
-**New LiveView: `FlixirWeb.UserMovieListLive` (Single List View)**
+**Updated LiveView: `FlixirWeb.UserMovieListLive` (Single List View)**
 
-State management:
+State management with TMDB integration:
 ```elixir
 %{
   current_user: map() | nil,
-  list: UserMovieList.t() | nil,
+  list: map() | nil,  # TMDB list object
   movies: [map()],
   loading: boolean(),
   error: String.t() | nil,
   editing: boolean(),
   form_data: map(),
-  stats: map()
+  stats: map(),
+  # New TMDB-specific state
+  tmdb_list_id: integer() | nil,
+  tmdb_session_id: String.t() | nil,
+  optimistic_movies: [map()],  # Movies being added/removed optimistically
+  sync_status: :synced | :syncing | :error | :offline,
+  last_sync_at: DateTime.t() | nil
 }
 ```
 
@@ -343,38 +434,66 @@ Movies will be fetched from TMDB API using existing `Flixir.Media` functions and
 }
 ```
 
-## Error Handling
+## Error Handling with TMDB Integration
 
 ### Error Types
 
-- `:unauthorized` - User not authenticated or accessing another user's list
-- `:not_found` - List or movie not found
-- `:validation_error` - Invalid input data
-- `:duplicate_movie` - Attempting to add movie already in list
-- `:database_error` - Database operation failures
-- `:api_error` - TMDB API errors when fetching movie data
+- `:unauthorized` - User not authenticated or accessing another user's TMDB list
+- `:not_found` - TMDB list or movie not found
+- `:validation_error` - Invalid input data for TMDB API
+- `:duplicate_movie` - Attempting to add movie already in TMDB list
+- `:tmdb_api_error` - TMDB API failures (rate limits, server errors, etc.)
+- `:session_expired` - TMDB session expired, requires re-authentication
+- `:api_unavailable` - TMDB API temporarily unavailable
+- `:network_error` - Network connectivity issues
+- `:quota_exceeded` - TMDB API quota exceeded
 
-### Error Recovery
+### Error Recovery with Queue System
 
 - **Validation errors**: Display inline form errors with field-specific messages
 - **Not found errors**: Redirect to lists overview with error message
 - **Unauthorized access**: Redirect to login or show access denied message
-- **Database errors**: Show retry option and log for investigation
-- **API errors**: Show cached movie data when available, graceful degradation
+- **TMDB API errors**: Queue operations for retry, show cached data when available
+- **Session expired**: Automatically refresh TMDB session and retry operation
+- **API unavailable**: Queue operations, show offline mode with cached data
+- **Network errors**: Implement exponential backoff retry with user notification
 
-### User Feedback
+### Optimistic Updates and Rollback
+
+```elixir
+# Optimistic update flow
+1. Update UI immediately
+2. Send request to TMDB API
+3. On success: confirm update, update cache
+4. On failure: rollback UI, show error, queue for retry
+
+# Example rollback scenarios
+- Movie addition fails -> Remove from UI, show error
+- List creation fails -> Remove optimistic list, show error
+- List deletion fails -> Restore list in UI, show error
+```
+
+### User Feedback with TMDB Context
 
 ```elixir
 # Success messages
-"List created successfully!"
-"Movie added to your list"
-"List updated"
+"List created successfully on TMDB!"
+"Movie added to your TMDB list"
+"List updated and synced with TMDB"
+"Changes synced with TMDB"
 
-# Error messages
-"You can only edit your own lists"
-"This movie is already in your list"
-"Failed to load movie data. Please try again."
-"List name must be between 3 and 100 characters"
+# Error messages with context
+"TMDB API is temporarily unavailable. Your changes have been queued."
+"Failed to sync with TMDB. Retrying in background..."
+"TMDB session expired. Please log in again."
+"List not found on TMDB. It may have been deleted."
+"TMDB API rate limit reached. Please try again later."
+
+# Queue status messages
+"3 operations pending sync with TMDB"
+"Syncing changes with TMDB..."
+"All changes synced successfully"
+"Some operations failed. Click to retry."
 ```
 
 ## Testing Strategy
