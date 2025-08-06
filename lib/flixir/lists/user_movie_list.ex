@@ -18,10 +18,7 @@ defmodule Flixir.Lists.UserMovieList do
     field :is_public, :boolean, default: false
     field :tmdb_user_id, :integer
 
-    has_many :list_items, Flixir.Lists.UserMovieListItem,
-      foreign_key: :list_id,
-      on_delete: :delete_all
-
+    has_many :list_items, Flixir.Lists.UserMovieListItem, foreign_key: :list_id, on_delete: :delete_all
     has_many :movies, through: [:list_items, :movie]
 
     timestamps()

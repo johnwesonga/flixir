@@ -19,41 +19,24 @@ defmodule FlixirWeb.UserMovieListLive do
   def mount(%{"id" => list_id}, _session, socket) do
     # Authentication state is handled by the on_mount hook
     if socket.assigns.authenticated? do
-      # Validate list_id format (should be a UUID)
-      case validate_uuid(list_id) do
-        :ok ->
-          socket =
-            socket
-            |> assign(:list_id, list_id)
-            |> assign(:list, nil)
-            |> assign(:movies, [])
-            |> assign(:loading, true)
-            |> assign(:error, nil)
-            |> assign(:editing, false)
-            |> assign(:form_data, %{})
-            |> assign(:stats, %{})
-            |> assign(:show_add_movie_modal, false)
-            |> assign(:show_remove_confirmation, false)
-            |> assign(:selected_movie, nil)
-            |> assign(:page_title, "Movie List")
-            |> assign(:current_section, :lists)
-            |> load_list_data()
+      socket =
+        socket
+        |> assign(:list_id, list_id)
+        |> assign(:list, nil)
+        |> assign(:movies, [])
+        |> assign(:loading, true)
+        |> assign(:error, nil)
+        |> assign(:editing, false)
+        |> assign(:form_data, %{})
+        |> assign(:stats, %{})
+        |> assign(:show_add_movie_modal, false)
+        |> assign(:show_remove_confirmation, false)
+        |> assign(:selected_movie, nil)
+        |> assign(:page_title, "Movie List")
+        |> assign(:current_section, :lists)
+        |> load_list_data()
 
-          {:ok, socket}
-
-        :error ->
-          Logger.warning("Invalid list ID format", %{
-            list_id: list_id,
-            tmdb_user_id: socket.assigns.current_user && socket.assigns.current_user["id"]
-          })
-
-          socket =
-            socket
-            |> put_flash(:error, "Invalid list ID format.")
-            |> redirect(to: ~p"/my-lists")
-
-          {:ok, socket}
-      end
+      {:ok, socket}
     else
       # Redirect to login if not authenticated
       socket =
@@ -67,34 +50,7 @@ defmodule FlixirWeb.UserMovieListLive do
 
   @impl true
   def handle_params(_params, _url, socket) do
-    case socket.assigns.live_action do
-      :edit ->
-        list = socket.assigns.list
-
-        if list do
-          changeset = UserMovieList.update_changeset(list, %{})
-
-          socket =
-            socket
-            |> assign(:editing, true)
-            |> assign(:form_data, to_form(changeset))
-
-          {:noreply, socket}
-        else
-          {:noreply, socket}
-        end
-
-      :show ->
-        socket =
-          socket
-          |> assign(:editing, false)
-          |> assign(:form_data, %{})
-
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true
@@ -387,13 +343,6 @@ defmodule FlixirWeb.UserMovieListLive do
   end
 
   # Private helper functions
-
-  defp validate_uuid(uuid_string) do
-    case Ecto.UUID.cast(uuid_string) do
-      {:ok, _} -> :ok
-      :error -> :error
-    end
-  end
 
   defp load_list_data(socket) do
     list_id = socket.assigns.list_id

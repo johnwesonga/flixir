@@ -1,129 +1,112 @@
-# Implementation Plan - TMDB API Integration
+# Implementation Plan
 
-- [ ] 1. Create TMDB Lists API client
-  - Implement `Flixir.Lists.TMDBClient` module for TMDB list management API integration
-  - Add functions for creating, reading, updating, and deleting lists through TMDB API
-  - Implement movie addition and removal from TMDB lists with proper error handling
-  - Add session management and authentication for TMDB API requests
-  - Include retry logic with exponential backoff for network failures
-  - _Requirements: 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 12.1, 12.2_
+- [x] 1. Create database migrations for user movie lists
+  - Create migration for `user_movie_lists` table with name, description, privacy, and user association
+  - Create migration for `user_movie_list_items` junction table with list and movie relationships
+  - Add appropriate indexes for performance and unique constraints to prevent duplicate movies per list
+  - _Requirements: 1.1, 2.1, 5.1, 9.1_
 
-- [ ] 2. Implement cache layer for TMDB list data
-  - Create `Flixir.Lists.Cache` module using ETS or GenServer for local caching
-  - Implement cache functions for storing and retrieving TMDB list data
-  - Add cache expiration and invalidation strategies
-  - Create cache warming functions for frequently accessed lists
-  - Add cache statistics and monitoring for performance optimization
-  - _Requirements: 9.1, 9.4, 11.1, 11.3, 12.5_
+- [x] 2. Implement Ecto schemas for user movie lists
+  - Create `Flixir.Lists.UserMovieList` schema with validations for name length, description, and privacy settings
+  - Create `Flixir.Lists.UserMovieListItem` schema with movie and list associations
+  - Implement changeset functions with proper validation rules and constraint handling
+  - Add associations between schemas for efficient data loading
+  - _Requirements: 1.2, 1.6, 2.2, 2.6, 5.3, 9.1_
 
-- [ ] 3. Create operation queue system for offline support
-  - Implement `Flixir.Lists.Queue` module for queuing operations when TMDB API is unavailable
-  - Create database schema for storing queued operations with retry metadata
-  - Add background job processing for retrying failed operations
-  - Implement operation deduplication and conflict resolution
-  - Add queue monitoring and manual retry capabilities
-  - _Requirements: 10.5, 11.4, 11.5, 12.3, 12.4_
+- [x] 3. Create Lists context with core CRUD operations
+  - Implement `Flixir.Lists` context module with functions for creating, reading, updating, and deleting lists
+  - Add user authorization checks to ensure users can only access their own lists
+  - Implement list statistics and summary functions for displaying list metadata
+  - Add error handling and logging for database operations
+  - _Requirements: 1.1, 1.5, 2.1, 2.5, 3.1, 3.5, 7.1, 7.2, 7.3, 7.4, 9.2, 9.5, 9.6_
 
-- [ ] 4. Update Lists context for TMDB integration
-  - Refactor `Flixir.Lists` context to use TMDB API as primary data source
-  - Implement optimistic updates with rollback capabilities for failed operations
-  - Add cache-first data retrieval with TMDB API fallback
-  - Integrate operation queuing for offline scenarios
-  - Add comprehensive error handling for TMDB API failures
-  - _Requirements: 9.1, 9.2, 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 11.3, 11.4_
+- [x] 4. Implement movie management functions in Lists context
+  - Add functions for adding movies to lists with duplicate prevention
+  - Implement movie removal from lists with proper authorization
+  - Create functions to retrieve movies in a list with TMDB data integration
+  - Add list clearing functionality that removes all movies while preserving list metadata
+  - _Requirements: 4.1, 4.4, 4.5, 5.1, 5.3, 5.4, 5.6, 6.1, 6.3, 6.4, 6.6_
 
-- [ ] 5. Update LiveViews for TMDB integration with optimistic updates
-  - Refactor `FlixirWeb.UserMovieListsLive` to work with TMDB list data and IDs
-  - Implement optimistic updates for list operations with rollback on failure
-  - Add sync status indicators and queue status display
-  - Handle TMDB session expiration and re-authentication flows
-  - Add offline mode support with queued operations display
-  - _Requirements: 9.1, 9.2, 10.1, 10.2, 11.1, 11.2, 11.3, 11.4, 11.5, 12.1, 12.2_
+- [x] 5. Create user movie lists UI components
+  - Implement `FlixirWeb.UserMovieListComponents` with reusable components for list display and management
+  - Create list card component showing name, description, movie count, and privacy status
+  - Build list form component for creating and editing lists with validation feedback
+  - Add confirmation modals for destructive operations like delete and clear
+  - _Requirements: 1.1, 1.6, 2.1, 2.6, 3.2, 3.4, 4.2, 4.4, 7.1, 7.2, 8.1, 8.2, 8.4_
 
-- [ ] 6. Update individual list LiveView for TMDB integration
-  - Refactor `FlixirWeb.UserMovieListLive` to use TMDB list IDs and data structures
-  - Implement optimistic movie addition and removal with TMDB API integration
-  - Add TMDB list sharing and external link functionality
-  - Handle TMDB-specific features like public/private visibility
-  - Add sync status and last updated information from TMDB
-  - _Requirements: 9.1, 9.2, 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 12.1, 12.2, 12.5, 12.6_
+- [x] 6. Implement UserMovieListsLive for lists overview
+  - Create `FlixirWeb.UserMovieListsLive` LiveView for displaying all user lists
+  - Handle mount with authentication checks and user data loading
+  - Implement events for creating, editing, deleting, and clearing lists
+  - Add real-time updates and error handling with user feedback
+  - _Requirements: 1.1, 1.5, 2.1, 2.5, 3.1, 3.4, 4.1, 4.4, 7.5, 8.1, 8.3, 8.5, 9.2_
 
-- [ ] 7. Update routing for TMDB list IDs
-  - Update routes to use TMDB list IDs instead of local UUIDs
-  - Add routes for TMDB list sharing and external access
-  - Implement API routes for sync operations and queue management
-  - Add proper parameter validation for TMDB list IDs
-  - Update route constraints and error handling for TMDB integration
-  - _Requirements: 10.1, 10.2, 12.1, 12.2, 12.5, 12.6_
+- [x] 7. Create UserMovieListLive for individual list management
+  - Implement `FlixirWeb.UserMovieListLive` for viewing and managing a single list
+  - Add movie display with integration to TMDB data through Media context
+  - Handle adding and removing movies from the list with optimistic updates
+  - Implement list editing functionality and statistics display
+  - _Requirements: 2.1, 2.2, 2.5, 5.1, 5.4, 5.6, 6.1, 6.4, 6.6, 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 8. Update UI components for TMDB features
-  - Update `FlixirWeb.UserMovieListComponents` to display TMDB-specific information
-  - Add sync status indicators and queue operation displays
-  - Implement TMDB list sharing components and external links
-  - Add offline mode indicators and retry buttons for failed operations
-  - Update list cards to show TMDB list IDs and creation information
-  - _Requirements: 10.1, 10.2, 11.4, 11.5, 12.1, 12.2, 12.5, 12.6_
+- [ ] 8. Add routing for user movie lists feature
+  - Update `lib/flixir_web/router.ex` with authenticated routes for list management
+  - Add routes for lists overview, individual list view, and list editing
+  - Ensure all routes require authentication using existing auth plug
+  - Add proper parameter validation and error handling
+  - _Requirements: 8.1, 8.5, 9.2_
 
-- [ ] 9. Enhance movie details page with TMDB list integration
-  - Update `FlixirWeb.MovieDetailsLive` to show "Add to TMDB List" functionality
-  - Integrate with TMDB lists API to check movie membership across user's lists
-  - Add optimistic updates for adding/removing movies from TMDB lists
-  - Display TMDB list information and external links
-  - Handle TMDB API errors gracefully with fallback to cached data
-  - _Requirements: 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 12.1, 12.2_
+- [ ] 9. Enhance movie details page with list integration
+  - Modify `FlixirWeb.MovieDetailsLive` to show "Add to List" functionality for authenticated users
+  - Create dropdown/modal for selecting which list to add movie to
+  - Display which lists already contain the current movie
+  - Add quick remove functionality for movies already in lists
+  - _Requirements: 5.1, 5.2, 5.4, 6.1, 6.4_
 
-- [ ] 10. Write comprehensive tests for TMDB integration
-  - Create tests for `Flixir.Lists.TMDBClient` with mocked TMDB API responses
-  - Test cache layer functionality with various scenarios and edge cases
-  - Test operation queue system with retry logic and failure handling
-  - Test optimistic updates and rollback scenarios in LiveViews
-  - Add integration tests for complete TMDB list management workflows
-  - _Requirements: 9.1, 9.2, 10.1, 10.2, 10.3, 10.4, 10.5, 11.1, 11.2, 11.3, 11.4, 11.5_
+- [ ] 10. Create templates for user movie lists LiveViews
+  - Build `user_movie_lists_live.html.heex` template for lists overview with responsive design
+  - Create `user_movie_list_live.html.heex` template for individual list view
+  - Implement proper loading states, error displays, and empty states
+  - Add mobile-responsive layouts and touch-friendly interactions
+  - _Requirements: 1.6, 2.6, 3.4, 4.4, 6.6, 7.5, 8.4, 8.6_
 
-- [ ] 11. Implement background job processing for queue operations
-  - Create background job worker for processing queued TMDB operations
-  - Implement job scheduling and retry logic with exponential backoff
-  - Add job monitoring and failure notification systems
-  - Create admin interface for viewing and managing queued operations
-  - Add metrics and logging for queue performance monitoring
-  - _Requirements: 10.5, 11.4, 11.5, 12.3, 12.4_
+- [ ] 11. Write unit tests for Lists context
+  - Create comprehensive tests in `test/flixir/lists_test.exs` for all context functions
+  - Test CRUD operations, authorization checks, and error handling
+  - Test movie management functions including duplicate prevention
+  - Test statistics and summary functions with various data scenarios
+  - _Requirements: 1.1, 1.5, 1.6, 2.1, 2.5, 2.6, 3.1, 3.4, 3.5, 4.1, 4.4, 4.5, 5.1, 5.3, 5.4, 6.1, 6.4, 6.5, 7.1, 7.2, 7.3, 7.4, 9.1, 9.2, 9.5, 9.6_
 
-- [ ] 12. Add TMDB list synchronization and conflict resolution
-  - Implement periodic sync jobs to keep local cache updated with TMDB
-  - Add conflict resolution for concurrent modifications
-  - Create sync status reporting and user notifications
-  - Implement manual sync triggers for users
-  - Add data consistency checks and repair mechanisms
-  - _Requirements: 9.1, 9.4, 11.3, 11.6, 12.1, 12.2, 12.5, 12.6_
+- [ ] 12. Write schema tests for user movie list models
+  - Test `UserMovieList` schema validations and changesets in dedicated test file
+  - Test `UserMovieListItem` schema with associations and constraints
+  - Verify database constraints and unique indexes work correctly
+  - Test edge cases and validation error scenarios
+  - _Requirements: 1.2, 1.6, 2.2, 2.6, 5.3, 9.1_
 
-- [ ] 13. Add TMDB list sharing and collaboration features
-  - Implement TMDB list sharing URLs and external access
-  - Add collaboration features for public TMDB lists
-  - Create list discovery functionality for public lists
-  - Add social features like list following and recommendations
-  - Implement list export and import functionality with TMDB
-  - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6_
+- [ ] 13. Write LiveView tests for user movie lists
+  - Create `test/flixir_web/live/user_movie_lists_live_test.exs` for lists overview functionality
+  - Test authentication requirements and user data isolation
+  - Test list creation, editing, deletion, and clearing workflows
+  - Test error handling and user feedback scenarios
+  - _Requirements: 1.1, 1.5, 1.6, 2.1, 2.5, 2.6, 3.1, 3.4, 3.5, 4.1, 4.4, 4.5, 7.5, 8.1, 8.5, 9.2_
 
-- [ ] 14. Implement performance optimizations for TMDB integration
-  - Add request batching for multiple TMDB API calls
-  - Implement intelligent caching strategies with cache warming
-  - Add connection pooling and request rate limiting
-  - Create performance monitoring and alerting for TMDB API usage
-  - Optimize database queries for cache and queue operations
-  - _Requirements: 9.1, 9.4, 11.3, 11.6, 12.5_
+- [ ] 14. Write component tests for user movie list UI
+  - Test all components in `FlixirWeb.UserMovieListComponents` for proper rendering
+  - Test form components with validation states and error display
+  - Test modal components for confirmation dialogs
+  - Test responsive behavior and accessibility features
+  - _Requirements: 1.6, 2.6, 3.4, 4.4, 7.5, 8.4, 8.6_
 
-- [ ] 15. Add monitoring and observability for TMDB integration
-  - Implement comprehensive logging for all TMDB API interactions
-  - Add metrics collection for API response times and error rates
-  - Create dashboards for monitoring TMDB integration health
-  - Add alerting for TMDB API failures and queue backlogs
-  - Implement user-facing status pages for TMDB service availability
-  - _Requirements: 10.5, 11.4, 11.5, 12.3, 12.4_
+- [ ] 15. Create integration tests for complete user workflows
+  - Test end-to-end user journey from authentication to list management
+  - Test movie addition from search results and movie details pages
+  - Test privacy settings and data isolation between users
+  - Test error recovery and data persistence across sessions
+  - _Requirements: 5.1, 5.4, 6.1, 6.4, 8.1, 8.5, 9.2, 9.3, 9.4, 9.6_
 
-- [ ] 16. Create migration strategy from local lists to TMDB lists
-  - Implement data migration tools for existing local lists to TMDB
-  - Add user consent and migration workflow UI
-  - Create rollback mechanisms for failed migrations
-  - Add data validation and integrity checks during migration
-  - Implement gradual rollout strategy with feature flags
-  - _Requirements: 9.1, 9.2, 9.6, 10.1, 10.2, 12.1, 12.2_
+- [ ] 16. Add navigation integration for user movie lists
+  - Update main navigation to include "My Lists" link for authenticated users
+  - Add proper active state highlighting when viewing lists section
+  - Ensure navigation is responsive and accessible
+  - Add list count badge or indicator in navigation when appropriate
+  - _Requirements: 8.1, 8.6_

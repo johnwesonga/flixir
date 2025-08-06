@@ -10,6 +10,7 @@ defmodule Flixir.Application do
     children = [
       FlixirWeb.Telemetry,
       Flixir.Repo,
+      {DNSCluster, query: Application.get_env(:flixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Flixir.PubSub},
       # Start the search cache
       {Flixir.Media.Cache, Application.get_env(:flixir, :search_cache, [])},

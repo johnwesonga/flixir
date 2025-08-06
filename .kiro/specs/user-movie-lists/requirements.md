@@ -2,9 +2,7 @@
 
 ## Introduction
 
-This feature will enable authenticated users to create and manage their own personal movie lists within the Flixir application using TMDB's native list management API. Users will be able to create custom lists, add movies to them, edit list details, remove movies, delete entire lists, and check the status of their lists. The system will leverage TMDB's list API for persistence and synchronization while providing a seamless user experience through local caching and optimistic updates.
-
-The integration with TMDB's list API ensures that user lists are synchronized across all TMDB-enabled applications and provides access to TMDB's advanced list features like public/private visibility, list sharing, and collaborative editing capabilities.
+This feature will enable authenticated users to create and manage their own personal movie lists within the Flixir application. Users will be able to create custom lists, add movies to them, edit list details, remove movies, delete entire lists, and check the status of their lists. This provides users with a personalized way to organize and track movies they want to watch, have watched, or want to categorize in custom ways.
 
 ## Requirements
 
@@ -114,52 +112,13 @@ The integration with TMDB's list API ensures that user lists are synchronized ac
 
 ### Requirement 9
 
-**User Story:** As an authenticated user, I want my movie lists to persist across sessions and sync with TMDB, so that my organization work is saved and available whenever I return and accessible from other TMDB applications.
+**User Story:** As an authenticated user, I want my movie lists to persist across sessions, so that my organization work is saved and available whenever I return.
 
 #### Acceptance Criteria
 
-1. WHEN I create or modify lists THEN the system SHALL save changes to TMDB's list API immediately
-2. WHEN I log out and log back in THEN all my lists SHALL be retrieved from TMDB and accessible
-3. WHEN the system experiences errors THEN my existing lists SHALL remain intact and recoverable from TMDB
-4. WHEN I access lists from different devices THEN they SHALL be synchronized through TMDB's API
-5. WHEN TMDB API operations fail THEN the system SHALL display appropriate error messages with retry options
-6. WHEN recovering from errors THEN the system SHALL not lose any previously saved list data stored in TMDB
-
-### Requirement 10
-
-**User Story:** As an authenticated user, I want my lists to integrate with TMDB's native list system, so that I can access advanced list features and share my lists with other TMDB users.
-
-#### Acceptance Criteria
-
-1. WHEN I create a list THEN the system SHALL use TMDB's create list API endpoint
-2. WHEN I add movies to lists THEN the system SHALL use TMDB's add movie to list API endpoint
-3. WHEN I remove movies from lists THEN the system SHALL use TMDB's remove movie from list API endpoint
-4. WHEN I delete a list THEN the system SHALL use TMDB's delete list API endpoint
-5. WHEN TMDB API is unavailable THEN the system SHALL queue operations for retry when service is restored
-6. WHEN viewing lists THEN the system SHALL display TMDB list IDs for reference and debugging
-
-### Requirement 11
-
-**User Story:** As an authenticated user, I want optimistic updates for list operations, so that the interface feels responsive even when TMDB API calls are slow.
-
-#### Acceptance Criteria
-
-1. WHEN I perform list operations THEN the UI SHALL update immediately before API confirmation
-2. WHEN TMDB API calls succeed THEN the optimistic updates SHALL be confirmed and persisted
-3. WHEN TMDB API calls fail THEN the optimistic updates SHALL be reverted with error notification
-4. WHEN operations are queued due to API unavailability THEN the UI SHALL show pending status
-5. WHEN queued operations complete THEN the UI SHALL update to reflect final state
-6. WHEN conflicts occur THEN the system SHALL prioritize TMDB's authoritative state
-
-### Requirement 12
-
-**User Story:** As an authenticated user, I want my lists to support TMDB's advanced features, so that I can take advantage of the full TMDB ecosystem.
-
-#### Acceptance Criteria
-
-1. WHEN creating lists THEN the system SHALL support TMDB's public/private visibility settings
-2. WHEN viewing public lists THEN other users SHALL be able to discover them through TMDB
-3. WHEN lists are shared THEN they SHALL include proper TMDB list URLs for external access
-4. WHEN lists have descriptions THEN they SHALL be stored and retrieved from TMDB
-5. WHEN lists are sorted THEN the system SHALL respect TMDB's list ordering capabilities
-6. WHEN accessing list metadata THEN the system SHALL display TMDB-specific information like creation date and item count
+1. WHEN I create or modify lists THEN the system SHALL save changes to the database immediately
+2. WHEN I log out and log back in THEN all my lists SHALL be preserved and accessible
+3. WHEN the system experiences errors THEN my existing lists SHALL remain intact and recoverable
+4. WHEN I access lists from different devices THEN they SHALL be synchronized and consistent
+5. WHEN database operations fail THEN the system SHALL display appropriate error messages
+6. WHEN recovering from errors THEN the system SHALL not lose any previously saved list data

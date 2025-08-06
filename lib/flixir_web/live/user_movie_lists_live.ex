@@ -48,28 +48,7 @@ defmodule FlixirWeb.UserMovieListsLive do
 
   @impl true
   def handle_params(_params, _url, socket) do
-    case socket.assigns.live_action do
-      :new ->
-        changeset = UserMovieList.changeset(%UserMovieList{}, %{})
-
-        socket =
-          socket
-          |> assign(:show_form, :create)
-          |> assign(:form_data, to_form(changeset))
-
-        {:noreply, socket}
-
-      :index ->
-        socket =
-          socket
-          |> assign(:show_form, nil)
-          |> assign(:form_data, %{})
-
-        {:noreply, socket}
-
-      _ ->
-        {:noreply, socket}
-    end
+    {:noreply, socket}
   end
 
   @impl true

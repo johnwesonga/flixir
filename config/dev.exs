@@ -20,7 +20,6 @@ config :flixir, FlixirWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {127, 0, 0, 1}, port: 4000],
-  url: [host: "localhost"],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -29,14 +28,10 @@ config :flixir, FlixirWeb.Endpoint,
     esbuild: {Esbuild, :install_and_run, [:flixir, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:flixir, ~w(--watch)]}
   ],
-  # Watch static and templates for browser reloading.
-  live_reload: [
-    web_console_logger: true,
-    patterns: [
-      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
-      ~r"priv/gettext/.*(po)$",
-      ~r"lib/flixir_web/(controllers|live|components)/.*(ex|heex)$"
-    ]
+  # Development session settings (less secure for easier development)
+  session: [
+    secure: false,  # Allow HTTP in development
+    same_site: "Lax"
   ]
 
 # ## SSL Support
@@ -62,6 +57,16 @@ config :flixir, FlixirWeb.Endpoint,
 # configured to run both http and https servers on
 # different ports.
 
+# Watch static and templates for browser reloading.
+config :flixir, FlixirWeb.Endpoint,
+  live_reload: [
+    web_console_logger: true,
+    patterns: [
+      ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
+      ~r"priv/gettext/.*(po)$",
+      ~r"lib/flixir_web/(controllers|live|components)/.*(ex|heex)$"
+    ]
+  ]
 
 # Enable dev routes for dashboard and mailbox
 config :flixir, dev_routes: true
