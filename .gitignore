@@ -38,3 +38,4 @@ npm-debug.log
 # ignore env files
 .env
 .envrc
+.env.example
