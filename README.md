@@ -42,6 +42,8 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics
 - **Data Persistence**: Secure database storage with proper user isolation and access control
 - **Error Handling**: Comprehensive error handling with user-friendly messages and retry mechanisms
+- **TMDB API Integration**: Direct integration with TMDB's native Lists API for seamless synchronization
+- **Comprehensive API Client**: Dedicated TMDB Lists client with retry logic, exponential backoff, and error classification
 - **Rich UI Components**: Comprehensive component library for list management including:
   - **List Cards**: Visual cards showing list details, movie counts, and privacy status
   - **Creation Forms**: Validated forms for creating and editing lists with privacy controls
@@ -92,6 +94,9 @@ mix test --cover
 # Run specific test file
 mix test test/flixir_web/live/movie_lists_live_test.exs
 
+# Run TMDB Lists client tests
+mix test test/flixir/lists/tmdb_client_test.exs
+
 # Run tests matching a pattern
 mix test --grep "authentication"
 ```
@@ -114,6 +119,14 @@ mix test --grep "authentication"
   - **Statistics & Analytics**: List summaries, movie counts, and user collection analytics testing
   - **Error Scenarios**: Comprehensive error handling including unauthorized access and validation failures
   - **Integration Testing**: Full workflow testing with TMDB authentication and Media context integration
+  - **TMDB Lists API Testing**: Comprehensive testing of the TMDB Lists client:
+    - **API Operations**: Testing all TMDB Lists API operations (create, read, update, delete, clear)
+    - **Movie Operations**: Testing add/remove movie operations with duplicate prevention
+    - **Error Handling**: Testing error classification, retry logic, and exponential backoff
+    - **Rate Limiting**: Testing graceful handling of TMDB API rate limits
+    - **Authentication**: Testing session-based authentication and authorization
+    - **Response Parsing**: Testing comprehensive response validation and error detection
+    - **Network Resilience**: Testing timeout handling and network error recovery
   - **LiveView Testing**: Complete testing of the UserMovieListsLive module:
     - **Authentication Flow**: Testing authentication requirements and redirect behavior
     - **List Management**: Testing all CRUD operations through the LiveView interface
@@ -351,6 +364,52 @@ The authentication system provides a clean API for managing user sessions:
 # Logout and cleanup session
 :ok = Flixir.Auth.logout(session_id)
 ```
+
+#### TMDB Lists API Integration
+
+The application includes a comprehensive TMDB Lists API client for managing user movie lists directly through TMDB's native API:
+
+**Lists TMDB Client (`Flixir.Lists.TMDBClient`):**
+```elixir
+# Create a new list on TMDB
+{:ok, %{list_id: list_id}} = Flixir.Lists.TMDBClient.create_list(session_id, %{
+  name: "My Watchlist",
+  description: "Movies I want to watch",
+  public: false
+})
+
+# Get list details
+{:ok, list_data} = Flixir.Lists.TMDBClient.get_list(list_id, session_id)
+
+# Update list information
+{:ok, _result} = Flixir.Lists.TMDBClient.update_list(list_id, session_id, %{
+  name: "Updated Watchlist",
+  description: "My updated movie list"
+})
+
+# Add movie to list
+{:ok, _result} = Flixir.Lists.TMDBClient.add_movie_to_list(list_id, movie_id, session_id)
+
+# Remove movie from list
+{:ok, _result} = Flixir.Lists.TMDBClient.remove_movie_from_list(list_id, movie_id, session_id)
+
+# Get all lists for an account
+{:ok, %{results: lists}} = Flixir.Lists.TMDBClient.get_account_lists(account_id, session_id)
+
+# Clear all movies from a list
+{:ok, _result} = Flixir.Lists.TMDBClient.clear_list(list_id, session_id)
+
+# Delete a list
+{:ok, _result} = Flixir.Lists.TMDBClient.delete_list(list_id, session_id)
+```
+
+**TMDB Lists Client Features:**
+- **Comprehensive Error Handling**: Intelligent error classification with retry logic and exponential backoff
+- **Rate Limit Management**: Graceful handling of TMDB API rate limits with appropriate delays
+- **Security**: Secure session handling with URL sanitization for logging
+- **Validation**: Full request and response validation with detailed error messages
+- **Logging**: Comprehensive logging for all operations, errors, and retry attempts
+- **Resilience**: Automatic retry for transient failures with configurable backoff strategies
 
 **Session Plug (`FlixirWeb.Plugs.AuthSession`):**
 The session plug automatically handles authentication state for all requests:
@@ -608,7 +667,7 @@ mix phx.gen.secret
 *TMDB API Configuration:*
 - `TMDB_BASE_URL` - TMDB API base URL (default: "https://api.themoviedb.org/3") - **Now enabled by default**
 - `TMDB_IMAGE_BASE_URL` - TMDB image base URL (default: "https://image.tmdb.org/t/p/w500")
-- `TMDB_TIMEOUT` - TMDB API timeout in milliseconds (default: 5000)
+- `TMDB_TIMEOUT` - TMDB API timeout in milliseconds (default: 10000 for Lists API, 5000 for other APIs)
 - `TMDB_MAX_RETRIES` - TMDB API retry attempts (default: 3)
 
 *Authentication Configuration:*
@@ -881,6 +940,15 @@ The application features a comprehensive navigation system with authentication-a
 #### Lists Context (`lib/flixir/lists/`)
 - **UserMovieList**: Schema for user-created movie lists with privacy controls and comprehensive validation
 - **UserMovieListItem**: Junction table for movies within lists with duplicate prevention constraints
+- **TMDB Lists Client**: Dedicated HTTP client for TMDB Lists API operations (`lib/flixir/lists/tmdb_client.ex`)
+  - **List Management**: Create, read, update, and delete lists on TMDB with full validation
+  - **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention
+  - **Account Integration**: Retrieve all lists for a TMDB account with proper authentication
+  - **Error Classification**: Intelligent error handling with retry logic and exponential backoff
+  - **Response Parsing**: Comprehensive response parsing with validation and error detection
+  - **Security Features**: Secure session handling with URL sanitization for logging
+  - **Retry Logic**: Automatic retry for transient failures with configurable backoff strategies
+  - **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
 - **List Management**: Full CRUD operations for personal movie collections with user authorization
   - `create_list/2`: Create new movie lists with validation and user association
   - `get_user_lists/1`: Retrieve all lists for a user with preloaded items

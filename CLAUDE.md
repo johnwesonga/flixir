@@ -53,6 +53,18 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Includes comprehensive error handling with user-friendly messages
 - Features proper logging for debugging and monitoring
 
+**Lists TMDB Client (`lib/flixir/lists/tmdb_client.ex`)**
+- HTTP client for TMDB Lists API operations with comprehensive error handling
+- **List Management**: Create, read, update, and delete lists on TMDB with full validation
+- **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention
+- **Account Integration**: Retrieve all lists for a TMDB account with proper authentication
+- **Error Classification**: Intelligent error handling with retry logic and exponential backoff
+- **Response Parsing**: Comprehensive response parsing with validation and error detection
+- **Security Features**: Secure session handling with URL sanitization for logging
+- **Retry Logic**: Automatic retry for transient failures with configurable backoff strategies
+- **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
+- **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
+
 **User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)**
 - Comprehensive UI component library for user movie list management
 - **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1`
@@ -169,6 +181,18 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Includes retry logic with exponential backoff for network resilience
 - Integrated with Auth context for seamless authentication flow management
 
+**Lists TMDB Client (`lib/flixir/lists/tmdb_client.ex`)**
+- HTTP client for TMDB Lists API operations with comprehensive error handling
+- **List Management**: Create, read, update, and delete lists on TMDB with full validation
+- **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention
+- **Account Integration**: Retrieve all lists for a TMDB account with proper authentication
+- **Error Classification**: Intelligent error handling with retry logic and exponential backoff
+- **Response Parsing**: Comprehensive response parsing with validation and error detection
+- **Security Features**: Secure session handling with URL sanitization for logging
+- **Retry Logic**: Automatic retry for transient failures with configurable backoff strategies
+- **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
+- **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
+
 **Caching System (`lib/flixir/media/cache.ex`)**
 - In-memory caching for search results and content details
 - Configurable TTL (5 minutes for search, 30 minutes for details)
@@ -201,11 +225,13 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 **Lists Flow:**
 1. User action → UserMovieListsLive (create/edit/delete list or add/remove movie)
 2. UserMovieListsLive → Lists context (validate user authorization)
-3. Lists context → Database (CRUD operations with constraints)
-4. Lists context → Media context (fetch TMDB movie data when needed)
-5. Media context → TMDB API (get movie details for display)
-6. Lists context → UserMovieListsLive (return results with error handling)
-7. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
+3. Lists context → Lists TMDB Client (TMDB API operations for list management)
+4. Lists TMDB Client → TMDB Lists API (create/update/delete lists, add/remove movies)
+5. Lists context → Database (local CRUD operations with constraints for caching/sync)
+6. Lists context → Media context (fetch TMDB movie data when needed)
+7. Media context → TMDB API (get movie details for display)
+8. Lists context → UserMovieListsLive (return results with error handling)
+9. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
 
 **Recent Authentication Improvements:**
 - Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
@@ -243,6 +269,7 @@ This debugging information helps identify authentication flow issues during deve
 - **Authentication**: TMDB-based user authentication with automatic session management
 - **Session Management**: Transparent session validation and user context injection across all requests
 - **Security**: Secure session storage with configurable encryption salts, automatic cleanup, and comprehensive logging
+- **TMDB Lists Integration**: Native TMDB Lists API integration with comprehensive error handling and retry logic
 - **User Movie Lists**: Personal movie collections with privacy controls
   - Create, edit, and delete custom movie lists with comprehensive validation
   - Add and remove movies from lists with duplicate prevention and error handling
@@ -264,10 +291,11 @@ This debugging information helps identify authentication flow issues during deve
 
 ### Configuration
 - Database: PostgreSQL with Ecto
-- HTTP Client: Req library for TMDB API calls
+- HTTP Client: Req library for TMDB API calls (including dedicated Lists API client)
 - Frontend: Phoenix LiveView with Tailwind CSS
 - Server: Bandit adapter
 - Session Management: Phoenix cookie-based sessions with configurable security settings
+- TMDB Lists API: Comprehensive client with retry logic, exponential backoff, and error classification
 
 ### Development Notes
 - Uses Phoenix 1.8 with LiveView for real-time interactions

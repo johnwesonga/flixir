@@ -1,6 +1,6 @@
 # Implementation Plan - TMDB API Integration
 
-- [ ] 1. Create TMDB Lists API client
+- [x] 1. Create TMDB Lists API client
   - Implement `Flixir.Lists.TMDBClient` module for TMDB list management API integration
   - Add functions for creating, reading, updating, and deleting lists through TMDB API
   - Implement movie addition and removal from TMDB lists with proper error handling
