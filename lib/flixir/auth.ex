@@ -454,6 +454,34 @@ defmodule Flixir.Auth do
     |> Repo.all()
   end
 
+  @doc """
+  Gets the current valid session for a user.
+
+  Returns the most recent valid session for the given user ID.
+
+  ## Parameters
+  - tmdb_user_id: The TMDB user ID
+
+  ## Returns
+  - `{:ok, session_id}` - Valid session found
+  - `{:error, :no_valid_session}` - No valid session found
+  """
+  def get_user_session(tmdb_user_id) when is_integer(tmdb_user_id) do
+    now = DateTime.utc_now()
+
+    case from(s in Session,
+      where: s.tmdb_user_id == ^tmdb_user_id and
+             s.expires_at > ^now and
+             s.last_activity_at > ^DateTime.add(now, -get_session_max_idle(), :second),
+      order_by: [desc: s.last_activity_at],
+      limit: 1
+    )
+    |> Repo.one() do
+      nil -> {:error, :no_valid_session}
+      session -> {:ok, session.tmdb_session_id}
+    end
+  end
+
   # Private helper functions
 
   defp build_auth_url(request_token) do

@@ -44,6 +44,12 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Error Handling**: Comprehensive error handling with user-friendly messages and retry mechanisms
 - **TMDB API Integration**: Direct integration with TMDB's native Lists API for seamless synchronization
 - **Comprehensive API Client**: Dedicated TMDB Lists client with retry logic, exponential backoff, and error classification
+- **Offline Support**: Queue system for reliable operation processing when TMDB API is unavailable
+  - **Operation Queuing**: Failed operations are automatically queued for retry with exponential backoff
+  - **Background Processing**: Automatic processing of queued operations with configurable intervals
+  - **Status Tracking**: Real-time monitoring of operation status (pending, processing, completed, failed)
+  - **Manual Retry**: Ability to manually retry failed operations or cancel pending ones
+  - **Deduplication**: Prevents duplicate operations for the same user/list/movie combinations
 - **Rich UI Components**: Comprehensive component library for list management including:
   - **List Cards**: Visual cards showing list details, movie counts, and privacy status
   - **Creation Forms**: Validated forms for creating and editing lists with privacy controls
@@ -101,6 +107,12 @@ mix test test/flixir/lists/tmdb_client_test.exs
 # Run Lists Cache tests
 mix test test/flixir/lists/cache_test.exs
 
+# Run Queue System tests
+mix test test/flixir/lists/queue_test.exs
+mix test test/flixir/lists/queue_processor_test.exs
+mix test test/flixir/lists/queued_operation_test.exs
+mix test test/flixir/lists/queue_integration_test.exs
+
 # Run tests matching a pattern
 mix test --grep "authentication"
 ```
@@ -146,6 +158,15 @@ mix test --grep "authentication"
     - **State Management**: Testing loading, empty, and error states with proper user feedback
     - **Responsive Design**: Testing component behavior across different screen sizes
     - **Accessibility**: Testing ARIA labels, keyboard navigation, and screen reader compatibility
+  - **Queue System Testing**: Comprehensive testing of the offline operation queue:
+    - **Operation Queuing**: Testing enqueuing of different operation types with proper validation
+    - **Background Processing**: Testing automatic processing of queued operations with QueueProcessor
+    - **Retry Logic**: Testing exponential backoff retry mechanism for failed operations
+    - **Status Tracking**: Testing operation status transitions and monitoring
+    - **Deduplication**: Testing prevention of duplicate operations
+    - **Error Handling**: Testing comprehensive error scenarios and recovery mechanisms
+    - **Integration Testing**: Testing queue integration with TMDB Lists API and cache systems
+    - **Performance Testing**: Testing queue performance under load and concurrent operations
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
@@ -284,7 +305,7 @@ CREATE TABLE auth_sessions (
 );
 ```
 
-The user movie lists feature requires the `user_movie_lists` and `user_movie_list_items` tables:
+The user movie lists feature requires the `user_movie_lists`, `user_movie_list_items`, and `queued_list_operations` tables:
 
 ```sql
 -- User movie lists table
@@ -308,6 +329,22 @@ CREATE TABLE user_movie_list_items (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- Queued list operations table (for offline support and retry logic)
+CREATE TABLE queued_list_operations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  operation_type VARCHAR(255) NOT NULL,
+  tmdb_user_id INTEGER NOT NULL,
+  tmdb_list_id INTEGER,
+  operation_data JSONB NOT NULL,
+  retry_count INTEGER DEFAULT 0,
+  last_retry_at TIMESTAMP WITH TIME ZONE,
+  status VARCHAR(255) DEFAULT 'pending',
+  error_message TEXT,
+  scheduled_for TIMESTAMP WITH TIME ZONE,
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
 -- Indexes for efficient querying
 CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists (tmdb_user_id);
 CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists (updated_at);
@@ -317,6 +354,12 @@ CREATE INDEX idx_user_movie_lists_user_updated ON user_movie_lists (tmdb_user_id
 CREATE INDEX idx_user_movie_list_items_list_id ON user_movie_list_items (list_id);
 CREATE INDEX idx_user_movie_list_items_tmdb_movie_id ON user_movie_list_items (tmdb_movie_id);
 CREATE INDEX idx_user_movie_list_items_added_at ON user_movie_list_items (added_at);
+
+-- Indexes for queued operations (optimized for queue processing)
+CREATE INDEX idx_queued_operations_status_inserted ON queued_list_operations (status, inserted_at);
+CREATE INDEX idx_queued_operations_user_id ON queued_list_operations (tmdb_user_id);
+CREATE INDEX idx_queued_operations_scheduled_for ON queued_list_operations (scheduled_for);
+CREATE INDEX idx_queued_operations_type_list_status ON queued_list_operations (operation_type, tmdb_list_id, status);
 
 -- Unique constraint to prevent duplicate movies in the same list
 CREATE UNIQUE INDEX idx_unique_movie_per_list ON user_movie_list_items (list_id, tmdb_movie_id);
@@ -464,6 +507,51 @@ cache_info = Flixir.Lists.Cache.get_cache_info()
 - **GenServer Supervision**: Reliable operation under OTP supervision tree
 
 For detailed Lists Cache documentation, see [`docs/lists_cache.md`](docs/lists_cache.md).
+
+**Queue System (`Flixir.Lists.Queue`):**
+The Queue System provides offline support and reliable operation processing for TMDB list operations:
+
+```elixir
+# Enqueue operations when TMDB API is unavailable
+{:ok, operation} = Flixir.Lists.Queue.enqueue_operation(
+  "create_list",
+  tmdb_user_id,
+  nil,
+  %{"name" => "My New List", "description" => "Description"}
+)
+
+# Add movie to list operation
+{:ok, operation} = Flixir.Lists.Queue.enqueue_operation(
+  "add_movie",
+  tmdb_user_id,
+  tmdb_list_id,
+  %{"movie_id" => 12345}
+)
+
+# Monitor queue status
+stats = Flixir.Lists.Queue.get_queue_stats()
+# Returns: %{pending: 5, processing: 1, completed: 100, failed: 2, total: 108}
+
+# Get pending operations for a user
+operations = Flixir.Lists.Queue.get_user_pending_operations(tmdb_user_id)
+
+# Retry failed operations
+{:ok, result} = Flixir.Lists.Queue.retry_operation(operation_id)
+
+# Process operations manually
+Flixir.Lists.Queue.process_pending_operations()
+```
+
+**Queue System Features:**
+- **Automatic Retry**: Failed operations are retried up to 5 times with exponential backoff (30s, 60s, 120s, 240s, 480s)
+- **Operation Deduplication**: Prevents duplicate operations for the same user/list/movie combination
+- **Background Processing**: QueueProcessor GenServer runs automatically to process pending operations
+- **Status Tracking**: Operations have statuses: pending, processing, completed, failed, cancelled
+- **Manual Control**: Ability to retry, cancel, or manually process operations
+- **Cleanup**: Automatic cleanup of old completed/cancelled operations
+- **Monitoring**: Real-time statistics and operation tracking
+
+For detailed Queue System documentation, see [`docs/queue_system.md`](docs/queue_system.md).
 
 **Session Plug (`FlixirWeb.Plugs.AuthSession`):**
 The session plug automatically handles authentication state for all requests:

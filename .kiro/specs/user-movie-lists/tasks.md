@@ -16,12 +16,12 @@
   - Add cache statistics and monitoring for performance optimization
   - _Requirements: 9.1, 9.4, 11.1, 11.3, 12.5_
 
-- [ ] 3. Create operation queue system for offline support
-  - Implement `Flixir.Lists.Queue` module for queuing operations when TMDB API is unavailable
-  - Create database schema for storing queued operations with retry metadata
-  - Add background job processing for retrying failed operations
-  - Implement operation deduplication and conflict resolution
-  - Add queue monitoring and manual retry capabilities
+- [x] 3. Create operation queue system for offline support
+  - [x] Implement `Flixir.Lists.Queue` module for queuing operations when TMDB API is unavailable
+  - [x] Create database schema for storing queued operations with retry metadata (`queued_list_operations` table)
+  - [x] Add background job processing for retrying failed operations (`QueueProcessor` GenServer)
+  - [x] Implement operation deduplication and conflict resolution
+  - [x] Add queue monitoring and manual retry capabilities
   - _Requirements: 10.5, 11.4, 11.5, 12.3, 12.4_
 
 - [ ] 4. Update Lists context for TMDB integration

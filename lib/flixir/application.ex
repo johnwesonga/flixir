@@ -20,6 +20,8 @@ defmodule Flixir.Application do
       {Flixir.Lists.Cache, Application.get_env(:flixir, :lists_cache, [])},
       # Start the session cleanup background job
       {Flixir.Auth.SessionCleanup, []},
+      # Start the queue processor for list operations
+      {Flixir.Lists.QueueProcessor, []},
       # Start a worker by calling: Flixir.Worker.start_link(arg)
       # {Flixir.Worker, arg},
       # Start to serve requests, typically the last entry

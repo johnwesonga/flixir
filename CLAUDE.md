@@ -77,6 +77,19 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Memory Optimization**: ETS tables with read concurrency for high-performance concurrent access
 - **Debugging Support**: Comprehensive logging for cache operations and performance monitoring
 
+**Lists Queue System (`lib/flixir/lists/queue.ex`)**
+- Offline support and reliable operation processing for TMDB list operations
+- **Operation Queuing**: Queue operations when TMDB API is unavailable with comprehensive validation
+- **Background Processing**: QueueProcessor GenServer automatically processes pending operations
+- **Retry Logic**: Exponential backoff retry mechanism (30s, 60s, 120s, 240s, 480s) for failed operations
+- **Status Tracking**: Real-time monitoring of operation status (pending, processing, completed, failed, cancelled)
+- **Deduplication**: Prevents duplicate operations for the same user/list/movie combinations
+- **Manual Control**: Ability to manually retry failed operations or cancel pending ones
+- **Database Schema**: Uses `queued_list_operations` table with optimized indexes for queue processing
+- **Operation Types**: Supports create_list, update_list, delete_list, clear_list, add_movie, remove_movie
+- **Monitoring**: Comprehensive statistics and operation tracking for queue health
+- **Cleanup**: Automatic cleanup of old completed/cancelled operations
+
 **User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)**
 - Comprehensive UI component library for user movie list management
 - **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1`
@@ -240,13 +253,15 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 3. Lists context → Lists Cache (check for cached list data)
 4. Cache miss → Lists TMDB Client (TMDB API operations for list management)
 5. Lists TMDB Client → TMDB Lists API (create/update/delete lists, add/remove movies)
-6. Lists context → Lists Cache (cache updated list data with TTL)
-7. Lists context → Database (local CRUD operations with constraints for caching/sync)
-8. Lists context → Media context (fetch TMDB movie data when needed)
-9. Media context → TMDB API (get movie details for display)
-10. Lists context → UserMovieListsLive (return results with error handling)
-11. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
-12. Cache invalidation → Lists Cache (invalidate affected cache entries on updates)
+6. **Success Path**: Lists context → Lists Cache (cache updated list data with TTL)
+7. **Failure Path**: Lists context → Queue System (enqueue failed operations for retry)
+8. Lists context → Database (local CRUD operations with constraints for caching/sync)
+9. Lists context → Media context (fetch TMDB movie data when needed)
+10. Media context → TMDB API (get movie details for display)
+11. Lists context → UserMovieListsLive (return results with error handling)
+12. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
+13. Cache invalidation → Lists Cache (invalidate affected cache entries on updates)
+14. **Background Processing**: QueueProcessor → Queue System (process pending operations with retry logic)
 
 **Recent Authentication Improvements:**
 - Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)
@@ -418,7 +433,7 @@ The application includes comprehensive integration testing for the complete TMDB
 - **State Verification**: Authentication state validation across multiple request cycles
 
 ### Testing Structure
-- **Unit Tests**: `test/flixir/media/`, `test/flixir/auth/`, and `test/flixir/lists/` - Test individual components and business logic
+- **Unit Tests**: `test/flixir/media/`, `test/flixir/auth/`, and `test/flixir/lists/` - Test individual components and business logic including queue system operations
 - **LiveView Tests**: `test/flixir_web/live/` - Test user interactions and real-time features
 - **Component Tests**: `test/flixir_web/components/` - Test UI components including navigation, movie lists, reviews, and search components
 - **Integration Tests**: `test/flixir_web/integration/` - Test complete workflows including:
