@@ -237,13 +237,16 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 **Lists Flow:**
 1. User action → UserMovieListsLive (create/edit/delete list or add/remove movie)
 2. UserMovieListsLive → Lists context (validate user authorization)
-3. Lists context → Lists TMDB Client (TMDB API operations for list management)
-4. Lists TMDB Client → TMDB Lists API (create/update/delete lists, add/remove movies)
-5. Lists context → Database (local CRUD operations with constraints for caching/sync)
-6. Lists context → Media context (fetch TMDB movie data when needed)
-7. Media context → TMDB API (get movie details for display)
-8. Lists context → UserMovieListsLive (return results with error handling)
-9. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
+3. Lists context → Lists Cache (check for cached list data)
+4. Cache miss → Lists TMDB Client (TMDB API operations for list management)
+5. Lists TMDB Client → TMDB Lists API (create/update/delete lists, add/remove movies)
+6. Lists context → Lists Cache (cache updated list data with TTL)
+7. Lists context → Database (local CRUD operations with constraints for caching/sync)
+8. Lists context → Media context (fetch TMDB movie data when needed)
+9. Media context → TMDB API (get movie details for display)
+10. Lists context → UserMovieListsLive (return results with error handling)
+11. UserMovieListsLive → User (display updated lists with feedback messages and real-time updates)
+12. Cache invalidation → Lists Cache (invalidate affected cache entries on updates)
 
 **Recent Authentication Improvements:**
 - Enhanced async result handling in AuthLive with support for both direct results (`{:ok, result}`) and nested tuple results (`{:ok, {:ok, result}}`)

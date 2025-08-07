@@ -11,7 +11,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Sorting**: Sort by relevance, popularity, release date, or title
 - **Navigation**: Click any search result to view detailed information and reviews
 - **Detail Pages**: Dedicated pages for each movie and TV show with comprehensive information
-- **Caching**: Intelligent caching system for improved performance
+- **Caching**: Multi-layer intelligent caching system with Media Cache for search results and Lists Cache for user data
 
 ### ⭐ Reviews & Ratings System
 - **Review Display**: Rich review cards with expandable content
@@ -59,6 +59,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Error Handling**: Graceful error handling with retry mechanisms
 - **Loading States**: Smooth loading indicators and skeleton animations for better perceived performance
 - **Error Recovery**: One-click retry functionality for failed operations
+- **High-Performance Caching**: Multi-layer caching system with ETS-based Lists Cache and in-memory Media Cache for optimal response times
 - **Navigation System**: Unified navigation with authentication state management:
   - **Main Navigation**: Context-aware navigation with authentication status
   - **Sub Navigation**: Dynamic sub-navigation for different sections
@@ -96,6 +97,9 @@ mix test test/flixir_web/live/movie_lists_live_test.exs
 
 # Run TMDB Lists client tests
 mix test test/flixir/lists/tmdb_client_test.exs
+
+# Run Lists Cache tests
+mix test test/flixir/lists/cache_test.exs
 
 # Run tests matching a pattern
 mix test --grep "authentication"
@@ -145,7 +149,7 @@ mix test --grep "authentication"
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
-- **Cache Tests**: Caching behavior and performance validation
+- **Cache Tests**: Multi-layer caching behavior and performance validation including Lists Cache ETS operations and Media Cache functionality
 - **Error Handling Tests**: Comprehensive error scenario testing
 
 ## Getting Started
@@ -410,6 +414,56 @@ The application includes a comprehensive TMDB Lists API client for managing user
 - **Validation**: Full request and response validation with detailed error messages
 - **Logging**: Comprehensive logging for all operations, errors, and retry attempts
 - **Resilience**: Automatic retry for transient failures with configurable backoff strategies
+
+**Lists Cache (`Flixir.Lists.Cache`):**
+The Lists Cache provides high-performance ETS-based caching for TMDB list data:
+
+```elixir
+# Cache user lists with TTL
+:ok = Flixir.Lists.Cache.put_user_lists(tmdb_user_id, lists, :timer.hours(1))
+
+# Retrieve cached user lists
+{:ok, lists} = Flixir.Lists.Cache.get_user_lists(tmdb_user_id)
+{:error, :not_found} = Flixir.Lists.Cache.get_user_lists(unknown_user_id)
+
+# Cache individual list data
+:ok = Flixir.Lists.Cache.put_list(list_data)
+{:ok, list_data} = Flixir.Lists.Cache.get_list(list_id)
+
+# Cache list items (movies in a list)
+:ok = Flixir.Lists.Cache.put_list_items(list_id, movie_items)
+{:ok, items} = Flixir.Lists.Cache.get_list_items(list_id)
+
+# Cache invalidation
+:ok = Flixir.Lists.Cache.invalidate_user_cache(tmdb_user_id)
+:ok = Flixir.Lists.Cache.invalidate_list_cache(list_id)
+
+# Cache warming for frequently accessed data
+:ok = Flixir.Lists.Cache.warm_cache(tmdb_user_id, [list_id_1, list_id_2])
+
+# Cache monitoring and statistics
+stats = Flixir.Lists.Cache.get_stats()
+# Returns: %{hits: 150, misses: 25, writes: 75, expired: 10, invalidations: 5}
+
+cache_info = Flixir.Lists.Cache.get_cache_info()
+# Returns: %{size: 100, memory: 2048, memory_bytes: 16384}
+
+# Cache management
+:ok = Flixir.Lists.Cache.clear_cache()
+:ok = Flixir.Lists.Cache.reset_stats()
+```
+
+**Lists Cache Features:**
+- **High Performance**: ETS-based storage with read concurrency for fast access
+- **Automatic Expiration**: Background cleanup process removes expired entries every 5 minutes
+- **Flexible TTL**: Configurable time-to-live for different cache types (default 1 hour)
+- **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
+- **Targeted Invalidation**: Invalidate specific users or lists without clearing entire cache
+- **Cache Warming**: Proactive caching of frequently accessed data
+- **Memory Optimization**: Efficient memory usage with automatic cleanup
+- **GenServer Supervision**: Reliable operation under OTP supervision tree
+
+For detailed Lists Cache documentation, see [`docs/lists_cache.md`](docs/lists_cache.md).
 
 **Session Plug (`FlixirWeb.Plugs.AuthSession`):**
 The session plug automatically handles authentication state for all requests:
