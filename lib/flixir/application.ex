@@ -16,6 +16,8 @@ defmodule Flixir.Application do
       {Flixir.Media.Cache, Application.get_env(:flixir, :search_cache, [])},
       # Start the reviews cache
       {Flixir.Reviews.Cache, Application.get_env(:flixir, :reviews_cache, [])},
+      # Start the lists cache
+      {Flixir.Lists.Cache, Application.get_env(:flixir, :lists_cache, [])},
       # Start the session cleanup background job
       {Flixir.Auth.SessionCleanup, []},
       # Start a worker by calling: Flixir.Worker.start_link(arg)

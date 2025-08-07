@@ -8,7 +8,7 @@
   - Include retry logic with exponential backoff for network failures
   - _Requirements: 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 12.1, 12.2_
 
-- [ ] 2. Implement cache layer for TMDB list data
+- [x] 2. Implement cache layer for TMDB list data
   - Create `Flixir.Lists.Cache` module using ETS or GenServer for local caching
   - Implement cache functions for storing and retrieving TMDB list data
   - Add cache expiration and invalidation strategies

@@ -65,6 +65,18 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
 - **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
 
+**Lists Cache (`lib/flixir/lists/cache.ex`)**
+- High-performance ETS-based caching system for TMDB list data with GenServer supervision
+- **User Lists Caching**: Cache user's complete list collections with automatic expiration (1-hour default TTL)
+- **Individual List Caching**: Cache specific list metadata and details for fast access
+- **List Items Caching**: Cache movie items within lists to reduce API calls for list contents
+- **Cache Management**: Comprehensive cache operations including invalidation, warming, and statistics
+- **Automatic Cleanup**: Background process removes expired entries every 5 minutes
+- **Performance Monitoring**: Real-time cache statistics including hits, misses, writes, and memory usage
+- **Cache Invalidation**: Targeted invalidation for users and specific lists to maintain data consistency
+- **Memory Optimization**: ETS tables with read concurrency for high-performance concurrent access
+- **Debugging Support**: Comprehensive logging for cache operations and performance monitoring
+
 **User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)**
 - Comprehensive UI component library for user movie list management
 - **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1`
@@ -193,10 +205,10 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
 - **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
 
-**Caching System (`lib/flixir/media/cache.ex`)**
-- In-memory caching for search results and content details
-- Configurable TTL (5 minutes for search, 30 minutes for details)
-- Provides cache statistics and management functions
+**Caching System**
+- **Media Cache (`lib/flixir/media/cache.ex`)**: In-memory caching for search results and content details with configurable TTL (5 minutes for search, 30 minutes for details)
+- **Lists Cache (`lib/flixir/lists/cache.ex`)**: High-performance ETS-based caching for TMDB list data including user lists, individual lists, and list items with 1-hour default TTL and automatic expiration cleanup
+- Provides cache statistics, monitoring, and management functions for both caching layers
 
 ### Data Flow
 
