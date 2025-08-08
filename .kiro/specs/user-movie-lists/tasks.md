@@ -24,7 +24,7 @@
   - [x] Add queue monitoring and manual retry capabilities
   - _Requirements: 10.5, 11.4, 11.5, 12.3, 12.4_
 
-- [ ] 4. Update Lists context for TMDB integration
+- [x] 4. Update Lists context for TMDB integration
   - Refactor `Flixir.Lists` context to use TMDB API as primary data source
   - Implement optimistic updates with rollback capabilities for failed operations
   - Add cache-first data retrieval with TMDB API fallback

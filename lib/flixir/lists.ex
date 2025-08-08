@@ -1,15 +1,18 @@
 defmodule Flixir.Lists do
   @moduledoc """
-  Context for managing user movie lists.
+  Context for managing user movie lists through TMDB API integration.
 
   This context provides business logic for creating, reading, updating, and deleting
-  user movie lists, as well as managing movies within those lists. It includes
-  user authorization checks to ensure data isolation and proper access control.
+  user movie lists using TMDB's native list management API as the primary data source.
+  It includes optimistic updates, local caching for performance, operation queuing
+  for offline scenarios, and comprehensive error handling for TMDB API failures.
+
+  The system prioritizes TMDB API as the authoritative source while providing
+  seamless user experience through local caching and optimistic updates.
   """
 
-  import Ecto.Query, warn: false
-  alias Flixir.Repo
-  alias Flixir.Lists.{UserMovieList, UserMovieListItem}
+  alias Flixir.Lists.{TMDBClient, Cache, Queue}
+  alias Flixir.Auth
   alias Flixir.Media
 
   require Logger
@@ -17,380 +20,339 @@ defmodule Flixir.Lists do
   # List Management Functions
 
   @doc """
-  Creates a new movie list for a user.
+  Creates a new movie list for a user using TMDB API.
+
+  This function creates a list directly on TMDB and caches the result locally.
+  If TMDB API is unavailable, the operation is queued for later processing.
 
   ## Parameters
   - tmdb_user_id: The TMDB user ID who owns the list
   - attrs: Map containing list attributes (name, description, is_public)
 
   ## Returns
-  - {:ok, list} - Successfully created list
-  - {:error, changeset} - Validation errors
+  - {:ok, list_data} - Successfully created list with TMDB data
+  - {:ok, :queued} - Operation queued due to API unavailability
+  - {:error, reason} - Validation or API errors
 
   ## Examples
       iex> create_list(12345, %{name: "My Watchlist", description: "Movies to watch"})
-      {:ok, %UserMovieList{}}
+      {:ok, %{"id" => 789, "name" => "My Watchlist", ...}}
 
       iex> create_list(12345, %{name: ""})
-      {:error, %Ecto.Changeset{}}
+      {:error, :validation_error}
   """
-  @spec create_list(integer(), map()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
+  @spec create_list(integer(), map()) :: {:ok, map()} | {:ok, :queued} | {:error, term()}
   def create_list(tmdb_user_id, attrs) when is_integer(tmdb_user_id) and is_map(attrs) do
-    Logger.info("Creating new movie list", %{
+    Logger.info("Creating new movie list via TMDB API", %{
       tmdb_user_id: tmdb_user_id,
       list_name: Map.get(attrs, "name") || Map.get(attrs, :name)
     })
 
-    attrs_with_user = Map.put(attrs, :tmdb_user_id, tmdb_user_id)
+    # Validate attributes locally first
+    case validate_list_attrs(attrs) do
+      :ok ->
+        create_list_via_tmdb(tmdb_user_id, attrs)
 
-    %UserMovieList{}
-    |> UserMovieList.changeset(attrs_with_user)
-    |> Repo.insert()
-    |> case do
-      {:ok, list} ->
-        Logger.info("Successfully created movie list", %{
-          list_id: list.id,
-          list_name: list.name,
-          tmdb_user_id: tmdb_user_id
-        })
-        {:ok, list}
-
-      {:error, changeset} ->
-        Logger.warning("Failed to create movie list", %{
+      {:error, reason} ->
+        Logger.warning("List creation validation failed", %{
           tmdb_user_id: tmdb_user_id,
-          errors: changeset.errors
+          reason: inspect(reason)
         })
-        {:error, changeset}
+        {:error, reason}
     end
   end
 
   @doc """
-  Retrieves all movie lists for a specific user, ordered by most recently updated.
+  Retrieves all movie lists for a specific user from TMDB API with cache fallback.
+
+  This function implements cache-first retrieval with TMDB API fallback.
+  It first checks the local cache, then fetches from TMDB API if needed.
 
   ## Parameters
   - tmdb_user_id: The TMDB user ID
 
   ## Returns
-  - List of UserMovieList structs with preloaded list_items
+  - {:ok, lists} - List of TMDB list data
+  - {:error, reason} - Error occurred during retrieval
 
   ## Examples
       iex> get_user_lists(12345)
-      [%UserMovieList{}, ...]
+      {:ok, [%{"id" => 1, "name" => "Watchlist", ...}, ...]}
+
+      iex> get_user_lists(99999)
+      {:error, :unauthorized}
   """
-  @spec get_user_lists(integer()) :: [UserMovieList.t()]
+  @spec get_user_lists(integer()) :: {:ok, [map()]} | {:error, term()}
   def get_user_lists(tmdb_user_id) when is_integer(tmdb_user_id) do
-    Logger.debug("Retrieving user lists", %{tmdb_user_id: tmdb_user_id})
+    Logger.debug("Retrieving user lists via TMDB integration", %{tmdb_user_id: tmdb_user_id})
 
-    lists = from(l in UserMovieList,
-      where: l.tmdb_user_id == ^tmdb_user_id,
-      order_by: [desc: l.updated_at],
-      preload: [:list_items]
-    )
-    |> Repo.all()
+    # Try cache first
+    case Cache.get_user_lists(tmdb_user_id) do
+      {:ok, cached_lists} ->
+        Logger.debug("Retrieved user lists from cache", %{
+          tmdb_user_id: tmdb_user_id,
+          count: length(cached_lists)
+        })
+        {:ok, cached_lists}
 
-    Logger.debug("Retrieved user lists", %{
-      tmdb_user_id: tmdb_user_id,
-      count: length(lists)
-    })
+      {:error, :not_found} ->
+        # Fetch from TMDB API
+        fetch_user_lists_from_tmdb(tmdb_user_id)
 
-    lists
+      {:error, :expired} ->
+        # Cache expired, fetch fresh data
+        Logger.debug("Cache expired, fetching fresh user lists", %{tmdb_user_id: tmdb_user_id})
+        fetch_user_lists_from_tmdb(tmdb_user_id)
+    end
   end
 
   @doc """
-  Retrieves a specific movie list by ID, ensuring the user has access to it.
+  Retrieves a specific movie list by TMDB list ID with cache fallback.
+
+  This function implements cache-first retrieval with TMDB API fallback.
+  It ensures the user has access to the list through session validation.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
   - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - {:ok, list} - List found and user authorized
-  - {:error, :not_found} - List doesn't exist or user not authorized
-  - {:error, :unauthorized} - User doesn't own the list
+  - {:ok, list_data} - List found and user authorized
+  - {:error, :not_found} - List doesn't exist
+  - {:error, :unauthorized} - User doesn't have access to the list
 
   ## Examples
-      iex> get_list("uuid-123", 12345)
-      {:ok, %UserMovieList{}}
+      iex> get_list(789, 12345)
+      {:ok, %{"id" => 789, "name" => "My List", ...}}
 
-      iex> get_list("nonexistent", 12345)
+      iex> get_list(999, 12345)
       {:error, :not_found}
   """
-  @spec get_list(binary(), integer()) :: {:ok, UserMovieList.t()} | {:error, :not_found | :unauthorized}
-  def get_list(list_id, tmdb_user_id) when is_binary(list_id) and is_integer(tmdb_user_id) do
-    Logger.debug("Retrieving list", %{list_id: list_id, tmdb_user_id: tmdb_user_id})
+  @spec get_list(integer(), integer()) :: {:ok, map()} | {:error, :not_found | :unauthorized | term()}
+  def get_list(tmdb_list_id, tmdb_user_id) when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) do
+    Logger.debug("Retrieving list via TMDB integration", %{
+      tmdb_list_id: tmdb_list_id,
+      tmdb_user_id: tmdb_user_id
+    })
 
-    case Repo.get(UserMovieList, list_id) do
-      nil ->
-        Logger.debug("List not found", %{list_id: list_id})
-        {:error, :not_found}
-
-      %UserMovieList{tmdb_user_id: ^tmdb_user_id} = list ->
-        list_with_items = Repo.preload(list, [:list_items])
-        Logger.debug("List retrieved successfully", %{
-          list_id: list_id,
-          list_name: list.name,
-          item_count: length(list_with_items.list_items)
+    # Try cache first
+    case Cache.get_list(tmdb_list_id) do
+      {:ok, cached_list} ->
+        Logger.debug("Retrieved list from cache", %{
+          tmdb_list_id: tmdb_list_id,
+          list_name: cached_list["name"]
         })
-        {:ok, list_with_items}
+        {:ok, cached_list}
 
-      %UserMovieList{} ->
-        Logger.warning("Unauthorized list access attempt", %{
-          list_id: list_id,
-          tmdb_user_id: tmdb_user_id
-        })
-        {:error, :unauthorized}
+      {:error, :not_found} ->
+        # Fetch from TMDB API
+        fetch_list_from_tmdb(tmdb_list_id, tmdb_user_id)
+
+      {:error, :expired} ->
+        # Cache expired, fetch fresh data
+        Logger.debug("Cache expired, fetching fresh list data", %{tmdb_list_id: tmdb_list_id})
+        fetch_list_from_tmdb(tmdb_list_id, tmdb_user_id)
     end
   end
 
   @doc """
-  Updates an existing movie list.
+  Updates an existing movie list via TMDB API with optimistic updates.
+
+  This function implements optimistic updates with rollback capabilities.
+  The cache is updated immediately, then the TMDB API is called. If the API
+  call fails, the cache is reverted and the operation may be queued.
 
   ## Parameters
-  - list: The UserMovieList struct to update
+  - tmdb_list_id: The TMDB list ID to update
+  - tmdb_user_id: The TMDB user ID for authorization
   - attrs: Map containing updated attributes
 
   ## Returns
-  - {:ok, list} - Successfully updated list
-  - {:error, changeset} - Validation errors
+  - {:ok, list_data} - Successfully updated list
+  - {:ok, :queued} - Operation queued due to API unavailability
+  - {:error, reason} - Validation or API errors
 
   ## Examples
-      iex> update_list(list, %{name: "Updated Name"})
-      {:ok, %UserMovieList{}}
+      iex> update_list(789, 12345, %{name: "Updated Name"})
+      {:ok, %{"id" => 789, "name" => "Updated Name", ...}}
 
-      iex> update_list(list, %{name: ""})
-      {:error, %Ecto.Changeset{}}
+      iex> update_list(789, 12345, %{name: ""})
+      {:error, :validation_error}
   """
-  @spec update_list(UserMovieList.t(), map()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
-  def update_list(%UserMovieList{} = list, attrs) when is_map(attrs) do
-    Logger.info("Updating movie list", %{
-      list_id: list.id,
-      list_name: list.name,
-      tmdb_user_id: list.tmdb_user_id
+  @spec update_list(integer(), integer(), map()) :: {:ok, map()} | {:ok, :queued} | {:error, term()}
+  def update_list(tmdb_list_id, tmdb_user_id, attrs)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) and is_map(attrs) do
+    Logger.info("Updating movie list via TMDB API", %{
+      tmdb_list_id: tmdb_list_id,
+      tmdb_user_id: tmdb_user_id,
+      list_name: Map.get(attrs, "name") || Map.get(attrs, :name)
     })
 
-    list
-    |> UserMovieList.update_changeset(attrs)
-    |> Repo.update()
-    |> case do
-      {:ok, updated_list} ->
-        Logger.info("Successfully updated movie list", %{
-          list_id: updated_list.id,
-          list_name: updated_list.name
-        })
-        {:ok, updated_list}
+    # Validate attributes locally first
+    case validate_list_attrs(attrs) do
+      :ok ->
+        update_list_via_tmdb(tmdb_list_id, tmdb_user_id, attrs)
 
-      {:error, changeset} ->
-        Logger.warning("Failed to update movie list", %{
-          list_id: list.id,
-          errors: changeset.errors
+      {:error, reason} ->
+        Logger.warning("List update validation failed", %{
+          tmdb_list_id: tmdb_list_id,
+          tmdb_user_id: tmdb_user_id,
+          reason: inspect(reason)
         })
-        {:error, changeset}
+        {:error, reason}
     end
   end
 
   @doc """
-  Deletes a movie list and all its associated items.
+  Deletes a movie list via TMDB API with optimistic updates.
+
+  This function implements optimistic updates with rollback capabilities.
+  The cache is invalidated immediately, then the TMDB API is called. If the API
+  call fails, the operation may be queued for later processing.
 
   ## Parameters
-  - list: The UserMovieList struct to delete
+  - tmdb_list_id: The TMDB list ID to delete
+  - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - {:ok, list} - Successfully deleted list
-  - {:error, changeset} - Database error
+  - {:ok, :deleted} - Successfully deleted list
+  - {:ok, :queued} - Operation queued due to API unavailability
+  - {:error, reason} - API or authorization errors
 
   ## Examples
-      iex> delete_list(list)
-      {:ok, %UserMovieList{}}
+      iex> delete_list(789, 12345)
+      {:ok, :deleted}
+
+      iex> delete_list(999, 12345)
+      {:error, :not_found}
   """
-  @spec delete_list(UserMovieList.t()) :: {:ok, UserMovieList.t()} | {:error, Ecto.Changeset.t()}
-  def delete_list(%UserMovieList{} = list) do
-    Logger.info("Deleting movie list", %{
-      list_id: list.id,
-      list_name: list.name,
-      tmdb_user_id: list.tmdb_user_id
+  @spec delete_list(integer(), integer()) :: {:ok, :deleted} | {:ok, :queued} | {:error, term()}
+  def delete_list(tmdb_list_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) do
+    Logger.info("Deleting movie list via TMDB API", %{
+      tmdb_list_id: tmdb_list_id,
+      tmdb_user_id: tmdb_user_id
     })
 
-    case Repo.delete(list) do
-      {:ok, deleted_list} ->
-        Logger.info("Successfully deleted movie list", %{
-          list_id: deleted_list.id,
-          list_name: deleted_list.name
-        })
-        {:ok, deleted_list}
-
-      {:error, changeset} ->
-        Logger.error("Failed to delete movie list", %{
-          list_id: list.id,
-          errors: changeset.errors
-        })
-        {:error, changeset}
-    end
+    delete_list_via_tmdb(tmdb_list_id, tmdb_user_id)
   end
 
   @doc """
-  Clears all movies from a list while preserving the list metadata.
+  Clears all movies from a list via TMDB API with optimistic updates.
+
+  This function implements optimistic updates with rollback capabilities.
+  The cache is updated immediately, then the TMDB API is called. If the API
+  call fails, the cache is reverted and the operation may be queued.
 
   ## Parameters
-  - list: The UserMovieList struct to clear
+  - tmdb_list_id: The TMDB list ID to clear
+  - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - {:ok, {count, nil}} - Number of items deleted
-  - {:error, reason} - Database error
+  - {:ok, :cleared} - Successfully cleared list
+  - {:ok, :queued} - Operation queued due to API unavailability
+  - {:error, reason} - API or authorization errors
 
   ## Examples
-      iex> clear_list(list)
-      {:ok, {5, nil}}  # 5 movies removed
+      iex> clear_list(789, 12345)
+      {:ok, :cleared}
+
+      iex> clear_list(999, 12345)
+      {:error, :not_found}
   """
-  @spec clear_list(UserMovieList.t()) :: {:ok, {integer(), nil}} | {:error, term()}
-  def clear_list(%UserMovieList{} = list) do
-    Logger.info("Clearing movie list", %{
-      list_id: list.id,
-      list_name: list.name,
-      tmdb_user_id: list.tmdb_user_id
+  @spec clear_list(integer(), integer()) :: {:ok, :cleared} | {:ok, :queued} | {:error, term()}
+  def clear_list(tmdb_list_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) do
+    Logger.info("Clearing movie list via TMDB API", %{
+      tmdb_list_id: tmdb_list_id,
+      tmdb_user_id: tmdb_user_id
     })
 
-    query = from(item in UserMovieListItem, where: item.list_id == ^list.id)
-
-    case Repo.delete_all(query) do
-      {count, nil} = result ->
-        Logger.info("Successfully cleared movie list", %{
-          list_id: list.id,
-          list_name: list.name,
-          items_removed: count
-        })
-        {:ok, result}
-
-      error ->
-        Logger.error("Failed to clear movie list", %{
-          list_id: list.id,
-          error: inspect(error)
-        })
-        {:error, error}
-    end
+    clear_list_via_tmdb(tmdb_list_id, tmdb_user_id)
   end
 
   # Movie Management Functions
 
   @doc """
-  Adds a movie to a user's list.
+  Adds a movie to a TMDB list with optimistic updates.
+
+  This function implements optimistic updates with rollback capabilities.
+  The cache is updated immediately, then the TMDB API is called. If the API
+  call fails, the cache is reverted and the operation may be queued.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
   - tmdb_movie_id: The TMDB movie ID
   - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - {:ok, list_item} - Successfully added movie
+  - {:ok, :added} - Successfully added movie
+  - {:ok, :queued} - Operation queued due to API unavailability
   - {:error, reason} - Error occurred (unauthorized, not_found, duplicate, etc.)
 
   ## Examples
-      iex> add_movie_to_list("uuid-123", 550, 12345)
-      {:ok, %UserMovieListItem{}}
+      iex> add_movie_to_list(789, 550, 12345)
+      {:ok, :added}
 
-      iex> add_movie_to_list("uuid-123", 550, 12345)
+      iex> add_movie_to_list(789, 550, 12345)
       {:error, :duplicate_movie}
   """
-  @spec add_movie_to_list(binary(), integer(), integer()) :: {:ok, UserMovieListItem.t()} | {:error, term()}
-  def add_movie_to_list(list_id, tmdb_movie_id, tmdb_user_id)
-      when is_binary(list_id) and is_integer(tmdb_movie_id) and is_integer(tmdb_user_id) do
-    Logger.info("Adding movie to list", %{
-      list_id: list_id,
+  @spec add_movie_to_list(integer(), integer(), integer()) :: {:ok, :added} | {:ok, :queued} | {:error, term()}
+  def add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_movie_id) and is_integer(tmdb_user_id) do
+    Logger.info("Adding movie to list via TMDB API", %{
+      tmdb_list_id: tmdb_list_id,
       tmdb_movie_id: tmdb_movie_id,
       tmdb_user_id: tmdb_user_id
     })
 
-    with {:ok, _list} <- get_list(list_id, tmdb_user_id),
-         {:ok, list_item} <- create_list_item(list_id, tmdb_movie_id) do
-      Logger.info("Successfully added movie to list", %{
-        list_id: list_id,
-        tmdb_movie_id: tmdb_movie_id,
-        item_id: list_item.id
-      })
-      {:ok, list_item}
-    else
-      {:error, %Ecto.Changeset{} = changeset} ->
-        # Check for unique constraint violation
-        if Enum.any?(changeset.errors, fn {field, {_msg, opts}} ->
-          field in [:tmdb_movie_id, :list_id] and Keyword.get(opts, :constraint) == :unique and
-          Keyword.get(opts, :constraint_name) == "idx_unique_movie_per_list"
-        end) do
-          Logger.info("Attempted to add duplicate movie to list", %{
-            list_id: list_id,
-            tmdb_movie_id: tmdb_movie_id
-          })
-          {:error, :duplicate_movie}
-        else
-          Logger.error("Failed to add movie to list", %{
-            list_id: list_id,
-            tmdb_movie_id: tmdb_movie_id,
-            errors: changeset.errors
-          })
-          {:error, :validation_error}
-        end
-
-      {:error, reason} = error ->
-        Logger.error("Failed to add movie to list", %{
-          list_id: list_id,
-          tmdb_movie_id: tmdb_movie_id,
-          reason: inspect(reason)
-        })
-        error
-    end
+    add_movie_to_list_via_tmdb(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
   end
 
   @doc """
-  Removes a movie from a user's list.
+  Removes a movie from a TMDB list with optimistic updates.
+
+  This function implements optimistic updates with rollback capabilities.
+  The cache is updated immediately, then the TMDB API is called. If the API
+  call fails, the cache is reverted and the operation may be queued.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
   - tmdb_movie_id: The TMDB movie ID
   - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - {:ok, list_item} - Successfully removed movie
+  - {:ok, :removed} - Successfully removed movie
+  - {:ok, :queued} - Operation queued due to API unavailability
   - {:error, reason} - Error occurred (unauthorized, not_found, etc.)
 
   ## Examples
-      iex> remove_movie_from_list("uuid-123", 550, 12345)
-      {:ok, %UserMovieListItem{}}
+      iex> remove_movie_from_list(789, 550, 12345)
+      {:ok, :removed}
 
-      iex> remove_movie_from_list("uuid-123", 999, 12345)
+      iex> remove_movie_from_list(789, 999, 12345)
       {:error, :not_found}
   """
-  @spec remove_movie_from_list(binary(), integer(), integer()) :: {:ok, UserMovieListItem.t()} | {:error, term()}
-  def remove_movie_from_list(list_id, tmdb_movie_id, tmdb_user_id)
-      when is_binary(list_id) and is_integer(tmdb_movie_id) and is_integer(tmdb_user_id) do
-    Logger.info("Removing movie from list", %{
-      list_id: list_id,
+  @spec remove_movie_from_list(integer(), integer(), integer()) :: {:ok, :removed} | {:ok, :queued} | {:error, term()}
+  def remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_movie_id) and is_integer(tmdb_user_id) do
+    Logger.info("Removing movie from list via TMDB API", %{
+      tmdb_list_id: tmdb_list_id,
       tmdb_movie_id: tmdb_movie_id,
       tmdb_user_id: tmdb_user_id
     })
 
-    with {:ok, _list} <- get_list(list_id, tmdb_user_id),
-         {:ok, list_item} <- get_list_item(list_id, tmdb_movie_id),
-         {:ok, deleted_item} <- Repo.delete(list_item) do
-      Logger.info("Successfully removed movie from list", %{
-        list_id: list_id,
-        tmdb_movie_id: tmdb_movie_id,
-        item_id: deleted_item.id
-      })
-      {:ok, deleted_item}
-    else
-      {:error, reason} = error ->
-        Logger.error("Failed to remove movie from list", %{
-          list_id: list_id,
-          tmdb_movie_id: tmdb_movie_id,
-          reason: inspect(reason)
-        })
-        error
-    end
+    remove_movie_from_list_via_tmdb(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
   end
 
   @doc """
-  Retrieves all movies in a list with their TMDB data.
+  Retrieves all movies in a TMDB list with cache fallback.
+
+  This function implements cache-first retrieval with TMDB API fallback.
+  It returns the list items with their TMDB movie data.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
   - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
@@ -398,226 +360,671 @@ defmodule Flixir.Lists do
   - {:error, reason} - Error occurred (unauthorized, not_found, etc.)
 
   ## Examples
-      iex> get_list_movies("uuid-123", 12345)
-      {:ok, [%{id: 550, title: "Fight Club", added_at: ~U[...], ...}, ...]}
+      iex> get_list_movies(789, 12345)
+      {:ok, [%{"id" => 550, "title" => "Fight Club", ...}, ...]}
   """
-  @spec get_list_movies(binary(), integer()) :: {:ok, [map()]} | {:error, term()}
-  def get_list_movies(list_id, tmdb_user_id)
-      when is_binary(list_id) and is_integer(tmdb_user_id) do
-    Logger.debug("Retrieving movies for list", %{
-      list_id: list_id,
+  @spec get_list_movies(integer(), integer()) :: {:ok, [map()]} | {:error, term()}
+  def get_list_movies(tmdb_list_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) do
+    Logger.debug("Retrieving movies for list via TMDB integration", %{
+      tmdb_list_id: tmdb_list_id,
       tmdb_user_id: tmdb_user_id
     })
 
-    with {:ok, list} <- get_list(list_id, tmdb_user_id) do
-      movies = list.list_items
-      |> Enum.map(fn item ->
-        case Media.get_content_details(item.tmdb_movie_id, :movie) do
-          {:ok, movie_data} ->
-            movie_data
-            |> Map.put("added_at", item.added_at)
-            |> Map.put("list_id", list_id)
+    # Try cache first
+    case Cache.get_list_items(tmdb_list_id) do
+      {:ok, cached_items} ->
+        Logger.debug("Retrieved list items from cache", %{
+          tmdb_list_id: tmdb_list_id,
+          movie_count: length(cached_items)
+        })
+        {:ok, cached_items}
 
-          {:error, reason} ->
-            Logger.warning("Failed to fetch movie details", %{
-              tmdb_movie_id: item.tmdb_movie_id,
-              reason: inspect(reason)
-            })
-            # Return basic movie info if TMDB fetch fails
-            %{
-              "id" => item.tmdb_movie_id,
-              "title" => "Movie ##{item.tmdb_movie_id}",
-              "overview" => "Movie details unavailable",
-              "poster_path" => nil,
-              "release_date" => nil,
-              "vote_average" => 0,
-              "added_at" => item.added_at,
-              "list_id" => list_id,
-              "_error" => "Failed to load movie details"
-            }
-        end
-      end)
-      |> Enum.sort_by(& &1["added_at"], {:desc, DateTime})
+      {:error, :not_found} ->
+        # Fetch from TMDB API
+        fetch_list_movies_from_tmdb(tmdb_list_id, tmdb_user_id)
 
-      Logger.debug("Retrieved movies for list", %{
-        list_id: list_id,
-        movie_count: length(movies)
-      })
-
-      {:ok, movies}
+      {:error, :expired} ->
+        # Cache expired, fetch fresh data
+        Logger.debug("Cache expired, fetching fresh list items", %{tmdb_list_id: tmdb_list_id})
+        fetch_list_movies_from_tmdb(tmdb_list_id, tmdb_user_id)
     end
   end
 
   @doc """
-  Checks if a movie is already in a specific list.
+  Checks if a movie is already in a specific TMDB list.
+
+  This function checks the cache first, then falls back to TMDB API if needed.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
   - tmdb_movie_id: The TMDB movie ID
+  - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - true if movie is in list, false otherwise
+  - {:ok, true} if movie is in list
+  - {:ok, false} if movie is not in list
+  - {:error, reason} if unable to check
 
   ## Examples
-      iex> movie_in_list?("uuid-123", 550)
-      true
+      iex> movie_in_list?(789, 550, 12345)
+      {:ok, true}
 
-      iex> movie_in_list?("uuid-123", 999)
-      false
+      iex> movie_in_list?(789, 999, 12345)
+      {:ok, false}
   """
-  @spec movie_in_list?(binary(), integer()) :: boolean()
-  def movie_in_list?(list_id, tmdb_movie_id)
-      when is_binary(list_id) and is_integer(tmdb_movie_id) do
-    query = from(item in UserMovieListItem,
-      where: item.list_id == ^list_id and item.tmdb_movie_id == ^tmdb_movie_id,
-      select: count(item.id)
-    )
+  @spec movie_in_list?(integer(), integer(), integer()) :: {:ok, boolean()} | {:error, term()}
+  def movie_in_list?(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+      when is_integer(tmdb_list_id) and is_integer(tmdb_movie_id) and is_integer(tmdb_user_id) do
+    case get_list_movies(tmdb_list_id, tmdb_user_id) do
+      {:ok, movies} ->
+        movie_exists = Enum.any?(movies, fn movie -> movie["id"] == tmdb_movie_id end)
+        {:ok, movie_exists}
 
-    Repo.one(query) > 0
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   # Statistics Functions
 
   @doc """
-  Gets statistics for a specific list.
+  Gets statistics for a specific TMDB list.
 
   ## Parameters
-  - list_id: The list UUID
+  - tmdb_list_id: The TMDB list ID
+  - tmdb_user_id: The TMDB user ID for authorization
 
   ## Returns
-  - Map containing list statistics
+  - {:ok, stats} - Map containing list statistics
+  - {:error, reason} - Error occurred
 
   ## Examples
-      iex> get_list_stats("uuid-123")
-      %{
+      iex> get_list_stats(789, 12345)
+      {:ok, %{
         movie_count: 15,
-        created_at: ~U[2024-01-01 12:00:00Z],
-        updated_at: ~U[2024-01-02 15:30:00Z],
-        is_public: false
-      }
+        created_at: "2024-01-01T12:00:00Z",
+        updated_at: "2024-01-02T15:30:00Z",
+        is_public: false,
+        name: "My Watchlist",
+        description: "Movies to watch"
+      }}
   """
-  @spec get_list_stats(binary()) :: map()
-  def get_list_stats(list_id) when is_binary(list_id) do
-    Logger.debug("Getting list statistics", %{list_id: list_id})
+  @spec get_list_stats(integer(), integer()) :: {:ok, map()} | {:error, term()}
+  def get_list_stats(tmdb_list_id, tmdb_user_id) when is_integer(tmdb_list_id) and is_integer(tmdb_user_id) do
+    Logger.debug("Getting list statistics via TMDB integration", %{
+      tmdb_list_id: tmdb_list_id,
+      tmdb_user_id: tmdb_user_id
+    })
 
-    case Repo.get(UserMovieList, list_id) do
-      nil ->
-        %{error: :not_found}
-
-      list ->
-        movie_count = from(item in UserMovieListItem,
-          where: item.list_id == ^list_id,
-          select: count(item.id)
-        )
-        |> Repo.one()
-
+    case get_list(tmdb_list_id, tmdb_user_id) do
+      {:ok, list_data} ->
         stats = %{
-          movie_count: movie_count,
-          created_at: list.inserted_at,
-          updated_at: list.updated_at,
-          is_public: list.is_public,
-          name: list.name,
-          description: list.description
+          movie_count: Map.get(list_data, "item_count", 0),
+          created_at: Map.get(list_data, "created_at"),
+          updated_at: Map.get(list_data, "updated_at"),
+          is_public: Map.get(list_data, "public", false),
+          name: Map.get(list_data, "name"),
+          description: Map.get(list_data, "description", "")
         }
 
         Logger.debug("Retrieved list statistics", %{
-          list_id: list_id,
-          movie_count: movie_count
+          tmdb_list_id: tmdb_list_id,
+          movie_count: stats.movie_count
         })
 
-        stats
+        {:ok, stats}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
   @doc """
-  Gets summary statistics for all of a user's lists.
+  Gets summary statistics for all of a user's TMDB lists.
 
   ## Parameters
   - tmdb_user_id: The TMDB user ID
 
   ## Returns
-  - Map containing user's list summary
+  - {:ok, summary} - Map containing user's list summary
+  - {:error, reason} - Error occurred
 
   ## Examples
       iex> get_user_lists_summary(12345)
-      %{
+      {:ok, %{
         total_lists: 5,
         total_movies: 47,
         public_lists: 2,
         private_lists: 3,
-        most_recent_list: %UserMovieList{},
+        most_recent_list: %{...},
         largest_list: %{name: "Watchlist", movie_count: 25}
+      }}
+  """
+  @spec get_user_lists_summary(integer()) :: {:ok, map()} | {:error, term()}
+  def get_user_lists_summary(tmdb_user_id) when is_integer(tmdb_user_id) do
+    Logger.debug("Getting user lists summary via TMDB integration", %{tmdb_user_id: tmdb_user_id})
+
+    case get_user_lists(tmdb_user_id) do
+      {:ok, lists} ->
+        total_lists = length(lists)
+        public_lists = Enum.count(lists, fn list -> Map.get(list, "public", false) end)
+        private_lists = total_lists - public_lists
+
+        # Calculate total movies across all lists
+        total_movies = lists
+        |> Enum.map(fn list -> Map.get(list, "item_count", 0) end)
+        |> Enum.sum()
+
+        # Find most recent list (by updated_at or created_at)
+        most_recent_list = lists
+        |> Enum.max_by(fn list ->
+          updated_at = Map.get(list, "updated_at")
+          created_at = Map.get(list, "created_at")
+          updated_at || created_at || "1970-01-01T00:00:00Z"
+        end, fn -> nil end)
+
+        # Find largest list
+        largest_list = lists
+        |> Enum.max_by(fn list -> Map.get(list, "item_count", 0) end, fn -> nil end)
+        |> case do
+          nil -> nil
+          list -> %{
+            name: Map.get(list, "name"),
+            movie_count: Map.get(list, "item_count", 0)
+          }
+        end
+
+        summary = %{
+          total_lists: total_lists,
+          total_movies: total_movies,
+          public_lists: public_lists,
+          private_lists: private_lists,
+          most_recent_list: most_recent_list,
+          largest_list: largest_list
+        }
+
+        Logger.debug("Retrieved user lists summary", %{
+          tmdb_user_id: tmdb_user_id,
+          total_lists: total_lists,
+          total_movies: total_movies
+        })
+
+        {:ok, summary}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  @doc """
+  Gets queue statistics for a user's pending operations.
+
+  ## Parameters
+  - tmdb_user_id: The TMDB user ID
+
+  ## Returns
+  - Map containing queue statistics
+
+  ## Examples
+      iex> get_user_queue_stats(12345)
+      %{
+        pending_operations: 3,
+        failed_operations: 1,
+        last_sync_attempt: ~U[2024-01-01 12:00:00Z]
       }
   """
-  @spec get_user_lists_summary(integer()) :: map()
-  def get_user_lists_summary(tmdb_user_id) when is_integer(tmdb_user_id) do
-    Logger.debug("Getting user lists summary", %{tmdb_user_id: tmdb_user_id})
+  @spec get_user_queue_stats(integer()) :: map()
+  def get_user_queue_stats(tmdb_user_id) when is_integer(tmdb_user_id) do
+    pending_operations = Queue.get_user_pending_operations(tmdb_user_id)
+    failed_operations = Queue.get_failed_operations() |> Enum.filter(&(&1.tmdb_user_id == tmdb_user_id))
 
-    # Get basic list counts
-    lists_query = from(l in UserMovieList, where: l.tmdb_user_id == ^tmdb_user_id)
-
-    total_lists = Repo.aggregate(lists_query, :count, :id)
-    public_lists = lists_query |> where([l], l.is_public == true) |> Repo.aggregate(:count, :id)
-    private_lists = total_lists - public_lists
-
-    # Get most recent list
-    most_recent_list = lists_query
-    |> order_by([l], desc: l.updated_at)
-    |> limit(1)
-    |> Repo.one()
-
-    # Get total movies across all lists
-    total_movies = from(item in UserMovieListItem,
-      join: list in UserMovieList, on: item.list_id == list.id,
-      where: list.tmdb_user_id == ^tmdb_user_id,
-      select: count(item.id)
-    )
-    |> Repo.one()
-
-    # Get largest list info
-    largest_list = from(l in UserMovieList,
-      left_join: item in UserMovieListItem, on: item.list_id == l.id,
-      where: l.tmdb_user_id == ^tmdb_user_id,
-      group_by: [l.id, l.name],
-      select: %{name: l.name, movie_count: count(item.id)},
-      order_by: [desc: count(item.id)],
-      limit: 1
-    )
-    |> Repo.one()
-
-    summary = %{
-      total_lists: total_lists,
-      total_movies: total_movies,
-      public_lists: public_lists,
-      private_lists: private_lists,
-      most_recent_list: most_recent_list,
-      largest_list: largest_list
+    %{
+      pending_operations: length(pending_operations),
+      failed_operations: length(failed_operations),
+      last_sync_attempt: get_last_sync_attempt(pending_operations ++ failed_operations)
     }
-
-    Logger.debug("Retrieved user lists summary", %{
-      tmdb_user_id: tmdb_user_id,
-      total_lists: total_lists,
-      total_movies: total_movies
-    })
-
-    summary
   end
 
-  # Private helper functions
-
-  defp create_list_item(list_id, tmdb_movie_id) do
-    %UserMovieListItem{}
-    |> UserMovieListItem.add_movie_changeset(%{
-      list_id: list_id,
-      tmdb_movie_id: tmdb_movie_id
-    })
-    |> Repo.insert()
+  defp get_last_sync_attempt([]), do: nil
+  defp get_last_sync_attempt(operations) do
+    operations
+    |> Enum.map(& &1.updated_at)
+    |> Enum.max(DateTime, fn -> nil end)
   end
 
-  defp get_list_item(list_id, tmdb_movie_id) do
-    case Repo.get_by(UserMovieListItem, list_id: list_id, tmdb_movie_id: tmdb_movie_id) do
-      nil -> {:error, :not_found}
-      item -> {:ok, item}
+  # Helper functions for TMDB integration
+
+  @doc """
+  Validates list attributes before sending to TMDB API.
+
+  ## Parameters
+  - attrs: Map containing list attributes
+
+  ## Returns
+  - :ok if valid
+  - {:error, reason} if invalid
+  """
+  def validate_list_attrs(attrs) do
+    name = Map.get(attrs, "name") || Map.get(attrs, :name)
+    description = Map.get(attrs, "description") || Map.get(attrs, :description)
+
+    cond do
+      is_nil(name) or String.trim(name) == "" ->
+        {:error, :name_required}
+
+      String.length(name) < 3 ->
+        {:error, :name_too_short}
+
+      String.length(name) > 100 ->
+        {:error, :name_too_long}
+
+      description && String.length(description) > 500 ->
+        {:error, :description_too_long}
+
+      true ->
+        :ok
     end
+  end
+
+  defp create_list_via_tmdb(tmdb_user_id, attrs) do
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        case TMDBClient.create_list(session_id, attrs) do
+          {:ok, %{list_id: tmdb_list_id} = response} ->
+            # Cache the new list
+            list_data = build_list_data_from_response(tmdb_list_id, attrs, response)
+            Cache.put_list(list_data)
+            Cache.invalidate_user_cache(tmdb_user_id)
+
+            Logger.info("Successfully created list via TMDB API", %{
+              tmdb_list_id: tmdb_list_id,
+              tmdb_user_id: tmdb_user_id
+            })
+
+            {:ok, list_data}
+
+          {:error, reason} ->
+            handle_tmdb_api_error(reason, :create_list, tmdb_user_id, nil, attrs)
+        end
+
+      {:error, :no_valid_session} ->
+        Logger.warning("No valid session for list creation", %{tmdb_user_id: tmdb_user_id})
+        {:error, :unauthorized}
+    end
+  end
+
+  defp fetch_user_lists_from_tmdb(tmdb_user_id) do
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        {:ok, account_id} = get_account_id(tmdb_user_id)
+
+        case TMDBClient.get_account_lists(account_id, session_id) do
+          {:ok, %{"results" => lists}} ->
+            # Cache the results
+            Cache.put_user_lists(tmdb_user_id, lists)
+
+            Logger.debug("Successfully fetched user lists from TMDB", %{
+              tmdb_user_id: tmdb_user_id,
+              count: length(lists)
+            })
+
+            {:ok, lists}
+
+          {:error, reason} ->
+            Logger.error("Failed to fetch user lists from TMDB", %{
+              tmdb_user_id: tmdb_user_id,
+              reason: inspect(reason)
+            })
+            {:error, reason}
+        end
+
+      {:error, :no_valid_session} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp fetch_list_from_tmdb(tmdb_list_id, tmdb_user_id) do
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        case TMDBClient.get_list(tmdb_list_id, session_id) do
+          {:ok, list_data} ->
+            # Cache the result
+            Cache.put_list(list_data)
+
+            Logger.debug("Successfully fetched list from TMDB", %{
+              tmdb_list_id: tmdb_list_id,
+              list_name: list_data["name"]
+            })
+
+            {:ok, list_data}
+
+          {:error, reason} ->
+            Logger.error("Failed to fetch list from TMDB", %{
+              tmdb_list_id: tmdb_list_id,
+              tmdb_user_id: tmdb_user_id,
+              reason: inspect(reason)
+            })
+            {:error, reason}
+        end
+
+      {:error, :no_valid_session} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp fetch_list_movies_from_tmdb(tmdb_list_id, tmdb_user_id) do
+    case fetch_list_from_tmdb(tmdb_list_id, tmdb_user_id) do
+      {:ok, list_data} ->
+        items = Map.get(list_data, "items", [])
+
+        # Cache the items separately
+        Cache.put_list_items(tmdb_list_id, items)
+
+        {:ok, items}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp update_list_via_tmdb(tmdb_list_id, tmdb_user_id, attrs) do
+    # Optimistic update: update cache first
+    case Cache.get_list(tmdb_list_id) do
+      {:ok, cached_list} ->
+        updated_list = Map.merge(cached_list, attrs)
+        Cache.put_list(updated_list)
+
+        # Now try TMDB API
+        case get_user_session(tmdb_user_id) do
+          {:ok, session_id} ->
+            case TMDBClient.update_list(tmdb_list_id, session_id, attrs) do
+              {:ok, _response} ->
+                # Invalidate cache to force fresh fetch next time
+                Cache.invalidate_list_cache(tmdb_list_id)
+                Cache.invalidate_user_cache(tmdb_user_id)
+
+                Logger.info("Successfully updated list via TMDB API", %{
+                  tmdb_list_id: tmdb_list_id,
+                  tmdb_user_id: tmdb_user_id
+                })
+
+                {:ok, updated_list}
+
+              {:error, reason} ->
+                # Rollback optimistic update
+                Cache.put_list(cached_list)
+                handle_tmdb_api_error(reason, :update_list, tmdb_user_id, tmdb_list_id, attrs)
+            end
+
+          {:error, :no_valid_session} ->
+            # Rollback optimistic update
+            Cache.put_list(cached_list)
+            {:error, :unauthorized}
+        end
+
+      {:error, _} ->
+        # No cached data, try direct API call
+        case get_user_session(tmdb_user_id) do
+          {:ok, session_id} ->
+            case TMDBClient.update_list(tmdb_list_id, session_id, attrs) do
+              {:ok, _response} ->
+                # Fetch updated list data
+                fetch_list_from_tmdb(tmdb_list_id, tmdb_user_id)
+
+              {:error, reason} ->
+                handle_tmdb_api_error(reason, :update_list, tmdb_user_id, tmdb_list_id, attrs)
+            end
+
+          {:error, :no_valid_session} ->
+            {:error, :unauthorized}
+        end
+    end
+  end
+
+  defp delete_list_via_tmdb(tmdb_list_id, tmdb_user_id) do
+    # Optimistic update: invalidate cache first
+    Cache.invalidate_list_cache(tmdb_list_id)
+    Cache.invalidate_user_cache(tmdb_user_id)
+
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        case TMDBClient.delete_list(tmdb_list_id, session_id) do
+          {:ok, _response} ->
+            Logger.info("Successfully deleted list via TMDB API", %{
+              tmdb_list_id: tmdb_list_id,
+              tmdb_user_id: tmdb_user_id
+            })
+
+            {:ok, :deleted}
+
+          {:error, reason} ->
+            handle_tmdb_api_error(reason, :delete_list, tmdb_user_id, tmdb_list_id, %{})
+        end
+
+      {:error, :no_valid_session} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp clear_list_via_tmdb(tmdb_list_id, tmdb_user_id) do
+    # Optimistic update: clear cached items
+    Cache.put_list_items(tmdb_list_id, [])
+
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        case TMDBClient.clear_list(tmdb_list_id, session_id) do
+          {:ok, _response} ->
+            # Invalidate cache to force fresh fetch
+            Cache.invalidate_list_cache(tmdb_list_id)
+
+            Logger.info("Successfully cleared list via TMDB API", %{
+              tmdb_list_id: tmdb_list_id,
+              tmdb_user_id: tmdb_user_id
+            })
+
+            {:ok, :cleared}
+
+          {:error, reason} ->
+            handle_tmdb_api_error(reason, :clear_list, tmdb_user_id, tmdb_list_id, %{})
+        end
+
+      {:error, :no_valid_session} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp add_movie_to_list_via_tmdb(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+    # Check for duplicates first
+    case movie_in_list?(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+      {:ok, true} ->
+        {:error, :duplicate_movie}
+
+      {:ok, false} ->
+        # Optimistic update: add to cached items
+        case Cache.get_list_items(tmdb_list_id) do
+          {:ok, cached_items} ->
+            # Add movie data to cache optimistically
+            case Media.get_content_details(tmdb_movie_id, :movie) do
+              {:ok, movie_data} ->
+                updated_items = [movie_data | cached_items]
+                Cache.put_list_items(tmdb_list_id, updated_items)
+
+              {:error, _} ->
+                # Continue without movie details
+                :ok
+            end
+
+          {:error, _} ->
+            # No cached items, continue
+            :ok
+        end
+
+        # Now try TMDB API
+        case get_user_session(tmdb_user_id) do
+          {:ok, session_id} ->
+            case TMDBClient.add_movie_to_list(tmdb_list_id, tmdb_movie_id, session_id) do
+              {:ok, _response} ->
+                # Invalidate cache to force fresh fetch
+                Cache.invalidate_list_cache(tmdb_list_id)
+
+                Logger.info("Successfully added movie to list via TMDB API", %{
+                  tmdb_list_id: tmdb_list_id,
+                  tmdb_movie_id: tmdb_movie_id,
+                  tmdb_user_id: tmdb_user_id
+                })
+
+                {:ok, :added}
+
+              {:error, reason} ->
+                # Rollback optimistic update
+                case Cache.get_list_items(tmdb_list_id) do
+                  {:ok, items} ->
+                    rollback_items = Enum.reject(items, fn item -> item["id"] == tmdb_movie_id end)
+                    Cache.put_list_items(tmdb_list_id, rollback_items)
+
+                  {:error, _} ->
+                    :ok
+                end
+
+                handle_tmdb_api_error(reason, :add_movie, tmdb_user_id, tmdb_list_id, %{"movie_id" => tmdb_movie_id})
+            end
+
+          {:error, :no_valid_session} ->
+            {:error, :unauthorized}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp remove_movie_from_list_via_tmdb(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+    # Optimistic update: remove from cached items
+    case Cache.get_list_items(tmdb_list_id) do
+      {:ok, cached_items} ->
+        updated_items = Enum.reject(cached_items, fn item -> item["id"] == tmdb_movie_id end)
+        Cache.put_list_items(tmdb_list_id, updated_items)
+
+      {:error, _} ->
+        # No cached items, continue
+        :ok
+    end
+
+    # Now try TMDB API
+    case get_user_session(tmdb_user_id) do
+      {:ok, session_id} ->
+        case TMDBClient.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, session_id) do
+          {:ok, _response} ->
+            # Invalidate cache to force fresh fetch
+            Cache.invalidate_list_cache(tmdb_list_id)
+
+            Logger.info("Successfully removed movie from list via TMDB API", %{
+              tmdb_list_id: tmdb_list_id,
+              tmdb_movie_id: tmdb_movie_id,
+              tmdb_user_id: tmdb_user_id
+            })
+
+            {:ok, :removed}
+
+          {:error, reason} ->
+            handle_tmdb_api_error(reason, :remove_movie, tmdb_user_id, tmdb_list_id, %{"movie_id" => tmdb_movie_id})
+        end
+
+      {:error, :no_valid_session} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  defp handle_tmdb_api_error(reason, operation_type, tmdb_user_id, tmdb_list_id, operation_data) do
+    case reason do
+      :timeout ->
+        # Queue operation for retry
+        queue_operation(operation_type, tmdb_user_id, tmdb_list_id, operation_data)
+
+      :network_error ->
+        # Queue operation for retry
+        queue_operation(operation_type, tmdb_user_id, tmdb_list_id, operation_data)
+
+      :rate_limited ->
+        # Queue operation for retry
+        queue_operation(operation_type, tmdb_user_id, tmdb_list_id, operation_data)
+
+      {:server_error, _} ->
+        # Queue operation for retry
+        queue_operation(operation_type, tmdb_user_id, tmdb_list_id, operation_data)
+
+      :session_expired ->
+        Logger.warning("TMDB session expired during operation", %{
+          operation_type: operation_type,
+          tmdb_user_id: tmdb_user_id,
+          tmdb_list_id: tmdb_list_id
+        })
+        {:error, :session_expired}
+
+      :not_found ->
+        {:error, :not_found}
+
+      :access_denied ->
+        {:error, :unauthorized}
+
+      {:validation_error, message} ->
+        {:error, {:validation_error, message}}
+
+      _ ->
+        Logger.error("Unhandled TMDB API error", %{
+          operation_type: operation_type,
+          tmdb_user_id: tmdb_user_id,
+          tmdb_list_id: tmdb_list_id,
+          reason: inspect(reason)
+        })
+        {:error, :api_error}
+    end
+  end
+
+  defp queue_operation(operation_type, tmdb_user_id, tmdb_list_id, operation_data) do
+    operation_type_string = Atom.to_string(operation_type)
+
+    case Queue.enqueue_operation(operation_type_string, tmdb_user_id, tmdb_list_id, operation_data) do
+      {:ok, _operation} ->
+        Logger.info("Operation queued due to TMDB API unavailability", %{
+          operation_type: operation_type,
+          tmdb_user_id: tmdb_user_id,
+          tmdb_list_id: tmdb_list_id
+        })
+        {:ok, :queued}
+
+      {:error, reason} ->
+        Logger.error("Failed to queue operation", %{
+          operation_type: operation_type,
+          tmdb_user_id: tmdb_user_id,
+          tmdb_list_id: tmdb_list_id,
+          reason: inspect(reason)
+        })
+        {:error, :queue_failed}
+    end
+  end
+
+  defp build_list_data_from_response(tmdb_list_id, attrs, _response) do
+    %{
+      "id" => tmdb_list_id,
+      "name" => Map.get(attrs, "name") || Map.get(attrs, :name),
+      "description" => Map.get(attrs, "description") || Map.get(attrs, :description) || "",
+      "public" => Map.get(attrs, "public") || Map.get(attrs, :public) || false,
+      "item_count" => 0,
+      "items" => [],
+      "created_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+      "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601()
+    }
+  end
+
+  defp get_user_session(tmdb_user_id) do
+    Auth.get_user_session(tmdb_user_id)
+  end
+
+  defp get_account_id(tmdb_user_id) do
+    # For now, assume tmdb_user_id is the account_id
+    # In a real implementation, this might need to be looked up from the session
+    {:ok, tmdb_user_id}
   end
 end

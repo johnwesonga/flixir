@@ -34,28 +34,32 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Error Recovery**: Comprehensive error handling with retry mechanisms
 
 ### 📝 User Movie Lists
-- **Personal Collections**: Create and manage custom movie lists with TMDB authentication
-- **List Management**: Full CRUD operations for personal movie collections with comprehensive validation
-- **Movie Operations**: Add and remove movies from lists with duplicate prevention and real-time updates
-- **Privacy Controls**: Public and private list visibility settings with user authorization
-- **User Integration**: Seamlessly integrated with TMDB user accounts and session management
-- **Statistics & Analytics**: List summaries, movie counts, and user collection analytics
-- **Data Persistence**: Secure database storage with proper user isolation and access control
-- **Error Handling**: Comprehensive error handling with user-friendly messages and retry mechanisms
-- **TMDB API Integration**: Direct integration with TMDB's native Lists API for seamless synchronization
-- **Comprehensive API Client**: Dedicated TMDB Lists client with retry logic, exponential backoff, and error classification
-- **Offline Support**: Queue system for reliable operation processing when TMDB API is unavailable
-  - **Operation Queuing**: Failed operations are automatically queued for retry with exponential backoff
-  - **Background Processing**: Automatic processing of queued operations with configurable intervals
-  - **Status Tracking**: Real-time monitoring of operation status (pending, processing, completed, failed)
-  - **Manual Retry**: Ability to manually retry failed operations or cancel pending ones
+- **TMDB-Native Integration**: Uses TMDB's native Lists API as the primary data source for seamless synchronization
+- **Personal Collections**: Create and manage custom movie lists with TMDB authentication and session management
+- **List Management**: Full CRUD operations for personal movie collections with comprehensive validation and optimistic updates
+- **Movie Operations**: Add and remove movies from lists with duplicate prevention, real-time updates, and rollback capabilities
+- **Privacy Controls**: Public and private list visibility settings with user authorization and access control
+- **High-Performance Caching**: ETS-based Lists Cache system for optimal response times and reduced API calls
+  - **Multi-Layer Caching**: User lists, individual lists, and list items cached separately with configurable TTL
+  - **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
+  - **Automatic Expiration**: Background cleanup process removes expired entries every 5 minutes
+  - **Targeted Invalidation**: Invalidate specific users or lists without clearing entire cache
+- **Offline Support & Reliability**: Comprehensive queue system for reliable operation processing
+  - **Operation Queuing**: Failed operations are automatically queued for retry with exponential backoff (30s, 60s, 120s, 240s, 480s)
+  - **Background Processing**: QueueProcessor GenServer automatically processes pending operations with configurable intervals
+  - **Status Tracking**: Real-time monitoring of operation status (pending, processing, completed, failed, cancelled)
+  - **Manual Control**: Ability to manually retry failed operations, cancel pending ones, or process operations immediately
   - **Deduplication**: Prevents duplicate operations for the same user/list/movie combinations
+  - **Database Persistence**: Queued operations stored in database with optimized indexes for efficient processing
+- **Optimistic Updates**: Immediate UI updates with automatic rollback on API failures for seamless user experience
+- **Comprehensive Error Handling**: Intelligent error classification, retry logic, and user-friendly error messages
+- **Statistics & Analytics**: List summaries, movie counts, user collection analytics, and queue monitoring
 - **Rich UI Components**: Comprehensive component library for list management including:
   - **List Cards**: Visual cards showing list details, movie counts, and privacy status
   - **Creation Forms**: Validated forms for creating and editing lists with privacy controls
   - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations
   - **Add to List Selector**: Modal interface for adding movies to existing lists
-  - **Statistics Display**: Both compact and detailed list statistics views
+  - **Statistics Display**: Both compact and detailed list statistics views with queue status
   - **Loading States**: Skeleton loading animations and progress indicators
   - **Empty States**: Helpful empty state messages with call-to-action buttons
 
@@ -176,7 +180,7 @@ mix test --grep "authentication"
 ## Getting Started
 
 ### Prerequisites
-- Elixir ~> 1.15
+- Elixir ~> 1.17
 - Phoenix ~> 1.8.0
 - PostgreSQL
 - TMDB API Key
@@ -1006,8 +1010,14 @@ The application uses Phoenix contexts to organize business logic:
 - **`error_handler.ex`**: Review-specific error handling
 
 **Lists Context (`lib/flixir/lists/`):**
-- **`lists.ex`**: User movie list management API
-- **`user_movie_list.ex`**: Movie list schema and validation
+- **`lists.ex`**: TMDB-native user movie list management API with caching and queue integration
+- **`tmdb_client.ex`**: Comprehensive TMDB Lists API client with retry logic and error handling
+- **`cache.ex`**: High-performance ETS-based caching system for TMDB list data
+- **`queue.ex`**: Offline support and reliable operation processing with exponential backoff
+- **`queue_processor.ex`**: Background GenServer for automatic queue processing
+- **`queued_operation.ex`**: Database schema for queued operations with status tracking
+- **`user_movie_list.ex`**: Movie list schema and validation (legacy/local storage)
+- **`user_movie_list_item.ex`**: Junction table for movies within lists (legacy/local storage)
 - **`user_movie_list_item.ex`**: List item schema and relationships
 
 #### LiveView Architecture
@@ -2094,7 +2104,7 @@ The application can be containerized for Docker deployment:
 
 ```dockerfile
 # Example Dockerfile structure
-FROM elixir:1.15-alpine AS build
+FROM elixir:1.17-alpine AS build
 # Build steps...
 
 FROM alpine:3.18 AS runtime
