@@ -1090,8 +1090,14 @@ The application features a comprehensive navigation system with authentication-a
 - **Performance**: Optimized rendering with minimal re-renders and efficient DOM updates
 
 #### Lists Context (`lib/flixir/lists/`)
-- **UserMovieList**: Schema for user-created movie lists with privacy controls and comprehensive validation
-- **UserMovieListItem**: Junction table for movies within lists with duplicate prevention constraints
+- **Lists**: TMDB-native list management with optimistic updates, caching, and queue integration
+- **TMDBClient**: Comprehensive TMDB Lists API client with retry logic, exponential backoff, and error classification
+- **Cache**: High-performance ETS-based caching system with automatic expiration and targeted invalidation
+- **Queue**: Offline support system with operation queuing, background processing, and status tracking
+- **QueueProcessor**: Background GenServer for automatic processing of queued operations with configurable intervals
+- **QueuedOperation**: Database schema for queued operations with retry logic and status management
+- **UserMovieList**: Schema for user-created movie lists with privacy controls (legacy/local storage)
+- **UserMovieListItem**: Junction table for movies within lists with duplicate prevention (legacy/local storage)
 - **TMDB Lists Client**: Dedicated HTTP client for TMDB Lists API operations (`lib/flixir/lists/tmdb_client.ex`)
   - **List Management**: Create, read, update, and delete lists on TMDB with full validation
   - **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention
