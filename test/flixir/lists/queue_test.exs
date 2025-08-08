@@ -27,7 +27,8 @@ defmodule Flixir.Lists.QueueTest do
       assert {:ok, first_op} = Queue.enqueue_operation("create_list", 123, nil, operation_data)
 
       # Try to create duplicate
-      assert {:ok, duplicate_op} = Queue.enqueue_operation("create_list", 123, nil, operation_data)
+      assert {:ok, duplicate_op} =
+               Queue.enqueue_operation("create_list", 123, nil, operation_data)
 
       # Should return the existing operation
       assert first_op.id == duplicate_op.id
@@ -58,14 +59,15 @@ defmodule Flixir.Lists.QueueTest do
 
   describe "process_operation/1" do
     test "marks operation as processing then completed on success" do
-      operation = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "Test List"}
-      })
+      operation =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "Test List"}
+        })
 
       with_mocks([
-        {Flixir.Auth, [], [get_user_session: fn(_) -> {:ok, "session_123"} end]},
-        {Flixir.Lists.TMDBClient, [], [create_list: fn(_, _) -> {:ok, %{list_id: 456}} end]}
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:ok, %{list_id: 456}} end]}
       ]) do
         assert {:ok, _result} = Queue.process_operation(operation)
 
@@ -75,12 +77,13 @@ defmodule Flixir.Lists.QueueTest do
     end
 
     test "handles auth failure" do
-      operation = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "Test List"}
-      })
+      operation =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "Test List"}
+        })
 
-      with_mock Flixir.Auth, [get_user_session: fn(_) -> {:error, :no_valid_session} end] do
+      with_mock Flixir.Auth, get_user_session: fn _ -> {:error, :no_valid_session} end do
         assert {:error, {:scheduled_retry, _delay}} = Queue.process_operation(operation)
 
         updated_operation = Repo.get(QueuedOperation, operation.id)
@@ -90,14 +93,15 @@ defmodule Flixir.Lists.QueueTest do
     end
 
     test "handles TMDB API failure with retry" do
-      operation = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "Test List"}
-      })
+      operation =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "Test List"}
+        })
 
       with_mocks([
-        {Flixir.Auth, [], [get_user_session: fn(_) -> {:ok, "session_123"} end]},
-        {Flixir.Lists.TMDBClient, [], [create_list: fn(_, _) -> {:error, :api_error} end]}
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:error, :api_error} end]}
       ]) do
         assert {:error, {:scheduled_retry, _delay}} = Queue.process_operation(operation)
 
@@ -109,15 +113,17 @@ defmodule Flixir.Lists.QueueTest do
     end
 
     test "marks operation as failed after max retries" do
-      operation = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "Test List"},
-        retry_count: 4  # One less than max
-      })
+      operation =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "Test List"},
+          # One less than max
+          retry_count: 4
+        })
 
       with_mocks([
-        {Flixir.Auth, [], [get_user_session: fn(_) -> {:ok, "session_123"} end]},
-        {Flixir.Lists.TMDBClient, [], [create_list: fn(_, _) -> {:error, :api_error} end]}
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:error, :api_error} end]}
       ]) do
         assert {:error, :max_retries_exceeded} = Queue.process_operation(operation)
 
@@ -131,19 +137,29 @@ defmodule Flixir.Lists.QueueTest do
   describe "process_pending_operations/0" do
     test "processes all pending operations" do
       # Create multiple pending operations
-      op1 = insert_queued_operation(%{operation_type: "create_list", operation_data: %{"name" => "List 1"}})
-      op2 = insert_queued_operation(%{operation_type: "create_list", operation_data: %{"name" => "List 2"}})
+      op1 =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "List 1"}
+        })
+
+      op2 =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "List 2"}
+        })
 
       # Create a scheduled operation (should not be processed)
-      _op3 = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "List 3"},
-        scheduled_for: DateTime.utc_now() |> DateTime.add(3600, :second)
-      })
+      _op3 =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "List 3"},
+          scheduled_for: DateTime.utc_now() |> DateTime.add(3600, :second)
+        })
 
       with_mocks([
-        {Flixir.Auth, [], [get_user_session: fn(_) -> {:ok, "session_123"} end]},
-        {Flixir.Lists.TMDBClient, [], [create_list: fn(_, _) -> {:ok, %{list_id: 456}} end]}
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:ok, %{list_id: 456}} end]}
       ]) do
         Queue.process_pending_operations()
 
@@ -157,18 +173,79 @@ defmodule Flixir.Lists.QueueTest do
     end
   end
 
-  describe "retry_operation/1" do
-    test "retries a failed operation" do
-      operation = insert_queued_operation(%{
-        operation_type: "create_list",
-        operation_data: %{"name" => "Test List"},
-        status: "failed",
-        retry_count: 2
-      })
+  describe "process_user_operations/1" do
+    test "processes all pending operations for a specific user" do
+      user_id_1 = 123
+      user_id_2 = 456
+
+      # Create operations for user 1
+      op1 =
+        insert_queued_operation(%{
+          tmdb_user_id: user_id_1,
+          operation_type: "create_list",
+          operation_data: %{"name" => "User 1 List 1"}
+        })
+
+      op2 =
+        insert_queued_operation(%{
+          tmdb_user_id: user_id_1,
+          operation_type: "create_list",
+          operation_data: %{"name" => "User 1 List 2"}
+        })
+
+      # Create operations for user 2 (should not be processed)
+      op3 =
+        insert_queued_operation(%{
+          tmdb_user_id: user_id_2,
+          operation_type: "create_list",
+          operation_data: %{"name" => "User 2 List 1"}
+        })
 
       with_mocks([
-        {Flixir.Auth, [], [get_user_session: fn(_) -> {:ok, "session_123"} end]},
-        {Flixir.Lists.TMDBClient, [], [create_list: fn(_, _) -> {:ok, %{list_id: 456}} end]}
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:ok, %{list_id: 456}} end]}
+      ]) do
+        Queue.process_user_operations(user_id_1)
+
+        # Check that only user 1's operations were processed
+        updated_op1 = Repo.get(QueuedOperation, op1.id)
+        updated_op2 = Repo.get(QueuedOperation, op2.id)
+        updated_op3 = Repo.get(QueuedOperation, op3.id)
+
+        assert updated_op1.status == "completed"
+        assert updated_op2.status == "completed"
+        # Should remain unchanged
+        assert updated_op3.status == "pending"
+      end
+    end
+
+    test "handles empty user operations gracefully" do
+      user_id = 999
+
+      # No operations for this user
+      with_mocks([
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:ok, %{list_id: 456}} end]}
+      ]) do
+        # Should not raise an error
+        assert :ok = Queue.process_user_operations(user_id)
+      end
+    end
+  end
+
+  describe "retry_operation/1" do
+    test "retries a failed operation" do
+      operation =
+        insert_queued_operation(%{
+          operation_type: "create_list",
+          operation_data: %{"name" => "Test List"},
+          status: "failed",
+          retry_count: 2
+        })
+
+      with_mocks([
+        {Flixir.Auth, [], [get_user_session: fn _ -> {:ok, "session_123"} end]},
+        {Flixir.Lists.TMDBClient, [], [create_list: fn _, _ -> {:ok, %{list_id: 456}} end]}
       ]) do
         assert {:ok, _result} = Queue.retry_operation(operation.id)
 
@@ -267,19 +344,27 @@ defmodule Flixir.Lists.QueueTest do
     test "removes old completed and cancelled operations" do
       # Old completed operation (should be deleted)
       old_completed = insert_queued_operation(%{status: "completed"})
-      old_completed = update_operation_timestamp(old_completed, DateTime.utc_now() |> DateTime.add(-31, :day))
+
+      old_completed =
+        update_operation_timestamp(old_completed, DateTime.utc_now() |> DateTime.add(-31, :day))
 
       # Old cancelled operation (should be deleted)
       old_cancelled = insert_queued_operation(%{status: "cancelled"})
-      old_cancelled = update_operation_timestamp(old_cancelled, DateTime.utc_now() |> DateTime.add(-31, :day))
+
+      old_cancelled =
+        update_operation_timestamp(old_cancelled, DateTime.utc_now() |> DateTime.add(-31, :day))
 
       # Recent completed operation (should not be deleted)
       recent_completed = insert_queued_operation(%{status: "completed"})
-      recent_completed = update_operation_timestamp(recent_completed, DateTime.utc_now() |> DateTime.add(-1, :day))
+
+      recent_completed =
+        update_operation_timestamp(recent_completed, DateTime.utc_now() |> DateTime.add(-1, :day))
 
       # Old failed operation (should not be deleted)
       old_failed = insert_queued_operation(%{status: "failed"})
-      old_failed = update_operation_timestamp(old_failed, DateTime.utc_now() |> DateTime.add(-31, :day))
+
+      old_failed =
+        update_operation_timestamp(old_failed, DateTime.utc_now() |> DateTime.add(-31, :day))
 
       {deleted_count, _} = Queue.cleanup_old_operations(30)
 

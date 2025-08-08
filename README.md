@@ -34,6 +34,8 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Error Recovery**: Comprehensive error handling with retry mechanisms
 
 ### 📝 User Movie Lists
+> **Architecture Update**: The Lists system has been refactored to use TMDB's native Lists API as the primary data source, with local caching and queue systems for performance and reliability. This provides seamless synchronization with TMDB while maintaining excellent user experience.
+
 - **TMDB-Native Integration**: Uses TMDB's native Lists API as the primary data source for seamless synchronization
 - **Personal Collections**: Create and manage custom movie lists with TMDB authentication and session management
 - **List Management**: Full CRUD operations for personal movie collections with comprehensive validation and optimistic updates
@@ -309,31 +311,10 @@ CREATE TABLE auth_sessions (
 );
 ```
 
-The user movie lists feature requires the `user_movie_lists`, `user_movie_list_items`, and `queued_list_operations` tables:
+The user movie lists feature requires the `queued_list_operations` table for queue system support, and optionally the `user_movie_lists` and `user_movie_list_items` tables for legacy/local storage (TMDB API is now the primary data source):
 
 ```sql
--- User movie lists table
-CREATE TABLE user_movie_lists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  is_public BOOLEAN NOT NULL DEFAULT FALSE,
-  tmdb_user_id INTEGER NOT NULL,
-  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- User movie list items table (junction table for movies in lists)
-CREATE TABLE user_movie_list_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  list_id UUID NOT NULL REFERENCES user_movie_lists(id) ON DELETE CASCADE,
-  tmdb_movie_id INTEGER NOT NULL,
-  added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
-
--- Queued list operations table (for offline support and retry logic)
+-- Queued list operations table (for offline support and retry logic) - REQUIRED
 CREATE TABLE queued_list_operations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   operation_type VARCHAR(255) NOT NULL,
@@ -349,21 +330,44 @@ CREATE TABLE queued_list_operations (
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
--- Indexes for efficient querying
-CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists (tmdb_user_id);
-CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists (updated_at);
-CREATE INDEX idx_user_movie_lists_user_updated ON user_movie_lists (tmdb_user_id, updated_at);
+-- User movie lists table (legacy/local storage - OPTIONAL)
+CREATE TABLE user_movie_lists (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  description TEXT,
+  is_public BOOLEAN NOT NULL DEFAULT FALSE,
+  tmdb_user_id INTEGER NOT NULL,
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
--- Indexes for list items
-CREATE INDEX idx_user_movie_list_items_list_id ON user_movie_list_items (list_id);
-CREATE INDEX idx_user_movie_list_items_tmdb_movie_id ON user_movie_list_items (tmdb_movie_id);
-CREATE INDEX idx_user_movie_list_items_added_at ON user_movie_list_items (added_at);
+-- User movie list items table (legacy/local storage - OPTIONAL)
+CREATE TABLE user_movie_list_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  list_id UUID NOT NULL REFERENCES user_movie_lists(id) ON DELETE CASCADE,
+  tmdb_movie_id INTEGER NOT NULL,
+  added_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  inserted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
 
--- Indexes for queued operations (optimized for queue processing)
+
+
+-- Indexes for queued operations (optimized for queue processing) - REQUIRED
 CREATE INDEX idx_queued_operations_status_inserted ON queued_list_operations (status, inserted_at);
 CREATE INDEX idx_queued_operations_user_id ON queued_list_operations (tmdb_user_id);
 CREATE INDEX idx_queued_operations_scheduled_for ON queued_list_operations (scheduled_for);
 CREATE INDEX idx_queued_operations_type_list_status ON queued_list_operations (operation_type, tmdb_list_id, status);
+
+-- Indexes for legacy/local storage tables (OPTIONAL)
+CREATE INDEX idx_user_movie_lists_tmdb_user_id ON user_movie_lists (tmdb_user_id);
+CREATE INDEX idx_user_movie_lists_updated_at ON user_movie_lists (updated_at);
+CREATE INDEX idx_user_movie_lists_user_updated ON user_movie_lists (tmdb_user_id, updated_at);
+
+-- Indexes for list items (legacy/local storage)
+CREATE INDEX idx_user_movie_list_items_list_id ON user_movie_list_items (list_id);
+CREATE INDEX idx_user_movie_list_items_tmdb_movie_id ON user_movie_list_items (tmdb_movie_id);
+CREATE INDEX idx_user_movie_list_items_added_at ON user_movie_list_items (added_at);
 
 -- Unique constraint to prevent duplicate movies in the same list
 CREATE UNIQUE INDEX idx_unique_movie_per_list ON user_movie_list_items (list_id, tmdb_movie_id);
@@ -544,6 +548,9 @@ operations = Flixir.Lists.Queue.get_user_pending_operations(tmdb_user_id)
 
 # Process operations manually
 Flixir.Lists.Queue.process_pending_operations()
+
+# Process all pending operations for a specific user
+Flixir.Lists.Queue.process_user_operations(tmdb_user_id)
 ```
 
 **Queue System Features:**
@@ -556,6 +563,69 @@ Flixir.Lists.Queue.process_pending_operations()
 - **Monitoring**: Real-time statistics and operation tracking
 
 For detailed Queue System documentation, see [`docs/queue_system.md`](docs/queue_system.md).
+
+**Lists Context API (`Flixir.Lists`):**
+The main Lists context provides a high-level API that integrates TMDB API, caching, and queue systems:
+
+```elixir
+# Create a new list (TMDB-native with caching and queue fallback)
+{:ok, list_data} = Flixir.Lists.create_list(tmdb_user_id, %{
+  name: "My Watchlist",
+  description: "Movies I want to watch",
+  is_public: false
+})
+
+# Get all user lists (cache-first with TMDB fallback)
+{:ok, lists} = Flixir.Lists.get_user_lists(tmdb_user_id)
+
+# Get specific list (cache-first with authorization)
+{:ok, list_data} = Flixir.Lists.get_list(tmdb_list_id, tmdb_user_id)
+
+# Update list with optimistic updates
+{:ok, updated_list} = Flixir.Lists.update_list(tmdb_list_id, tmdb_user_id, %{
+  name: "Updated Watchlist"
+})
+
+# Delete list with optimistic updates
+{:ok, :deleted} = Flixir.Lists.delete_list(tmdb_list_id, tmdb_user_id)
+
+# Clear all movies from list
+{:ok, :cleared} = Flixir.Lists.clear_list(tmdb_list_id, tmdb_user_id)
+
+# Add movie to list with duplicate prevention
+{:ok, :added} = Flixir.Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+
+# Remove movie from list
+{:ok, :removed} = Flixir.Lists.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+
+# Get all movies in a list
+{:ok, movies} = Flixir.Lists.get_list_movies(tmdb_list_id, tmdb_user_id)
+
+# Check if movie is in list
+{:ok, true} = Flixir.Lists.movie_in_list?(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+
+# Get list statistics
+{:ok, stats} = Flixir.Lists.get_list_stats(tmdb_list_id, tmdb_user_id)
+# Returns: %{movie_count: 15, created_at: "...", is_public: false, ...}
+
+# Get user's collection summary
+{:ok, summary} = Flixir.Lists.get_user_lists_summary(tmdb_user_id)
+# Returns: %{total_lists: 5, total_movies: 47, public_lists: 2, ...}
+
+# Get queue statistics for user
+queue_stats = Flixir.Lists.get_user_queue_stats(tmdb_user_id)
+# Returns: %{pending_operations: 3, failed_operations: 1, last_sync_attempt: ...}
+```
+
+**Lists Context Features:**
+- **TMDB-Native**: Uses TMDB Lists API as the primary data source for seamless synchronization
+- **Optimistic Updates**: Immediate cache updates with automatic rollback on API failures
+- **Cache Integration**: Automatic caching with configurable TTL and intelligent invalidation
+- **Queue Fallback**: Operations are queued when TMDB API is unavailable with automatic retry
+- **Session Management**: Integrates with Auth context for secure session handling
+- **Comprehensive Validation**: Input validation before API calls to prevent errors
+- **Error Classification**: Intelligent error handling with user-friendly messages
+- **Statistics & Analytics**: Built-in analytics for lists and user collections
 
 **Session Plug (`FlixirWeb.Plugs.AuthSession`):**
 The session plug automatically handles authentication state for all requests:
@@ -1375,7 +1445,7 @@ iex> Flixir.Auth.validate_session("session-uuid")
 
 #### Lists API Usage Patterns
 
-**Basic List Management:**
+**Basic List Management (TMDB-Native with Caching and Queue Fallback):**
 ```elixir
 # Create a new movie list
 case Flixir.Lists.create_list(tmdb_user_id, %{
@@ -1383,122 +1453,163 @@ case Flixir.Lists.create_list(tmdb_user_id, %{
   description: "Movies I want to watch",
   is_public: false
 }) do
-  {:ok, list} -> 
-    # List created successfully
-    IO.puts("Created list: #{list.name}")
-  {:error, changeset} -> 
-    # Handle validation errors
-    IO.inspect(changeset.errors)
+  {:ok, list_data} -> 
+    # List created successfully on TMDB and cached locally
+    IO.puts("Created list: #{list_data["name"]} (ID: #{list_data["id"]})")
+  {:ok, :queued} ->
+    # TMDB API unavailable, operation queued for later processing
+    IO.puts("List creation queued - will sync when TMDB API is available")
+  {:error, :name_required} -> 
+    IO.puts("List name is required")
+  {:error, :unauthorized} ->
+    IO.puts("Please log in to create lists")
 end
 
-# Get all lists for a user
-user_lists = Flixir.Lists.get_user_lists(tmdb_user_id)
-IO.puts("User has #{length(user_lists)} lists")
+# Get all lists for a user (cache-first with TMDB fallback)
+case Flixir.Lists.get_user_lists(tmdb_user_id) do
+  {:ok, lists} ->
+    IO.puts("User has #{length(lists)} lists")
+  {:error, :unauthorized} ->
+    IO.puts("Please log in to view lists")
+end
 
-# Get a specific list with authorization
-case Flixir.Lists.get_list(list_id, tmdb_user_id) do
-  {:ok, list} -> 
+# Get a specific list with authorization (cache-first)
+case Flixir.Lists.get_list(tmdb_list_id, tmdb_user_id) do
+  {:ok, list_data} -> 
     # User authorized and list found
-    IO.puts("List '#{list.name}' has #{length(list.list_items)} movies")
+    IO.puts("List '#{list_data["name"]}' has #{list_data["item_count"]} movies")
   {:error, :not_found} -> 
-    # List doesn't exist
     IO.puts("List not found")
   {:error, :unauthorized} -> 
-    # User doesn't own this list
     IO.puts("Access denied")
 end
 
-# Update list metadata
-case Flixir.Lists.update_list(list, %{name: "Updated Name", is_public: true}) do
+# Update list metadata (optimistic updates with rollback)
+case Flixir.Lists.update_list(tmdb_list_id, tmdb_user_id, %{name: "Updated Name"}) do
   {:ok, updated_list} -> 
-    IO.puts("List updated: #{updated_list.name}")
-  {:error, changeset} -> 
-    IO.inspect(changeset.errors)
+    IO.puts("List updated: #{updated_list["name"]}")
+  {:ok, :queued} ->
+    IO.puts("Update queued - will sync when TMDB API is available")
+  {:error, :name_too_short} -> 
+    IO.puts("List name must be at least 3 characters")
 end
 
-# Delete a list and all its movies
-case Flixir.Lists.delete_list(list) do
-  {:ok, deleted_list} -> 
-    IO.puts("Deleted list: #{deleted_list.name}")
-  {:error, changeset} -> 
-    IO.puts("Failed to delete list")
+# Delete a list (optimistic updates)
+case Flixir.Lists.delete_list(tmdb_list_id, tmdb_user_id) do
+  {:ok, :deleted} -> 
+    IO.puts("List deleted successfully")
+  {:ok, :queued} ->
+    IO.puts("Deletion queued - will sync when TMDB API is available")
+  {:error, :unauthorized} -> 
+    IO.puts("Cannot delete this list")
 end
 
-# Clear all movies from a list
-case Flixir.Lists.clear_list(list) do
-  {:ok, {count, nil}} -> 
-    IO.puts("Removed #{count} movies from list")
-  {:error, reason} -> 
-    IO.puts("Failed to clear list: #{inspect(reason)}")
+# Clear all movies from a list (optimistic updates)
+case Flixir.Lists.clear_list(tmdb_list_id, tmdb_user_id) do
+  {:ok, :cleared} -> 
+    IO.puts("All movies removed from list")
+  {:ok, :queued} ->
+    IO.puts("Clear operation queued - will sync when TMDB API is available")
+  {:error, :unauthorized} -> 
+    IO.puts("Cannot modify this list")
 end
 ```
 
-**Movie Management in Lists:**
+**Movie Management in Lists (TMDB-Native with Optimistic Updates):**
 ```elixir
-# Add a movie to a list
-case Flixir.Lists.add_movie_to_list(list_id, tmdb_movie_id, tmdb_user_id) do
-  {:ok, list_item} -> 
-    # Movie added successfully
+# Add a movie to a list (optimistic updates with duplicate prevention)
+case Flixir.Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+  {:ok, :added} -> 
+    # Movie added successfully to TMDB and cache updated
     IO.puts("Added movie #{tmdb_movie_id} to list")
+  {:ok, :queued} ->
+    # TMDB API unavailable, operation queued
+    IO.puts("Add movie operation queued - will sync when TMDB API is available")
   {:error, :duplicate_movie} -> 
-    # Movie already in list
+    # Movie already in list (checked via cache/API)
     IO.puts("Movie already in this list")
   {:error, :unauthorized} -> 
-    # User doesn't own the list
+    # User doesn't have access to the list
     IO.puts("Cannot add to this list")
   {:error, :not_found} -> 
     # List doesn't exist
     IO.puts("List not found")
 end
 
-# Remove a movie from a list
-case Flixir.Lists.remove_movie_from_list(list_id, tmdb_movie_id, tmdb_user_id) do
-  {:ok, deleted_item} -> 
+# Remove a movie from a list (optimistic updates)
+case Flixir.Lists.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+  {:ok, :removed} -> 
     IO.puts("Removed movie #{tmdb_movie_id} from list")
+  {:ok, :queued} ->
+    IO.puts("Remove movie operation queued - will sync when TMDB API is available")
   {:error, :not_found} -> 
     IO.puts("Movie not in list or list not found")
   {:error, :unauthorized} -> 
     IO.puts("Cannot modify this list")
 end
 
-# Get all movies in a list with TMDB data
-case Flixir.Lists.get_list_movies(list_id, tmdb_user_id) do
+# Get all movies in a list with TMDB data (cache-first)
+case Flixir.Lists.get_list_movies(tmdb_list_id, tmdb_user_id) do
   {:ok, movies} -> 
-    # Movies with TMDB data and list metadata
+    # Movies with full TMDB data from cache or API
     Enum.each(movies, fn movie ->
-      IO.puts("#{movie["title"]} (added: #{movie["added_at"]})")
+      IO.puts("#{movie["title"]} (#{movie["release_date"]})")
     end)
-  {:error, reason} -> 
-    IO.puts("Failed to get movies: #{inspect(reason)}")
+  {:error, :unauthorized} -> 
+    IO.puts("Cannot access this list")
+  {:error, :not_found} ->
+    IO.puts("List not found")
 end
 
-# Check if a movie is in a list
-if Flixir.Lists.movie_in_list?(list_id, tmdb_movie_id) do
-  IO.puts("Movie is in the list")
-else
-  IO.puts("Movie not in list")
+# Check if a movie is in a list (cache-first)
+case Flixir.Lists.movie_in_list?(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+  {:ok, true} ->
+    IO.puts("Movie is in the list")
+  {:ok, false} ->
+    IO.puts("Movie not in list")
+  {:error, reason} ->
+    IO.puts("Could not check: #{inspect(reason)}")
 end
 ```
 
-**Statistics and Analytics:**
+**Statistics and Analytics (TMDB-Native with Caching):**
 ```elixir
-# Get statistics for a specific list
-stats = Flixir.Lists.get_list_stats(list_id)
-IO.puts("List has #{stats.movie_count} movies")
-IO.puts("Created: #{stats.created_at}")
-IO.puts("Public: #{stats.is_public}")
-
-# Get user's collection summary
-summary = Flixir.Lists.get_user_lists_summary(tmdb_user_id)
-IO.puts("User has #{summary.total_lists} lists with #{summary.total_movies} total movies")
-IO.puts("#{summary.public_lists} public, #{summary.private_lists} private")
-
-if summary.largest_list do
-  IO.puts("Largest list: '#{summary.largest_list.name}' (#{summary.largest_list.movie_count} movies)")
+# Get statistics for a specific list (cache-first)
+case Flixir.Lists.get_list_stats(tmdb_list_id, tmdb_user_id) do
+  {:ok, stats} ->
+    IO.puts("List has #{stats.movie_count} movies")
+    IO.puts("Created: #{stats.created_at}")
+    IO.puts("Updated: #{stats.updated_at}")
+    IO.puts("Public: #{stats.is_public}")
+    IO.puts("Description: #{stats.description}")
+  {:error, :unauthorized} ->
+    IO.puts("Cannot access list statistics")
 end
 
-if summary.most_recent_list do
-  IO.puts("Most recent: '#{summary.most_recent_list.name}'")
+# Get user's collection summary (cache-first with TMDB fallback)
+case Flixir.Lists.get_user_lists_summary(tmdb_user_id) do
+  {:ok, summary} ->
+    IO.puts("User has #{summary.total_lists} lists with #{summary.total_movies} total movies")
+    IO.puts("#{summary.public_lists} public, #{summary.private_lists} private")
+
+    if summary.largest_list do
+      IO.puts("Largest list: '#{summary.largest_list.name}' (#{summary.largest_list.movie_count} movies)")
+    end
+
+    if summary.most_recent_list do
+      IO.puts("Most recent: '#{summary.most_recent_list["name"]}'")
+    end
+  {:error, :unauthorized} ->
+    IO.puts("Please log in to view collection summary")
+end
+
+# Get queue statistics for monitoring sync status
+queue_stats = Flixir.Lists.get_user_queue_stats(tmdb_user_id)
+IO.puts("Pending operations: #{queue_stats.pending_operations}")
+IO.puts("Failed operations: #{queue_stats.failed_operations}")
+
+if queue_stats.last_sync_attempt do
+  IO.puts("Last sync attempt: #{queue_stats.last_sync_attempt}")
 end
 ```
 

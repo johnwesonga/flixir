@@ -32,7 +32,7 @@
   - Add comprehensive error handling for TMDB API failures
   - _Requirements: 9.1, 9.2, 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 5. Update LiveViews for TMDB integration with optimistic updates
+- [x] 5. Update LiveViews for TMDB integration with optimistic updates
   - Refactor `FlixirWeb.UserMovieListsLive` to work with TMDB list data and IDs
   - Implement optimistic updates for list operations with rollback on failure
   - Add sync status indicators and queue status display

@@ -4,7 +4,6 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
   import Mock
 
   alias Flixir.{Auth, Lists}
-  alias Flixir.Lists.UserMovieList
 
   @valid_session_attrs %{
     tmdb_session_id: "test_session_123",
@@ -51,8 +50,9 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
          ]},
         {Lists, [:passthrough],
          [
-           get_user_lists: fn _user_id -> [] end,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 0, total_movies: 0} end
+           get_user_lists: fn _user_id -> {:ok, []} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 0, total_movies: 0}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end
          ]}
       ]) do
         {:ok, view, html} = live(conn, ~p"/my-lists")
@@ -64,28 +64,27 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
     end
 
     test "displays existing lists when user has lists", %{conn: conn, session: session} do
-      # Create mock lists
+      # Create mock lists in TMDB API format
       mock_lists = [
-        %UserMovieList{
-          id: "list-1",
-          name: "My Watchlist",
-          description: "Movies to watch",
-          is_public: false,
-          tmdb_user_id: 12345,
-          list_items: [],
-          inserted_at: DateTime.utc_now(),
-          updated_at: DateTime.utc_now()
+        %{
+          "id" => 1001,
+          "name" => "My Watchlist",
+          "description" => "Movies to watch",
+          "public" => false,
+          "item_count" => 0,
+          "created_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "created_by" => 12345
         },
-        %UserMovieList{
-          id: "list-2",
-          name: "Favorites",
-          description: "My favorite movies",
-          is_public: true,
-          tmdb_user_id: 12345,
-          # Mock 2 items
-          list_items: [%{}, %{}],
-          inserted_at: DateTime.utc_now(),
-          updated_at: DateTime.utc_now()
+        %{
+          "id" => 1002,
+          "name" => "Favorites",
+          "description" => "My favorite movies",
+          "public" => true,
+          "item_count" => 2,
+          "created_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "created_by" => 12345
         }
       ]
 
@@ -97,8 +96,9 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
          ]},
         {Lists, [:passthrough],
          [
-           get_user_lists: fn _user_id -> mock_lists end,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 2, total_movies: 2} end
+           get_user_lists: fn _user_id -> {:ok, mock_lists} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 2, total_movies: 2}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end
          ]}
       ]) do
         {:ok, view, html} = live(conn, ~p"/my-lists")
@@ -124,8 +124,9 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
          ]},
         {Lists, [:passthrough],
          [
-           get_user_lists: fn _user_id -> [] end,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 0, total_movies: 0} end
+           get_user_lists: fn _user_id -> {:ok, []} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 0, total_movies: 0}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end
          ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/my-lists")
@@ -139,22 +140,22 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
     end
 
     test "creates new list successfully", %{conn: conn, session: session} do
-      new_list = %UserMovieList{
-        id: "new-list-id",
-        name: "Test List",
-        description: "Test description",
-        is_public: false,
-        tmdb_user_id: 12345,
-        list_items: [],
-        inserted_at: DateTime.utc_now(),
-        updated_at: DateTime.utc_now()
+      new_list = %{
+        "id" => 1003,
+        "name" => "Test List",
+        "description" => "Test description",
+        "public" => false,
+        "item_count" => 0,
+        "created_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "created_by" => 12345
       }
 
       # Track calls to get_user_lists to return the new list after creation
       {:ok, lists_agent} = Agent.start_link(fn -> [] end)
 
       get_user_lists_fn = fn _user_id ->
-        Agent.get(lists_agent, & &1)
+        {:ok, Agent.get(lists_agent, & &1)}
       end
 
       create_list_fn = fn _user_id, _attrs ->
@@ -171,7 +172,8 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
         {Lists, [:passthrough],
          [
            get_user_lists: get_user_lists_fn,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 0, total_movies: 0} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 0, total_movies: 0}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end,
            create_list: create_list_fn
          ]}
       ]) do
@@ -183,7 +185,7 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
         # Fill and submit form
         view
         |> form("[data-testid='list-form'] form",
-          user_movie_list: %{
+          list: %{
             name: "Test List",
             description: "Test description",
             is_public: false
@@ -211,13 +213,14 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
          ]},
         {Lists, [:passthrough],
          [
-           get_user_lists: fn _user_id -> raise "Database error" end,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 0, total_movies: 0} end
+           get_user_lists: fn _user_id -> {:error, :database_error} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 0, total_movies: 0}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end
          ]}
       ]) do
         {:ok, view, html} = live(conn, ~p"/my-lists")
 
-        assert html =~ "Failed to load your movie lists"
+        assert html =~ "Failed to load lists"
         assert has_element?(view, "[data-testid='error-state']")
       end
     end
@@ -231,8 +234,9 @@ defmodule FlixirWeb.UserMovieListsLiveTest do
          ]},
         {Lists, [:passthrough],
          [
-           get_user_lists: fn _user_id -> raise "Database error" end,
-           get_user_lists_summary: fn _user_id -> %{total_lists: 0, total_movies: 0} end
+           get_user_lists: fn _user_id -> {:error, :database_error} end,
+           get_user_lists_summary: fn _user_id -> {:ok, %{total_lists: 0, total_movies: 0}} end,
+           get_user_queue_stats: fn _user_id -> %{pending_operations: 0, failed_operations: 0} end
          ]}
       ]) do
         {:ok, view, _html} = live(conn, ~p"/my-lists")

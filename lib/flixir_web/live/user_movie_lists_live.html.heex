@@ -4,12 +4,24 @@ page_title={@page_title}
 current_section={@current_section}
 authenticated?={@authenticated?}
 >
+  <!-- Sync Status Bar -->
+  <div class="mb-4">
+    <.sync_status_bar
+      sync_status={@sync_status}
+      last_sync_at={@last_sync_at}
+      queue_stats={@queue_stats}
+      optimistic_updates={@optimistic_updates}
+    />
+  </div>
+
   <!-- Main Content -->
   <.user_lists_container
     lists={@lists}
     loading={@loading}
     error={@error}
     current_user={@current_user}
+    sync_status={@sync_status}
+    queue_stats={@queue_stats}
   />
 
   <!-- Create/Edit Form Modal -->
@@ -25,6 +37,7 @@ authenticated?={@authenticated?}
             form={@form_data}
             action={@show_form}
             title={if @show_form == :create, do: "Create New List", else: "Edit List"}
+            sync_status={@sync_status}
           />
         </div>
       </div>
@@ -36,6 +49,7 @@ authenticated?={@authenticated?}
     <.delete_confirmation_modal
       show={@show_delete_confirmation}
       list={@selected_list}
+      sync_status={@sync_status}
     />
   <% end %>
 
@@ -44,6 +58,17 @@ authenticated?={@authenticated?}
     <.clear_confirmation_modal
       show={@show_clear_confirmation}
       list={@selected_list}
+      sync_status={@sync_status}
     />
+  <% end %>
+
+  <!-- Queue Operations Modal -->
+  <%= if @queue_stats.pending_operations > 0 or @queue_stats.failed_operations > 0 do %>
+    <div class="fixed bottom-4 right-4 z-40">
+      <.queue_status_indicator
+        queue_stats={@queue_stats}
+        sync_status={@sync_status}
+      />
+    </div>
   <% end %>
 </.app_layout>

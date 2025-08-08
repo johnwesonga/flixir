@@ -51,6 +51,9 @@ Operations are automatically processed by the QueueProcessor, but you can also p
 
 # Process all pending operations
 Flixir.Lists.Queue.process_pending_operations()
+
+# Process all pending operations for a specific user
+Flixir.Lists.Queue.process_user_operations(tmdb_user_id)
 ```
 
 ### Monitoring

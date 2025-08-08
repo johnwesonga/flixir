@@ -144,6 +144,24 @@ defmodule Flixir.Lists.Queue do
   end
 
   @doc """
+  Processes all pending operations for a specific user.
+  """
+  def process_user_operations(tmdb_user_id) do
+    Logger.info("Processing pending operations for user", %{tmdb_user_id: tmdb_user_id})
+
+    user_operations = get_user_pending_operations(tmdb_user_id)
+
+    Enum.each(user_operations, fn operation ->
+      process_operation(operation)
+    end)
+
+    Logger.info("Completed processing user operations", %{
+      tmdb_user_id: tmdb_user_id,
+      operations_processed: length(user_operations)
+    })
+  end
+
+  @doc """
   Gets failed operations that can be retried.
   """
   def get_failed_operations(limit \\ 50) do

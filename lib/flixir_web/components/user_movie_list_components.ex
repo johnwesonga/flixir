@@ -25,6 +25,8 @@ defmodule FlixirWeb.UserMovieListComponents do
   attr :loading, :boolean, default: false, doc: "Whether content is loading"
   attr :error, :string, default: nil, doc: "Error message if any"
   attr :current_user, :map, default: nil, doc: "Current authenticated user"
+  attr :sync_status, :atom, default: :synced, doc: "Current sync status with TMDB"
+  attr :queue_stats, :map, default: %{}, doc: "Queue statistics for pending operations"
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
   def user_lists_container(assigns) do
@@ -100,7 +102,7 @@ defmodule FlixirWeb.UserMovieListComponents do
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
   def list_card(assigns) do
-    assigns = assign(assigns, :movie_count, length(assigns.list.list_items || []))
+    assigns = assign(assigns, :movie_count, Map.get(assigns.list, "item_count", 0))
 
     ~H"""
     <div
@@ -114,19 +116,25 @@ defmodule FlixirWeb.UserMovieListComponents do
       <div class="p-6 pb-4">
         <div class="flex items-start justify-between mb-3">
           <div class="flex-1 min-w-0">
-            <h3 class="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
-              {@list.name}
-            </h3>
-            <%= if @list.description && String.trim(@list.description) != "" do %>
+            <div class="flex items-center">
+              <h3 class="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
+                {@list["name"]}
+              </h3>
+              <!-- TMDB List ID Badge -->
+              <span class="ml-2 px-2 py-1 text-xs font-mono text-gray-500 bg-gray-100 rounded">
+                #{@list["id"]}
+              </span>
+            </div>
+            <%= if @list["description"] && String.trim(@list["description"]) != "" do %>
               <p class="text-sm text-gray-600 mt-1 line-clamp-2">
-                {@list.description}
+                {@list["description"]}
               </p>
             <% end %>
           </div>
 
           <!-- Privacy Status -->
           <div class="flex-shrink-0 ml-3">
-            <%= if @list.is_public do %>
+            <%= if Map.get(@list, "public", false) do %>
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 <.icon name="hero-globe-alt" class="w-3 h-3 mr-1" />
                 Public
@@ -148,9 +156,11 @@ defmodule FlixirWeb.UserMovieListComponents do
               <%= ngettext("1 movie", "%{count} movies", @movie_count) %>
             </span>
           </div>
-          <time datetime={DateTime.to_iso8601(@list.updated_at)}>
-            Updated {format_relative_date(@list.updated_at)}
-          </time>
+          <%= if @list["updated_at"] do %>
+            <time datetime={@list["updated_at"]}>
+              Updated {format_relative_date(parse_tmdb_date(@list["updated_at"]))}
+            </time>
+          <% end %>
         </div>
       </div>
 
@@ -160,17 +170,32 @@ defmodule FlixirWeb.UserMovieListComponents do
           <button
             type="button"
             phx-click="view_list"
-            phx-value-list-id={@list.id}
+            phx-value-list-id={@list["id"]}
             class="text-blue-600 hover:text-blue-800 text-sm font-medium transition-colors"
           >
             View List
           </button>
 
           <div class="flex items-center space-x-3">
+            <!-- Privacy Toggle -->
+            <button
+              type="button"
+              phx-click="toggle_privacy"
+              phx-value-list-id={@list["id"]}
+              class="text-purple-600 hover:text-purple-800 text-sm font-medium transition-colors"
+              title={if Map.get(@list, "public", false), do: "Make Private", else: "Make Public"}
+            >
+              <%= if Map.get(@list, "public", false) do %>
+                <.icon name="hero-lock-closed" class="w-4 h-4" />
+              <% else %>
+                <.icon name="hero-globe-alt" class="w-4 h-4" />
+              <% end %>
+            </button>
+
             <button
               type="button"
               phx-click="edit_list"
-              phx-value-list-id={@list.id}
+              phx-value-list-id={@list["id"]}
               class="text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors"
               data-testid="edit-list-button"
             >
@@ -181,7 +206,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <button
                 type="button"
                 phx-click="show_clear_confirmation"
-                phx-value-list-id={@list.id}
+                phx-value-list-id={@list["id"]}
                 class="text-orange-600 hover:text-orange-800 text-sm font-medium transition-colors"
                 data-testid="clear-list-button"
               >
@@ -192,7 +217,7 @@ defmodule FlixirWeb.UserMovieListComponents do
             <button
               type="button"
               phx-click="show_delete_confirmation"
-              phx-value-list-id={@list.id}
+              phx-value-list-id={@list["id"]}
               class="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
               data-testid="delete-list-button"
             >
@@ -219,6 +244,7 @@ defmodule FlixirWeb.UserMovieListComponents do
   attr :form, Phoenix.HTML.Form, required: true, doc: "The form struct"
   attr :action, :atom, required: true, values: [:create, :edit], doc: "Form action type"
   attr :title, :string, required: true, doc: "Form title"
+  attr :sync_status, :atom, default: :synced, doc: "Current sync status with TMDB"
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
   def list_form(assigns) do
@@ -228,11 +254,33 @@ defmodule FlixirWeb.UserMovieListComponents do
         <h2 class="text-xl font-semibold text-gray-900">{@title}</h2>
         <p class="text-sm text-gray-600 mt-1">
           <%= if @action == :create do %>
-            Create a new movie list to organize your favorite films.
+            Create a new movie list on TMDB to organize your favorite films.
           <% else %>
-            Update your list details and privacy settings.
+            Update your TMDB list details and privacy settings.
           <% end %>
         </p>
+
+        <!-- Sync Status in Form -->
+        <%= if assigns[:sync_status] && @sync_status != :synced do %>
+          <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+            <div class="flex items-center text-sm text-blue-700">
+              <%= case @sync_status do %>
+                <% :syncing -> %>
+                  <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Syncing with TMDB...</span>
+                <% :offline -> %>
+                  <.icon name="hero-wifi" class="w-4 h-4 mr-2" />
+                  <span>Will sync when TMDB is available</span>
+                <% :error -> %>
+                  <.icon name="hero-exclamation-triangle" class="w-4 h-4 mr-2" />
+                  <span>Sync error - changes may be queued</span>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
       </div>
 
       <.form for={@form} phx-submit={if @action == :create, do: "create_list", else: "update_list"}>
@@ -260,11 +308,12 @@ defmodule FlixirWeb.UserMovieListComponents do
         <.input
           field={@form[:is_public]}
           type="checkbox"
-          label="Make this list public"
+          label="Make this list public on TMDB"
         />
 
         <div class="text-xs text-gray-500 mt-1 mb-4">
-          Public lists can be viewed by other users, but only you can edit them.
+          Public lists can be viewed by other TMDB users and discovered through TMDB search.
+          Only you can edit your lists regardless of privacy setting.
         </div>
 
         <!-- Form Actions -->
@@ -325,10 +374,11 @@ defmodule FlixirWeb.UserMovieListComponents do
   """
   attr :show, :boolean, required: true, doc: "Whether to show the modal"
   attr :list, :map, required: true, doc: "The list to be deleted"
+  attr :sync_status, :atom, default: :synced, doc: "Current sync status with TMDB"
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
   def delete_confirmation_modal(assigns) do
-    assigns = assign(assigns, :movie_count, length(assigns.list.list_items || []))
+    assigns = assign(assigns, :movie_count, Map.get(assigns.list, "item_count", 0))
 
     ~H"""
     <div
@@ -354,16 +404,40 @@ defmodule FlixirWeb.UserMovieListComponents do
             <!-- Content -->
             <div class="text-center">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                Delete List
+                Delete TMDB List
               </h3>
               <p class="text-sm text-gray-600 mb-4">
-                Are you sure you want to delete "<strong>{@list.name}</strong>"?
+                Are you sure you want to delete "<strong>{@list["name"]}</strong>" from TMDB?
                 <%= if @movie_count > 0 do %>
-                  This will permanently remove the list and all {ngettext("1 movie", "%{count} movies", @movie_count)} in it.
+                  This will permanently remove the list and all {ngettext("1 movie", "%{count} movies", @movie_count)} in it from TMDB.
                 <% else %>
                   This action cannot be undone.
                 <% end %>
               </p>
+
+              <!-- TMDB List ID -->
+              <div class="text-xs text-gray-500 mb-4">
+                TMDB List ID: #{@list["id"]}
+              </div>
+
+              <!-- Sync Status Warning -->
+              <%= if assigns[:sync_status] && @sync_status != :synced do %>
+                <div class="p-2 bg-orange-50 border border-orange-200 rounded-md mb-4">
+                  <div class="flex items-center text-sm text-orange-700">
+                    <.icon name="hero-exclamation-triangle" class="w-4 h-4 mr-2" />
+                    <span>
+                      <%= case @sync_status do %>
+                        <% :offline -> %>
+                          Deletion will be queued until TMDB is available
+                        <% :syncing -> %>
+                          Currently syncing with TMDB
+                        <% :error -> %>
+                          Sync error - deletion may be queued
+                      <% end %>
+                    </span>
+                  </div>
+                </div>
+              <% end %>
             </div>
 
             <!-- Actions -->
@@ -379,7 +453,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <button
                 type="button"
                 phx-click="confirm_delete"
-                phx-value-list-id={@list.id}
+                phx-value-list-id={@list["id"]}
                 class="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 transition-colors"
                 data-testid="confirm-delete-button"
               >
@@ -405,10 +479,11 @@ defmodule FlixirWeb.UserMovieListComponents do
   """
   attr :show, :boolean, required: true, doc: "Whether to show the modal"
   attr :list, :map, required: true, doc: "The list to be cleared"
+  attr :sync_status, :atom, default: :synced, doc: "Current sync status with TMDB"
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
   def clear_confirmation_modal(assigns) do
-    assigns = assign(assigns, :movie_count, length(assigns.list.list_items || []))
+    assigns = assign(assigns, :movie_count, Map.get(assigns.list, "item_count", 0))
 
     ~H"""
     <div
@@ -434,13 +509,37 @@ defmodule FlixirWeb.UserMovieListComponents do
             <!-- Content -->
             <div class="text-center">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
-                Clear List
+                Clear TMDB List
               </h3>
               <p class="text-sm text-gray-600 mb-4">
-                Are you sure you want to remove all movies from "<strong>{@list.name}</strong>"?
+                Are you sure you want to remove all movies from "<strong>{@list["name"]}</strong>" on TMDB?
                 This will remove {ngettext("1 movie", "all %{count} movies", @movie_count)} but keep the list itself.
                 This action cannot be undone.
               </p>
+
+              <!-- TMDB List ID -->
+              <div class="text-xs text-gray-500 mb-4">
+                TMDB List ID: #{@list["id"]}
+              </div>
+
+              <!-- Sync Status Warning -->
+              <%= if assigns[:sync_status] && @sync_status != :synced do %>
+                <div class="p-2 bg-orange-50 border border-orange-200 rounded-md mb-4">
+                  <div class="flex items-center text-sm text-orange-700">
+                    <.icon name="hero-exclamation-triangle" class="w-4 h-4 mr-2" />
+                    <span>
+                      <%= case @sync_status do %>
+                        <% :offline -> %>
+                          Clear operation will be queued until TMDB is available
+                        <% :syncing -> %>
+                          Currently syncing with TMDB
+                        <% :error -> %>
+                          Sync error - clear operation may be queued
+                      <% end %>
+                    </span>
+                  </div>
+                </div>
+              <% end %>
             </div>
 
             <!-- Actions -->
@@ -456,7 +555,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <button
                 type="button"
                 phx-click="confirm_clear"
-                phx-value-list-id={@list.id}
+                phx-value-list-id={@list["id"]}
                 class="px-4 py-2 text-sm font-medium text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 transition-colors"
                 data-testid="confirm-clear-button"
               >
@@ -921,6 +1020,189 @@ defmodule FlixirWeb.UserMovieListComponents do
     """
   end
 
+  @doc """
+  Renders a sync status bar showing TMDB integration status and queue information.
+
+  ## Examples
+
+      <.sync_status_bar
+        sync_status={:synced}
+        last_sync_at={~U[2024-01-01 12:00:00Z]}
+        queue_stats={%{pending_operations: 0, failed_operations: 0}}
+        optimistic_updates={[]}
+      />
+  """
+  attr :sync_status, :atom, required: true, doc: "Current sync status"
+  attr :last_sync_at, :any, default: nil, doc: "Last successful sync timestamp"
+  attr :queue_stats, :map, required: true, doc: "Queue statistics"
+  attr :optimistic_updates, :list, default: [], doc: "Current optimistic updates"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def sync_status_bar(assigns) do
+    ~H"""
+    <div class={[
+      "bg-white border border-gray-200 rounded-lg p-4 shadow-sm",
+      @class
+    ]} data-testid="sync-status-bar">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+          <!-- Sync Status Indicator -->
+          <div class="flex items-center">
+            <%= case @sync_status do %>
+              <% :synced -> %>
+                <div class="flex items-center text-green-600">
+                  <.icon name="hero-check-circle" class="w-5 h-5 mr-2" />
+                  <span class="text-sm font-medium">Synced with TMDB</span>
+                </div>
+              <% :syncing -> %>
+                <div class="flex items-center text-blue-600">
+                  <svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span class="text-sm font-medium">Syncing...</span>
+                </div>
+              <% :offline -> %>
+                <div class="flex items-center text-orange-600">
+                  <.icon name="hero-wifi" class="w-5 h-5 mr-2" />
+                  <span class="text-sm font-medium">Offline Mode</span>
+                </div>
+              <% :error -> %>
+                <div class="flex items-center text-red-600">
+                  <.icon name="hero-exclamation-triangle" class="w-5 h-5 mr-2" />
+                  <span class="text-sm font-medium">Sync Error</span>
+                </div>
+            <% end %>
+          </div>
+
+          <!-- Last Sync Time -->
+          <%= if @last_sync_at do %>
+            <div class="text-sm text-gray-500">
+              Last synced {format_relative_date(@last_sync_at)}
+            </div>
+          <% end %>
+
+          <!-- Optimistic Updates Count -->
+          <%= if length(@optimistic_updates) > 0 do %>
+            <div class="flex items-center text-blue-600">
+              <.icon name="hero-clock" class="w-4 h-4 mr-1" />
+              <span class="text-sm">
+                {length(@optimistic_updates)} pending
+              </span>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="flex items-center space-x-3">
+          <!-- Queue Stats -->
+          <%= if @queue_stats.pending_operations > 0 or @queue_stats.failed_operations > 0 do %>
+            <div class="flex items-center space-x-2 text-sm">
+              <%= if @queue_stats.pending_operations > 0 do %>
+                <span class="text-orange-600">
+                  {ngettext("1 queued", "%{count} queued", @queue_stats.pending_operations)}
+                </span>
+              <% end %>
+              <%= if @queue_stats.failed_operations > 0 do %>
+                <span class="text-red-600">
+                  {ngettext("1 failed", "%{count} failed", @queue_stats.failed_operations)}
+                </span>
+              <% end %>
+            </div>
+          <% end %>
+
+          <!-- Action Buttons -->
+          <div class="flex items-center space-x-2">
+            <%= if @queue_stats.failed_operations > 0 do %>
+              <button
+                type="button"
+                phx-click="retry_failed_operations"
+                class="px-3 py-1 text-sm font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
+              >
+                Retry Failed
+              </button>
+            <% end %>
+
+            <button
+              type="button"
+              phx-click="sync_with_tmdb"
+              class="px-3 py-1 text-sm font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+              title="Force sync with TMDB"
+            >
+              <.icon name="hero-arrow-path" class="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
+  Renders a queue status indicator showing pending and failed operations.
+
+  ## Examples
+
+      <.queue_status_indicator
+        queue_stats={%{pending_operations: 3, failed_operations: 1}}
+        sync_status={:offline}
+      />
+  """
+  attr :queue_stats, :map, required: true, doc: "Queue statistics"
+  attr :sync_status, :atom, required: true, doc: "Current sync status"
+  attr :class, :string, default: "", doc: "Additional CSS classes"
+
+  def queue_status_indicator(assigns) do
+    ~H"""
+    <div class={[
+      "bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm",
+      @class
+    ]} data-testid="queue-status-indicator">
+      <div class="flex items-center justify-between mb-3">
+        <h4 class="text-sm font-semibold text-gray-900">Queue Status</h4>
+        <button
+          type="button"
+          phx-click="hide_queue_status"
+          class="text-gray-400 hover:text-gray-600"
+        >
+          <.icon name="hero-x-mark" class="w-4 h-4" />
+        </button>
+      </div>
+
+      <div class="space-y-2">
+        <%= if @queue_stats.pending_operations > 0 do %>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">Pending operations:</span>
+            <span class="font-medium text-orange-600">
+              {@queue_stats.pending_operations}
+            </span>
+          </div>
+        <% end %>
+
+        <%= if @queue_stats.failed_operations > 0 do %>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-600">Failed operations:</span>
+            <span class="font-medium text-red-600">
+              {@queue_stats.failed_operations}
+            </span>
+          </div>
+        <% end %>
+      </div>
+
+      <%= if @queue_stats.failed_operations > 0 do %>
+        <div class="mt-3 pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            phx-click="retry_failed_operations"
+            class="w-full px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors"
+          >
+            Retry Failed Operations
+          </button>
+        </div>
+      <% end %>
+    </div>
+    """
+  end
+
   # Helper functions
 
   defp format_relative_date(%DateTime{} = datetime) do
@@ -933,6 +1215,17 @@ defmodule FlixirWeb.UserMovieListComponents do
       _ -> Calendar.strftime(datetime, "%B %Y")
     end
   end
+
+  defp format_relative_date(nil), do: "never"
+
+  defp parse_tmdb_date(date_string) when is_binary(date_string) do
+    case DateTime.from_iso8601(date_string) do
+      {:ok, datetime, _} -> datetime
+      {:error, _} -> DateTime.utc_now()
+    end
+  end
+
+  defp parse_tmdb_date(_), do: DateTime.utc_now()
 
   defp error_message(:timeout), do: "The request timed out. Please check your connection and try again."
   defp error_message(:unauthorized), do: "You don't have permission to access these lists."
