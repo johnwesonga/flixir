@@ -2457,6 +2457,14 @@ The authentication system has been improved with more robust async result proces
 
 These improvements ensure the authentication flow remains stable and reliable regardless of how the underlying Auth context returns results from async operations.
 
+**Session Field Consistency Fix**
+Fixed a consistency issue in the authentication system:
+
+- **Database Schema Alignment**: Corrected `get_user_session/1` function to use `last_accessed_at` field instead of incorrect `last_activity_at`
+- **Query Consistency**: Ensured all session queries use the correct field names that match the database schema
+- **Improved Reliability**: Enhanced session validation and user session retrieval accuracy
+- **No Migration Required**: This was a code consistency fix that aligns with existing database schema
+
 ## Development Guidelines
 
 ### Code Quality & Debugging
