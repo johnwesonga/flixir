@@ -44,14 +44,16 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - Provides caching layer for performance optimization
 
 **Lists Context (`lib/flixir/lists.ex`)**
-- Manages user-created movie lists and collections with comprehensive validation
-- Provides full CRUD operations for personal movie lists with user authorization
-- Handles movie addition/removal from lists with duplicate prevention and error handling
-- Implements privacy controls for public/private lists with access control
-- Integrates with TMDB user authentication for data isolation
-- Supports list statistics and user collection analytics
-- Includes comprehensive error handling with user-friendly messages
-- Features proper logging for debugging and monitoring
+- Manages TMDB-native movie lists and collections with comprehensive validation
+- Provides full CRUD operations for TMDB movie lists with user authorization and cross-platform sync
+- Handles movie addition/removal from TMDB lists with duplicate prevention and error handling
+- Implements privacy controls for public/private TMDB lists with access control
+- Integrates with TMDB user authentication for secure session management and data isolation
+- Supports TMDB list statistics and user collection analytics with sync status monitoring
+- Includes comprehensive error handling with user-friendly messages and retry logic
+- Features proper logging for debugging and monitoring of TMDB operations
+- Provides offline support through queue system with automatic retry and exponential backoff
+- Implements optimistic updates with automatic rollback on API failures for seamless UX
 
 **Lists TMDB Client (`lib/flixir/lists/tmdb_client.ex`)**
 - HTTP client for TMDB Lists API operations with comprehensive error handling
@@ -91,42 +93,48 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Cleanup**: Automatic cleanup of old completed/cancelled operations
 
 **User Movie List Components (`lib/flixir_web/components/user_movie_list_components.ex`)**
-- Comprehensive UI component library for user movie list management
-- **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1`
-- **Display Components**: Rich `list_card/1` components showing list details, movie counts, and privacy status
-- **Interactive Forms**: Validated `list_form/1` for creating and editing lists with privacy controls
-- **Modal Components**: Confirmation dialogs for safe deletion (`delete_confirmation_modal/1`), list clearing (`clear_confirmation_modal/1`), and movie addition (`add_to_list_selector/1`)
-- **State Management**: Loading states with skeleton animations, empty states with call-to-action buttons, and error states with retry functionality
+- Comprehensive UI component library for TMDB movie list management
+- **Container Components**: Main layout with `user_lists_container/1` and responsive `lists_grid/1` with sync status indicators
+- **Display Components**: Rich `list_card/1` components showing TMDB list details, movie counts, privacy status, and sync indicators
+- **Interactive Forms**: Validated `list_form/1` for creating and editing TMDB lists with privacy controls and validation
+- **Modal Components**: Confirmation dialogs for safe deletion (`delete_confirmation_modal/1`), list clearing (`clear_confirmation_modal/1`), movie addition (`add_to_list_selector/1`), and share functionality
+- **Sync Status Components**: Real-time sync status indicators showing TMDB synchronization state (synced, syncing, offline, error)
+- **State Management**: Loading states with skeleton animations, empty states with call-to-action buttons, error states with retry functionality, and queue status displays
 - **Accessibility Features**: Proper ARIA labels, semantic HTML, keyboard navigation, and screen reader support
 - **Responsive Design**: Mobile-first design with Tailwind CSS responsive utilities
 - **Internationalization**: Support for multiple languages with proper pluralization using `ngettext`
 - **Testing Support**: Comprehensive `data-testid` attributes for reliable component testing
 
-**User Movie Lists LiveView (`lib/flixir_web/live/user_movie_lists_live.ex`)**
-- Complete LiveView implementation for managing user movie lists with comprehensive functionality
+**User Movie List LiveView (`lib/flixir_web/live/user_movie_list_live.ex`)**
+- Complete LiveView implementation for managing individual TMDB movie lists with comprehensive functionality
+- **TMDB-Native Integration**: Direct integration with TMDB Lists API for real-time synchronization across platforms
 - **Authentication Integration**: Automatic authentication checks with redirect handling for unauthenticated users
-- **List Management Interface**: Full CRUD operations for movie lists with real-time updates
-  - **Create Lists**: Modal-based list creation with form validation and error handling
-  - **Edit Lists**: In-place editing with dynamic form management and validation feedback
-  - **Delete Lists**: Safe deletion with confirmation modals and proper cleanup
-  - **Clear Lists**: Remove all movies from lists while preserving list metadata
+- **List Management Interface**: Full CRUD operations for TMDB movie lists with real-time updates and sync status
+  - **Edit Lists**: In-place editing with dynamic form management, validation feedback, and TMDB sync
+  - **Privacy Controls**: Toggle between public and private lists with optimistic updates and TMDB synchronization
+  - **Share Functionality**: Generate and copy TMDB share URLs for public lists with native TMDB integration
+- **Movie Management**: Comprehensive movie operations with TMDB API integration
+  - **Add Movies**: Add movies to TMDB lists with duplicate prevention and optimistic updates
+  - **Remove Movies**: Remove movies with confirmation modals and automatic rollback on failures
+  - **Movie Display**: Rich movie cards with TMDB data and loading states
+- **Sync Status Management**: Real-time synchronization status with TMDB
+  - **Status Indicators**: Visual indicators for synced, syncing, offline, and error states
+  - **Force Sync**: Manual synchronization with TMDB API for data consistency
+  - **Queue Integration**: Display and manage queued operations for offline support
+- **Optimistic Updates**: Immediate UI updates with automatic rollback on API failures for seamless UX
+- **Offline Support**: Queue operations when TMDB API is unavailable with automatic retry and exponential backoff
 - **Form State Management**: Comprehensive form handling with validation, error display, and state persistence
-  - **Dynamic Forms**: Context-aware forms that adapt for create vs. edit operations
-  - **Validation Integration**: Real-time validation with user-friendly error messages
-  - **Form Lifecycle**: Proper form initialization, submission, and cleanup
 - **Modal Operations**: Safe destructive operations with detailed confirmation dialogs
-  - **Delete Confirmation**: Shows list details and movie count before deletion
-  - **Clear Confirmation**: Confirms removal of all movies with impact information
-  - **Cancel Handling**: Easy cancellation of all modal operations with state cleanup
-- **Real-time Updates**: Live updates for all operations without page refreshes
-- **Statistics Integration**: Real-time display of list statistics and user collection analytics
-- **Error Handling**: Comprehensive error handling with retry mechanisms and user feedback
-- **Loading States**: Smooth loading indicators during all operations with proper state management
-- **User Authorization**: Ensures users can only access and modify their own lists with proper security
-- **Logging Integration**: Comprehensive logging for all user actions, system events, and error conditions
+  - **Remove Confirmation**: Shows movie details before removal from TMDB list
+  - **Share Modal**: Display TMDB share URLs with copy-to-clipboard functionality
+  - **Add Movie Modal**: Interface for adding movies by TMDB ID with validation
+- **Error Handling**: Comprehensive error handling with retry mechanisms, user feedback, and TMDB-specific error messages
+- **Loading States**: Smooth loading indicators during TMDB operations with proper state management
+- **User Authorization**: Ensures users can only access and modify their own TMDB lists with proper security
+- **Background Operations**: Asynchronous TMDB API operations with proper error handling and state updates
+- **Statistics Integration**: Real-time display of TMDB list statistics and sync status
 - **Component Integration**: Seamless integration with UserMovieListComponents for consistent UI
-- **Template Structure**: Clean HEEx template with modal overlays and app layout integration
-- **Modal Management**: Multiple modal types (form, delete confirmation, clear confirmation) with proper z-index stacking
+- **Template Structure**: Clean HEEx template with TMDB-specific features and modal overlays
 
 **Auth Context (`lib/flixir/auth.ex`)**
 - Manages user authentication and session handling

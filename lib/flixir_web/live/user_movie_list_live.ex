@@ -1,42 +1,61 @@
 defmodule FlixirWeb.UserMovieListLive do
   @moduledoc """
-  LiveView for viewing and managing a single user movie list.
+  LiveView for viewing and managing a single TMDB movie list.
 
-  This module handles the detailed view of an individual movie list, providing functionality
+  This module handles the detailed view of an individual TMDB movie list, providing functionality
   for viewing movies in the list, adding and removing movies, editing list details,
-  and displaying list statistics. It includes optimistic updates for better user experience
-  and comprehensive error handling.
+  displaying list statistics, and managing TMDB-specific features like sharing and visibility.
+  It includes optimistic updates for better user experience, comprehensive error handling
+  for TMDB API failures, and sync status indicators.
   """
 
   use FlixirWeb, :live_view
   import FlixirWeb.UserMovieListComponents
   alias Flixir.Lists
-  alias Flixir.Lists.UserMovieList
 
   require Logger
 
   @impl true
-  def mount(%{"id" => list_id}, _session, socket) do
+  def mount(%{"id" => tmdb_list_id_str}, _session, socket) do
     # Authentication state is handled by the on_mount hook
     if socket.assigns.authenticated? do
-      socket =
-        socket
-        |> assign(:list_id, list_id)
-        |> assign(:list, nil)
-        |> assign(:movies, [])
-        |> assign(:loading, true)
-        |> assign(:error, nil)
-        |> assign(:editing, false)
-        |> assign(:form_data, %{})
-        |> assign(:stats, %{})
-        |> assign(:show_add_movie_modal, false)
-        |> assign(:show_remove_confirmation, false)
-        |> assign(:selected_movie, nil)
-        |> assign(:page_title, "Movie List")
-        |> assign(:current_section, :lists)
-        |> load_list_data()
+      case Integer.parse(tmdb_list_id_str) do
+        {tmdb_list_id, ""} ->
+          socket =
+            socket
+            |> assign(:tmdb_list_id, tmdb_list_id)
+            |> assign(:list, nil)
+            |> assign(:movies, [])
+            |> assign(:loading, true)
+            |> assign(:error, nil)
+            |> assign(:editing, false)
+            |> assign(:form_data, %{})
+            |> assign(:stats, %{})
+            |> assign(:show_add_movie_modal, false)
+            |> assign(:show_remove_confirmation, false)
+            |> assign(:show_share_modal, false)
+            |> assign(:selected_movie, nil)
+            |> assign(:page_title, "Movie List")
+            |> assign(:current_section, :lists)
+            # TMDB-specific state
+            |> assign(:sync_status, :synced)
+            |> assign(:last_sync_at, nil)
+            |> assign(:optimistic_movies, [])
+            |> assign(:queued_operations, [])
+            |> assign(:tmdb_share_url, nil)
+            |> assign(:show_privacy_toggle, false)
+            |> load_list_data()
 
-      {:ok, socket}
+          {:ok, socket}
+
+        _ ->
+          socket =
+            socket
+            |> put_flash(:error, "Invalid list ID.")
+            |> redirect(to: ~p"/my-lists")
+
+          {:ok, socket}
+      end
     else
       # Redirect to login if not authenticated
       socket =
@@ -58,12 +77,17 @@ defmodule FlixirWeb.UserMovieListLive do
     list = socket.assigns.list
 
     if list do
-      changeset = UserMovieList.update_changeset(list, %{})
+      # Create form data from TMDB list data
+      form_data = %{
+        "name" => Map.get(list, "name", ""),
+        "description" => Map.get(list, "description", ""),
+        "is_public" => Map.get(list, "public", false)
+      }
 
       socket =
         socket
         |> assign(:editing, true)
-        |> assign(:form_data, to_form(changeset))
+        |> assign(:form_data, to_form(form_data))
 
       {:noreply, socket}
     else
@@ -72,16 +96,41 @@ defmodule FlixirWeb.UserMovieListLive do
   end
 
   @impl true
-  def handle_event("update_list", %{"user_movie_list" => list_params}, socket) do
-    list = socket.assigns.list
+  def handle_event("update_list", %{"list" => list_params}, socket) do
+    tmdb_list_id = socket.assigns.tmdb_list_id
     current_user = socket.assigns.current_user
 
-    case Lists.update_list(list, list_params) do
-      {:ok, updated_list} ->
-        Logger.info("User updated movie list", %{
+    # Set sync status to syncing
+    socket = assign(socket, :sync_status, :syncing)
+
+    case Lists.update_list(tmdb_list_id, current_user["id"], list_params) do
+      {:ok, :queued} ->
+        Logger.info("List update queued for TMDB sync", %{
           tmdb_user_id: current_user["id"],
-          list_id: updated_list.id,
-          list_name: updated_list.name
+          tmdb_list_id: tmdb_list_id
+        })
+
+        # Update local state optimistically
+        current_list = socket.assigns.list
+        updated_list = Map.merge(current_list, list_params)
+
+        socket =
+          socket
+          |> assign(:editing, false)
+          |> assign(:form_data, %{})
+          |> assign(:list, updated_list)
+          |> assign(:page_title, Map.get(updated_list, "name", "Movie List"))
+          |> assign(:sync_status, :offline)
+          |> put_flash(:info, "List updated locally. Changes will sync when TMDB is available.")
+          |> load_queued_operations()
+
+        {:noreply, socket}
+
+      {:ok, updated_list} ->
+        Logger.info("User updated TMDB movie list", %{
+          tmdb_user_id: current_user["id"],
+          tmdb_list_id: tmdb_list_id,
+          list_name: Map.get(updated_list, "name")
         })
 
         socket =
@@ -89,23 +138,36 @@ defmodule FlixirWeb.UserMovieListLive do
           |> assign(:editing, false)
           |> assign(:form_data, %{})
           |> assign(:list, updated_list)
-          |> assign(:page_title, updated_list.name)
-          |> put_flash(:info, "List \"#{updated_list.name}\" updated successfully!")
+          |> assign(:page_title, Map.get(updated_list, "name", "Movie List"))
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
+          |> put_flash(:info, "List \"#{Map.get(updated_list, "name")}\" updated successfully!")
           |> load_list_stats()
 
         {:noreply, socket}
 
-      {:error, changeset} ->
-        Logger.warning("Failed to update movie list", %{
+      {:error, reason} ->
+        Logger.warning("Failed to update TMDB movie list", %{
           tmdb_user_id: current_user["id"],
-          list_id: list.id,
-          errors: changeset.errors
+          tmdb_list_id: tmdb_list_id,
+          reason: inspect(reason)
         })
+
+        error_message =
+          case reason do
+            :name_required -> "List name is required."
+            :name_too_short -> "List name must be at least 3 characters."
+            :name_too_long -> "List name cannot exceed 100 characters."
+            :description_too_long -> "Description cannot exceed 500 characters."
+            :unauthorized -> "You don't have permission to update this list."
+            :not_found -> "List not found on TMDB."
+            _ -> "Failed to update list. Please try again."
+          end
 
         socket =
           socket
-          |> assign(:form_data, to_form(changeset))
-          |> put_flash(:error, "Failed to update list. Please check the form for errors.")
+          |> assign(:sync_status, :error)
+          |> put_flash(:error, error_message)
 
         {:noreply, socket}
     end
@@ -118,6 +180,100 @@ defmodule FlixirWeb.UserMovieListLive do
       |> assign(:editing, false)
       |> assign(:form_data, %{})
 
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("toggle_privacy", _params, socket) do
+    list = socket.assigns.list
+    tmdb_list_id = socket.assigns.tmdb_list_id
+    current_user = socket.assigns.current_user
+
+    if list do
+      current_privacy = Map.get(list, "public", false)
+      new_privacy = !current_privacy
+
+      # Optimistic update
+      updated_list = Map.put(list, "public", new_privacy)
+      socket = assign(socket, :list, updated_list)
+      socket = assign(socket, :sync_status, :syncing)
+
+      # Update via TMDB API
+      attrs = %{"is_public" => new_privacy}
+
+      send(
+        self(),
+        {:update_list_privacy, tmdb_list_id, current_user["id"], attrs, current_privacy}
+      )
+
+      privacy_text = if new_privacy, do: "public", else: "private"
+      socket = put_flash(socket, :info, "List is now #{privacy_text}.")
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "List not found.")}
+    end
+  end
+
+  @impl true
+  def handle_event("show_share_modal", _params, socket) do
+    list = socket.assigns.list
+    tmdb_list_id = socket.assigns.tmdb_list_id
+
+    if list && Map.get(list, "public", false) do
+      # Generate TMDB share URL
+      share_url = "https://www.themoviedb.org/list/#{tmdb_list_id}"
+
+      socket =
+        socket
+        |> assign(:show_share_modal, true)
+        |> assign(:tmdb_share_url, share_url)
+
+      {:noreply, socket}
+    else
+      {:noreply, put_flash(socket, :error, "Only public lists can be shared.")}
+    end
+  end
+
+  @impl true
+  def handle_event("cancel_share", _params, socket) do
+    socket =
+      socket
+      |> assign(:show_share_modal, false)
+      |> assign(:tmdb_share_url, nil)
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("copy_share_url", _params, socket) do
+    # The actual copying is handled by JavaScript
+    socket = put_flash(socket, :info, "Share URL copied to clipboard!")
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("sync_with_tmdb", _params, socket) do
+    tmdb_list_id = socket.assigns.tmdb_list_id
+    current_user = socket.assigns.current_user
+
+    socket = assign(socket, :sync_status, :syncing)
+
+    # Force refresh from TMDB
+    send(self(), {:force_sync_list, tmdb_list_id, current_user["id"]})
+
+    socket = put_flash(socket, :info, "Syncing with TMDB...")
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("retry_failed_operations", _params, socket) do
+    current_user = socket.assigns.current_user
+
+    # Trigger retry of failed operations
+    send(self(), {:retry_failed_operations, current_user["id"]})
+
+    socket = put_flash(socket, :info, "Retrying failed operations...")
     {:noreply, socket}
   end
 
@@ -141,7 +297,7 @@ defmodule FlixirWeb.UserMovieListLive do
 
   @impl true
   def handle_event("add_movie_by_id", %{"movie_id" => movie_id_str}, socket) do
-    list = socket.assigns.list
+    tmdb_list_id = socket.assigns.tmdb_list_id
 
     case Integer.parse(movie_id_str) do
       {movie_id, ""} ->
@@ -154,17 +310,19 @@ defmodule FlixirWeb.UserMovieListLive do
           "release_date" => nil,
           "vote_average" => 0,
           "added_at" => DateTime.utc_now(),
-          "list_id" => list.id,
-          "_loading" => true
+          "_loading" => true,
+          "_optimistic" => true
         }
 
         socket =
           socket
           |> assign(:movies, [optimistic_movie | socket.assigns.movies])
+          |> assign(:optimistic_movies, [movie_id | socket.assigns.optimistic_movies])
           |> assign(:show_add_movie_modal, false)
+          |> assign(:sync_status, :syncing)
 
-        # Add movie to list in background
-        send(self(), {:add_movie_to_list, movie_id})
+        # Add movie to TMDB list in background
+        send(self(), {:add_movie_to_tmdb_list, tmdb_list_id, movie_id})
 
         {:noreply, socket}
 
@@ -197,8 +355,13 @@ defmodule FlixirWeb.UserMovieListLive do
 
   @impl true
   def handle_event("confirm_remove_movie", %{"movie-id" => movie_id_str}, socket) do
+    tmdb_list_id = socket.assigns.tmdb_list_id
+
     case Integer.parse(movie_id_str) do
       {movie_id, ""} ->
+        # Store the movie being removed for potential rollback
+        removed_movie = Enum.find(socket.assigns.movies, &(&1["id"] == movie_id))
+
         # Optimistic update - remove movie from UI immediately
         updated_movies = Enum.reject(socket.assigns.movies, &(&1["id"] == movie_id))
 
@@ -207,9 +370,10 @@ defmodule FlixirWeb.UserMovieListLive do
           |> assign(:movies, updated_movies)
           |> assign(:show_remove_confirmation, false)
           |> assign(:selected_movie, nil)
+          |> assign(:sync_status, :syncing)
 
-        # Remove movie from list in background
-        send(self(), {:remove_movie_from_list, movie_id})
+        # Remove movie from TMDB list in background
+        send(self(), {:remove_movie_from_tmdb_list, tmdb_list_id, movie_id, removed_movie})
 
         {:noreply, socket}
 
@@ -250,23 +414,46 @@ defmodule FlixirWeb.UserMovieListLive do
     {:noreply, redirect(socket, to: ~p"/my-lists")}
   end
 
-  # Handle background movie operations
+  # Handle background TMDB operations
   @impl true
-  def handle_info({:add_movie_to_list, movie_id}, socket) do
-    list = socket.assigns.list
+  def handle_info({:add_movie_to_tmdb_list, tmdb_list_id, movie_id}, socket) do
     current_user = socket.assigns.current_user
 
-    case Lists.add_movie_to_list(list.id, movie_id, current_user["id"]) do
-      {:ok, _list_item} ->
-        Logger.info("Movie added to list", %{
+    case Lists.add_movie_to_list(tmdb_list_id, movie_id, current_user["id"]) do
+      {:ok, :queued} ->
+        Logger.info("Movie addition queued for TMDB sync", %{
           tmdb_user_id: current_user["id"],
-          list_id: list.id,
+          tmdb_list_id: tmdb_list_id,
           movie_id: movie_id
         })
 
-        # Reload movies to get actual movie data
+        # Keep optimistic update but mark as queued
+        optimistic_movies = List.delete(socket.assigns.optimistic_movies, movie_id)
+
         socket =
           socket
+          |> assign(:optimistic_movies, optimistic_movies)
+          |> assign(:sync_status, :offline)
+          |> load_queued_operations()
+          |> put_flash(:info, "Movie added locally. Will sync when TMDB is available.")
+
+        {:noreply, socket}
+
+      {:ok, :added} ->
+        Logger.info("Movie added to TMDB list", %{
+          tmdb_user_id: current_user["id"],
+          tmdb_list_id: tmdb_list_id,
+          movie_id: movie_id
+        })
+
+        # Remove from optimistic list and reload movies to get actual movie data
+        optimistic_movies = List.delete(socket.assigns.optimistic_movies, movie_id)
+
+        socket =
+          socket
+          |> assign(:optimistic_movies, optimistic_movies)
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
           |> load_list_movies()
           |> load_list_stats()
           |> put_flash(:info, "Movie added to list successfully!")
@@ -275,111 +462,261 @@ defmodule FlixirWeb.UserMovieListLive do
 
       {:error, :duplicate_movie} ->
         # Remove the optimistic movie and show error
-        updated_movies = Enum.reject(socket.assigns.movies, &(&1["id"] == movie_id && Map.get(&1, "_loading")))
+        updated_movies =
+          Enum.reject(
+            socket.assigns.movies,
+            &(&1["id"] == movie_id && Map.get(&1, "_optimistic"))
+          )
+
+        optimistic_movies = List.delete(socket.assigns.optimistic_movies, movie_id)
 
         socket =
           socket
           |> assign(:movies, updated_movies)
+          |> assign(:optimistic_movies, optimistic_movies)
+          |> assign(:sync_status, :synced)
           |> put_flash(:error, "This movie is already in your list.")
 
         {:noreply, socket}
 
       {:error, reason} ->
-        Logger.error("Failed to add movie to list", %{
+        Logger.error("Failed to add movie to TMDB list", %{
           tmdb_user_id: current_user["id"],
-          list_id: list.id,
+          tmdb_list_id: tmdb_list_id,
           movie_id: movie_id,
           reason: inspect(reason)
         })
 
         # Remove the optimistic movie and show error
-        updated_movies = Enum.reject(socket.assigns.movies, &(&1["id"] == movie_id && Map.get(&1, "_loading")))
+        updated_movies =
+          Enum.reject(
+            socket.assigns.movies,
+            &(&1["id"] == movie_id && Map.get(&1, "_optimistic"))
+          )
+
+        optimistic_movies = List.delete(socket.assigns.optimistic_movies, movie_id)
+
+        error_message =
+          case reason do
+            :unauthorized -> "You don't have permission to modify this list."
+            :not_found -> "List or movie not found."
+            _ -> "Failed to add movie to list. Please try again."
+          end
 
         socket =
           socket
           |> assign(:movies, updated_movies)
-          |> put_flash(:error, "Failed to add movie to list. Please try again.")
+          |> assign(:optimistic_movies, optimistic_movies)
+          |> assign(:sync_status, :error)
+          |> put_flash(:error, error_message)
 
         {:noreply, socket}
     end
   end
 
   @impl true
-  def handle_info({:remove_movie_from_list, movie_id}, socket) do
-    list = socket.assigns.list
+  def handle_info({:remove_movie_from_tmdb_list, tmdb_list_id, movie_id, removed_movie}, socket) do
     current_user = socket.assigns.current_user
 
-    case Lists.remove_movie_from_list(list.id, movie_id, current_user["id"]) do
-      {:ok, _list_item} ->
-        Logger.info("Movie removed from list", %{
+    case Lists.remove_movie_from_list(tmdb_list_id, movie_id, current_user["id"]) do
+      {:ok, :removed} ->
+        Logger.info("Movie removed from TMDB list", %{
           tmdb_user_id: current_user["id"],
-          list_id: list.id,
+          tmdb_list_id: tmdb_list_id,
           movie_id: movie_id
         })
 
         socket =
           socket
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
           |> load_list_stats()
           |> put_flash(:info, "Movie removed from list successfully!")
 
         {:noreply, socket}
 
-      {:error, reason} ->
-        Logger.error("Failed to remove movie from list", %{
+      {:ok, :queued} ->
+        Logger.info("Movie removal queued for TMDB sync", %{
           tmdb_user_id: current_user["id"],
-          list_id: list.id,
+          tmdb_list_id: tmdb_list_id,
+          movie_id: movie_id
+        })
+
+        socket =
+          socket
+          |> assign(:sync_status, :offline)
+          |> load_queued_operations()
+          |> put_flash(:info, "Movie removed locally. Will sync when TMDB is available.")
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        Logger.error("Failed to remove movie from TMDB list", %{
+          tmdb_user_id: current_user["id"],
+          tmdb_list_id: tmdb_list_id,
           movie_id: movie_id,
           reason: inspect(reason)
         })
 
         # Restore the movie to the UI since removal failed
+        restored_movies =
+          if removed_movie do
+            [removed_movie | socket.assigns.movies]
+          else
+            socket.assigns.movies
+          end
+
+        error_message =
+          case reason do
+            :unauthorized -> "You don't have permission to modify this list."
+            :not_found -> "Movie not found in list."
+            _ -> "Failed to remove movie from list. Please try again."
+          end
+
         socket =
           socket
-          |> load_list_movies()
-          |> put_flash(:error, "Failed to remove movie from list. Please try again.")
+          |> assign(:movies, restored_movies)
+          |> assign(:sync_status, :error)
+          |> put_flash(:error, error_message)
 
         {:noreply, socket}
     end
   end
 
+  @impl true
+  def handle_info(
+        {:update_list_privacy, tmdb_list_id, tmdb_user_id, attrs, original_privacy},
+        socket
+      ) do
+    case Lists.update_list(tmdb_list_id, tmdb_user_id, attrs) do
+      {:ok, :queued} ->
+        socket =
+          socket
+          |> assign(:sync_status, :offline)
+          |> load_queued_operations()
+          |> put_flash(:info, "Privacy setting will sync when TMDB is available.")
+
+        {:noreply, socket}
+
+      {:ok, updated_list} when is_map(updated_list) ->
+        Logger.info("List privacy updated via TMDB", %{
+          tmdb_list_id: tmdb_list_id,
+          tmdb_user_id: tmdb_user_id,
+          is_public: Map.get(updated_list, "public")
+        })
+
+        socket =
+          socket
+          |> assign(:list, updated_list)
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        Logger.error("Failed to update list privacy", %{
+          tmdb_list_id: tmdb_list_id,
+          reason: inspect(reason)
+        })
+
+        # Rollback optimistic update
+        current_list = socket.assigns.list
+        rollback_list = Map.put(current_list, "public", original_privacy)
+
+        socket =
+          socket
+          |> assign(:list, rollback_list)
+          |> assign(:sync_status, :error)
+          |> put_flash(:error, "Failed to update privacy setting. Please try again.")
+
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:force_sync_list, tmdb_list_id, tmdb_user_id}, socket) do
+    # Force refresh from TMDB by invalidating cache
+    case Lists.get_list(tmdb_list_id, tmdb_user_id) do
+      {:ok, fresh_list} ->
+        socket =
+          socket
+          |> assign(:list, fresh_list)
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
+          |> load_list_movies()
+          |> load_list_stats()
+          |> put_flash(:info, "List synced with TMDB successfully!")
+
+        {:noreply, socket}
+
+      {:error, reason} ->
+        Logger.error("Failed to sync list with TMDB", %{
+          tmdb_list_id: tmdb_list_id,
+          reason: inspect(reason)
+        })
+
+        socket =
+          socket
+          |> assign(:sync_status, :error)
+          |> put_flash(:error, "Failed to sync with TMDB. Please try again.")
+
+        {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_info({:retry_failed_operations, _tmdb_user_id}, socket) do
+    # This would trigger the queue processor to retry failed operations
+    # For now, just reload the queue status
+    socket =
+      socket
+      |> load_queued_operations()
+      |> put_flash(:info, "Retrying failed operations...")
+
+    {:noreply, socket}
+  end
+
   # Private helper functions
 
   defp load_list_data(socket) do
-    list_id = socket.assigns.list_id
+    tmdb_list_id = socket.assigns.tmdb_list_id
     current_user = socket.assigns.current_user
 
     try do
-      case Lists.get_list(list_id, current_user["id"]) do
+      case Lists.get_list(tmdb_list_id, current_user["id"]) do
         {:ok, list} ->
-          Logger.debug("Loaded list data", %{
+          Logger.debug("Loaded TMDB list data", %{
             tmdb_user_id: current_user["id"],
-            list_id: list_id,
-            list_name: list.name
+            tmdb_list_id: tmdb_list_id,
+            list_name: Map.get(list, "name")
           })
 
           socket
           |> assign(:list, list)
-          |> assign(:page_title, list.name)
+          |> assign(:page_title, Map.get(list, "name", "Movie List"))
           |> assign(:loading, false)
           |> assign(:error, nil)
+          |> assign(:sync_status, :synced)
+          |> assign(:last_sync_at, DateTime.utc_now())
           |> load_list_movies()
           |> load_list_stats()
+          |> load_queued_operations()
 
         {:error, :not_found} ->
-          Logger.warning("List not found", %{
+          Logger.warning("TMDB list not found", %{
             tmdb_user_id: current_user["id"],
-            list_id: list_id
+            tmdb_list_id: tmdb_list_id
           })
 
           socket
           |> assign(:loading, false)
-          |> assign(:error, "List not found.")
+          |> assign(:error, "List not found on TMDB.")
           |> redirect(to: ~p"/my-lists")
 
         {:error, :unauthorized} ->
-          Logger.warning("Unauthorized list access", %{
+          Logger.warning("Unauthorized TMDB list access", %{
             tmdb_user_id: current_user["id"],
-            list_id: list_id
+            tmdb_list_id: tmdb_list_id
           })
 
           socket
@@ -388,55 +725,77 @@ defmodule FlixirWeb.UserMovieListLive do
           |> redirect(to: ~p"/my-lists")
 
         {:error, reason} ->
-          Logger.error("Failed to load list", %{
+          Logger.error("Failed to load TMDB list", %{
             tmdb_user_id: current_user["id"],
-            list_id: list_id,
+            tmdb_list_id: tmdb_list_id,
             reason: inspect(reason)
           })
 
           socket
           |> assign(:loading, false)
-          |> assign(:error, "Failed to load list. Please try again.")
+          |> assign(:error, "Failed to load list from TMDB. Please try again.")
+          |> assign(:sync_status, :error)
       end
     rescue
       error ->
-        Logger.error("Exception loading list data", %{
+        Logger.error("Exception loading TMDB list data", %{
           tmdb_user_id: current_user["id"],
-          list_id: list_id,
+          tmdb_list_id: tmdb_list_id,
           error: inspect(error)
         })
 
         socket
         |> assign(:loading, false)
         |> assign(:error, "An unexpected error occurred. Please try again.")
+        |> assign(:sync_status, :error)
     end
   end
 
   defp load_list_movies(socket) do
-    list = socket.assigns.list
+    tmdb_list_id = socket.assigns.tmdb_list_id
     current_user = socket.assigns.current_user
 
-    if list do
-      case Lists.get_list_movies(list.id, current_user["id"]) do
+    if tmdb_list_id do
+      case Lists.get_list_movies(tmdb_list_id, current_user["id"]) do
         {:ok, movies} ->
-          Logger.debug("Loaded list movies", %{
+          Logger.debug("Loaded TMDB list movies", %{
             tmdb_user_id: current_user["id"],
-            list_id: list.id,
+            tmdb_list_id: tmdb_list_id,
             movie_count: length(movies)
           })
 
-          assign(socket, :movies, movies)
+          # Filter out any optimistic movies that are now confirmed
+          optimistic_movie_ids = socket.assigns.optimistic_movies
+
+          confirmed_movies =
+            Enum.reject(movies, fn movie ->
+              movie_id = movie["id"]
+              Enum.member?(optimistic_movie_ids, movie_id)
+            end)
+
+          # Keep optimistic movies that haven't been confirmed yet
+          optimistic_movies =
+            Enum.filter(socket.assigns.movies, fn movie ->
+              Map.get(movie, "_optimistic", false)
+            end)
+
+          all_movies = optimistic_movies ++ confirmed_movies
+
+          assign(socket, :movies, all_movies)
 
         {:error, reason} ->
-          Logger.error("Failed to load list movies", %{
+          Logger.error("Failed to load TMDB list movies", %{
             tmdb_user_id: current_user["id"],
-            list_id: list.id,
+            tmdb_list_id: tmdb_list_id,
             reason: inspect(reason)
           })
 
           socket
           |> assign(:movies, [])
-          |> put_flash(:error, "Failed to load movies. Some movie details may be unavailable.")
+          |> put_flash(
+            :error,
+            "Failed to load movies from TMDB. Some movie details may be unavailable."
+          )
       end
     else
       assign(socket, :movies, [])
@@ -444,19 +803,40 @@ defmodule FlixirWeb.UserMovieListLive do
   end
 
   defp load_list_stats(socket) do
-    list = socket.assigns.list
+    tmdb_list_id = socket.assigns.tmdb_list_id
+    current_user = socket.assigns.current_user
 
-    if list do
-      stats = Lists.get_list_stats(list.id)
+    if tmdb_list_id do
+      case Lists.get_list_stats(tmdb_list_id, current_user["id"]) do
+        {:ok, stats} ->
+          Logger.debug("Loaded TMDB list stats", %{
+            tmdb_list_id: tmdb_list_id,
+            movie_count: stats.movie_count
+          })
 
-      Logger.debug("Loaded list stats", %{
-        list_id: list.id,
-        movie_count: stats.movie_count
-      })
+          assign(socket, :stats, stats)
 
-      assign(socket, :stats, stats)
+        {:error, reason} ->
+          Logger.error("Failed to load TMDB list stats", %{
+            tmdb_list_id: tmdb_list_id,
+            reason: inspect(reason)
+          })
+
+          assign(socket, :stats, %{})
+      end
     else
       assign(socket, :stats, %{})
+    end
+  end
+
+  defp load_queued_operations(socket) do
+    current_user = socket.assigns.current_user
+
+    if current_user do
+      queue_stats = Lists.get_user_queue_stats(current_user["id"])
+      assign(socket, :queued_operations, queue_stats)
+    else
+      assign(socket, :queued_operations, %{})
     end
   end
 end

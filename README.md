@@ -33,14 +33,15 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Automatic Cleanup**: Background session cleanup for expired and idle sessions
 - **Error Recovery**: Comprehensive error handling with retry mechanisms
 
-### 📝 User Movie Lists
-> **Architecture Update**: The Lists system has been refactored to use TMDB's native Lists API as the primary data source, with local caching and queue systems for performance and reliability. This provides seamless synchronization with TMDB while maintaining excellent user experience.
+### 📝 TMDB Movie Lists
+> **Architecture Update**: The Lists system has been fully refactored to use TMDB's native Lists API as the primary data source, with local caching and queue systems for performance and reliability. This provides seamless synchronization with TMDB while maintaining excellent user experience.
 
-- **TMDB-Native Integration**: Uses TMDB's native Lists API as the primary data source for seamless synchronization
-- **Personal Collections**: Create and manage custom movie lists with TMDB authentication and session management
-- **List Management**: Full CRUD operations for personal movie collections with comprehensive validation and optimistic updates
-- **Movie Operations**: Add and remove movies from lists with duplicate prevention, real-time updates, and rollback capabilities
-- **Privacy Controls**: Public and private list visibility settings with user authorization and access control
+- **TMDB-Native Integration**: Uses TMDB's native Lists API as the primary data source for seamless synchronization across all TMDB-integrated applications
+- **Personal Collections**: Create and manage custom movie lists directly on TMDB with full authentication and session management
+- **List Management**: Full CRUD operations for TMDB movie collections with comprehensive validation and optimistic updates
+- **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention, real-time updates, and rollback capabilities
+- **Privacy Controls**: Public and private list visibility settings with TMDB authorization and access control
+- **Cross-Platform Sync**: Lists created in Flixir are automatically available in TMDB and other TMDB-integrated applications
 - **High-Performance Caching**: ETS-based Lists Cache system for optimal response times and reduced API calls
   - **Multi-Layer Caching**: User lists, individual lists, and list items cached separately with configurable TTL
   - **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
@@ -56,14 +57,16 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Optimistic Updates**: Immediate UI updates with automatic rollback on API failures for seamless user experience
 - **Comprehensive Error Handling**: Intelligent error classification, retry logic, and user-friendly error messages
 - **Statistics & Analytics**: List summaries, movie counts, user collection analytics, and queue monitoring
-- **Rich UI Components**: Comprehensive component library for list management including:
-  - **List Cards**: Visual cards showing list details, movie counts, and privacy status
-  - **Creation Forms**: Validated forms for creating and editing lists with privacy controls
-  - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations
-  - **Add to List Selector**: Modal interface for adding movies to existing lists
-  - **Statistics Display**: Both compact and detailed list statistics views with queue status
-  - **Loading States**: Skeleton loading animations and progress indicators
-  - **Empty States**: Helpful empty state messages with call-to-action buttons
+- **Rich UI Components**: Comprehensive component library for TMDB list management including:
+  - **List Cards**: Visual cards showing TMDB list details, movie counts, privacy status, and sync indicators
+  - **Creation Forms**: Validated forms for creating and editing TMDB lists with privacy controls
+  - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations for TMDB operations
+  - **Add to List Selector**: Modal interface for adding movies to existing TMDB lists
+  - **Statistics Display**: Both compact and detailed TMDB list statistics views with queue status and sync indicators
+  - **Sync Status Indicators**: Real-time display of TMDB synchronization status (synced, syncing, offline, error)
+  - **Share Functionality**: Generate and share public TMDB list URLs with copy-to-clipboard functionality
+  - **Loading States**: Skeleton loading animations and progress indicators for TMDB operations
+  - **Empty States**: Helpful empty state messages with call-to-action buttons for TMDB list creation
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -263,11 +266,11 @@ The authentication process follows TMDB's three-step authentication flow:
 - **Callback**: `/auth/callback` - Handles the return from TMDB after user approval
 - **Logout**: `/auth/logout` - Ends the user session and cleans up stored data
 
-#### User Movie Lists Routes
+#### TMDB Movie Lists Routes
 
-- **My Lists**: `/my-lists` - User movie lists overview and management dashboard (requires authentication)
-- **List Details**: `/my-lists/:id` - Individual list view with movie management (planned)
-- **List Sharing**: `/lists/:id/public` - Public list view for shared lists (planned)
+- **My Lists**: `/my-lists` - TMDB movie lists overview and management dashboard (requires authentication)
+- **List Details**: `/my-lists/:id` - Individual TMDB list view with movie management and sync status
+- **List Sharing**: TMDB lists can be shared via native TMDB URLs for public lists
 
 #### Authentication Configuration
 
@@ -311,7 +314,7 @@ CREATE TABLE auth_sessions (
 );
 ```
 
-The user movie lists feature requires the `queued_list_operations` table for queue system support, and optionally the `user_movie_lists` and `user_movie_list_items` tables for legacy/local storage (TMDB API is now the primary data source):
+The TMDB movie lists feature requires the `queued_list_operations` table for queue system support and offline functionality. The legacy `user_movie_lists` and `user_movie_list_items` tables are now optional as TMDB API is the primary data rce:sou
 
 ```sql
 -- Queued list operations table (for offline support and retry logic) - REQUIRED
@@ -568,64 +571,70 @@ For detailed Queue System documentation, see [`docs/queue_system.md`](docs/queue
 The main Lists context provides a high-level API that integrates TMDB API, caching, and queue systems:
 
 ```elixir
-# Create a new list (TMDB-native with caching and queue fallback)
+# Create a new TMDB list (native with caching and queue fallback)
 {:ok, list_data} = Flixir.Lists.create_list(tmdb_user_id, %{
   name: "My Watchlist",
   description: "Movies I want to watch",
   is_public: false
 })
+{:ok, :queued} = Flixir.Lists.create_list(tmdb_user_id, attrs)  # When TMDB API unavailable
 
-# Get all user lists (cache-first with TMDB fallback)
+# Get all user lists from TMDB (cache-first with TMDB fallback)
 {:ok, lists} = Flixir.Lists.get_user_lists(tmdb_user_id)
 
-# Get specific list (cache-first with authorization)
+# Get specific TMDB list (cache-first with authorization)
 {:ok, list_data} = Flixir.Lists.get_list(tmdb_list_id, tmdb_user_id)
 
-# Update list with optimistic updates
+# Update TMDB list with optimistic updates and sync status
 {:ok, updated_list} = Flixir.Lists.update_list(tmdb_list_id, tmdb_user_id, %{
-  name: "Updated Watchlist"
+  name: "Updated Watchlist",
+  description: "Updated description",
+  is_public: true
 })
+{:ok, :queued} = Flixir.Lists.update_list(tmdb_list_id, tmdb_user_id, attrs)  # Queued when offline
 
-# Delete list with optimistic updates
+# Delete TMDB list with optimistic updates
 {:ok, :deleted} = Flixir.Lists.delete_list(tmdb_list_id, tmdb_user_id)
 
-# Clear all movies from list
+# Clear all movies from TMDB list
 {:ok, :cleared} = Flixir.Lists.clear_list(tmdb_list_id, tmdb_user_id)
 
-# Add movie to list with duplicate prevention
+# Add movie to TMDB list with duplicate prevention
 {:ok, :added} = Flixir.Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
+{:ok, :queued} = Flixir.Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)  # Queued when offline
 
-# Remove movie from list
+# Remove movie from TMDB list
 {:ok, :removed} = Flixir.Lists.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
 
-# Get all movies in a list
+# Get all movies in a TMDB list
 {:ok, movies} = Flixir.Lists.get_list_movies(tmdb_list_id, tmdb_user_id)
 
-# Check if movie is in list
+# Check if movie is in TMDB list
 {:ok, true} = Flixir.Lists.movie_in_list?(tmdb_list_id, tmdb_movie_id, tmdb_user_id)
 
-# Get list statistics
+# Get TMDB list statistics
 {:ok, stats} = Flixir.Lists.get_list_stats(tmdb_list_id, tmdb_user_id)
 # Returns: %{movie_count: 15, created_at: "...", is_public: false, ...}
 
-# Get user's collection summary
+# Get user's TMDB collection summary
 {:ok, summary} = Flixir.Lists.get_user_lists_summary(tmdb_user_id)
 # Returns: %{total_lists: 5, total_movies: 47, public_lists: 2, ...}
 
-# Get queue statistics for user
+# Get queue statistics for user (offline operations)
 queue_stats = Flixir.Lists.get_user_queue_stats(tmdb_user_id)
 # Returns: %{pending_operations: 3, failed_operations: 1, last_sync_attempt: ...}
 ```
 
 **Lists Context Features:**
-- **TMDB-Native**: Uses TMDB Lists API as the primary data source for seamless synchronization
-- **Optimistic Updates**: Immediate cache updates with automatic rollback on API failures
-- **Cache Integration**: Automatic caching with configurable TTL and intelligent invalidation
-- **Queue Fallback**: Operations are queued when TMDB API is unavailable with automatic retry
-- **Session Management**: Integrates with Auth context for secure session handling
-- **Comprehensive Validation**: Input validation before API calls to prevent errors
-- **Error Classification**: Intelligent error handling with user-friendly messages
-- **Statistics & Analytics**: Built-in analytics for lists and user collections
+- **TMDB-Native**: Uses TMDB Lists API as the primary data source for seamless cross-platform synchronization
+- **Optimistic Updates**: Immediate cache updates with automatic rollback on API failures for better UX
+- **Cache Integration**: Automatic caching with configurable TTL and intelligent invalidation for performance
+- **Queue Fallback**: Operations are queued when TMDB API is unavailable with automatic retry and exponential backoff
+- **Session Management**: Integrates with Auth context for secure TMDB session handling
+- **Comprehensive Validation**: Input validation before API calls to prevent errors and improve reliability
+- **Error Classification**: Intelligent error handling with user-friendly messages and retry logic
+- **Statistics & Analytics**: Built-in analytics for TMDB lists with sync status monitoring
+- **Cross-Platform Sync**: Lists created in Flixir are immediately available in TMDB and other TMDB-integrated apps and user collections
 
 **Session Plug (`FlixirWeb.Plugs.AuthSession`):**
 The session plug automatically handles authentication state for all requests:
@@ -2870,6 +2879,60 @@ The `Flixir.Auth.TMDBClient` module provides the following functions:
 # Delete/invalidate session
 {:ok, %{success: true}} = TMDBClient.delete_session(session_id)
 ```
+
+### TMDB Movie Lists LiveView
+The `FlixirWeb.UserMovieListLive` module provides a comprehensive interface for managing individual TMDB movie lists:
+
+**Key Features:**
+- **TMDB-Native Operations**: Direct integration with TMDB Lists API for real-time synchronization
+- **Optimistic Updates**: Immediate UI updates with automatic rollback on API failures
+- **Sync Status Indicators**: Real-time display of synchronization status (synced, syncing, offline, error)
+- **Offline Support**: Queue operations when TMDB API is unavailable with automatic retry
+- **Privacy Controls**: Toggle list visibility between public and private with TMDB sync
+- **Share Functionality**: Generate and copy TMDB share URLs for public lists
+- **Movie Management**: Add and remove movies with duplicate prevention and error handling
+
+**LiveView Events:**
+```elixir
+# List management events
+"edit_list" -> Enter edit mode for list details
+"update_list" -> Save list changes to TMDB with validation
+"cancel_edit" -> Cancel editing without saving changes
+"toggle_privacy" -> Switch between public/private with optimistic updates
+
+# Movie management events
+"show_add_movie_modal" -> Display movie addition interface
+"add_movie_by_id" -> Add movie to TMDB list with optimistic updates
+"show_remove_confirmation" -> Display removal confirmation modal
+"confirm_remove_movie" -> Remove movie from TMDB list
+
+# Sync and sharing events
+"sync_with_tmdb" -> Force refresh from TMDB API
+"retry_failed_operations" -> Retry queued operations
+"show_share_modal" -> Display share interface for public lists
+"copy_share_url" -> Copy TMDB share URL to clipboard
+
+# Navigation events
+"back_to_lists" -> Return to lists overview
+"retry" -> Retry failed operations or reload data
+```
+
+**State Management:**
+The LiveView maintains comprehensive state for TMDB integration:
+- **List Data**: Current TMDB list information with metadata
+- **Movies**: List of movies with optimistic updates and loading states
+- **Sync Status**: Current synchronization state with TMDB (`:synced`, `:syncing`, `:offline`, `:error`)
+- **Queue Operations**: Pending operations for offline support
+- **Form State**: Edit forms with validation and error handling
+- **Modal State**: Various modal interfaces for user interactions
+
+**Background Operations:**
+The LiveView handles asynchronous TMDB operations:
+- **Movie Addition**: Background API calls with optimistic UI updates
+- **Movie Removal**: Async removal with rollback on failure
+- **List Updates**: Privacy changes and metadata updates with sync status
+- **Force Sync**: Manual synchronization with TMDB API
+- **Queue Processing**: Retry failed operations and process pending changes
 
 **Error Handling:**
 The client handles various error scenarios:

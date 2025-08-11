@@ -40,7 +40,7 @@
   - Add offline mode support with queued operations display
   - _Requirements: 9.1, 9.2, 10.1, 10.2, 11.1, 11.2, 11.3, 11.4, 11.5, 12.1, 12.2_
 
-- [ ] 6. Update individual list LiveView for TMDB integration
+- [x] 6. Update individual list LiveView for TMDB integration
   - Refactor `FlixirWeb.UserMovieListLive` to use TMDB list IDs and data structures
   - Implement optimistic movie addition and removal with TMDB API integration
   - Add TMDB list sharing and external link functionality

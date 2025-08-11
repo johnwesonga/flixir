@@ -63,34 +63,52 @@
 
               <.form for={@form_data} phx-submit="update_list">
                 <!-- List Name -->
-                <.input
-                  field={@form_data[:name]}
-                  type="text"
-                  label="List Name"
-                  placeholder="e.g., My Watchlist, Favorite Comedies"
-                  required
-                  maxlength="100"
-                />
+                <div class="mb-4">
+                  <label for="list_name" class="block text-sm font-medium text-gray-700 mb-2">
+                    List Name
+                  </label>
+                  <input
+                    type="text"
+                    id="list_name"
+                    name="list[name]"
+                    value={@form_data.data["name"]}
+                    placeholder="e.g., My Watchlist, Favorite Comedies"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    maxlength="100"
+                  />
+                </div>
 
                 <!-- Description -->
-                <.input
-                  field={@form_data[:description]}
-                  type="textarea"
-                  label="Description (Optional)"
-                  placeholder="Describe what this list is about..."
-                  rows="3"
-                  maxlength="500"
-                />
+                <div class="mb-4">
+                  <label for="list_description" class="block text-sm font-medium text-gray-700 mb-2">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    id="list_description"
+                    name="list[description]"
+                    rows="3"
+                    placeholder="Describe what this list is about..."
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    maxlength="500"
+                  >{@form_data.data["description"]}</textarea>
+                </div>
 
                 <!-- Privacy Setting -->
-                <.input
-                  field={@form_data[:is_public]}
-                  type="checkbox"
-                  label="Make this list public"
-                />
-
-                <div class="text-xs text-gray-500 mt-1 mb-4">
-                  Public lists can be viewed by other users, but only you can edit them.
+                <div class="mb-4">
+                  <label class="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="list[is_public]"
+                      value="true"
+                      checked={@form_data.data["is_public"]}
+                      class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <span class="ml-2 text-sm text-gray-700">Make this list public</span>
+                  </label>
+                  <div class="text-xs text-gray-500 mt-1">
+                    Public lists can be viewed by other TMDB users and shared externally.
+                  </div>
                 </div>
 
                 <!-- Form Actions -->
@@ -116,31 +134,120 @@
           <% else %>
             <!-- List Header Display -->
             <.header>
-              {@list.name}
+              {Map.get(@list, "name", "Movie List")}
               <:subtitle>
-                <%= if @list.description && String.trim(@list.description) != "" do %>
-                  {@list.description}
-                <% else %>
-                  <span class="text-gray-500 italic">No description</span>
-                <% end %>
+                <div class="space-y-2">
+                  <%= if Map.get(@list, "description") && String.trim(Map.get(@list, "description")) != "" do %>
+                    <p>{Map.get(@list, "description")}</p>
+                  <% else %>
+                    <p class="text-gray-500 italic">No description</p>
+                  <% end %>
+                  
+                  <!-- TMDB List Info -->
+                  <div class="flex items-center space-x-4 text-sm text-gray-600">
+                    <span class="inline-flex items-center">
+                      <.icon name="hero-identification" class="w-4 h-4 mr-1" />
+                      TMDB ID: {@tmdb_list_id}
+                    </span>
+                    
+                    <%= if Map.get(@list, "public", false) do %>
+                      <span class="inline-flex items-center text-green-600">
+                        <.icon name="hero-globe-alt" class="w-4 h-4 mr-1" />
+                        Public
+                      </span>
+                    <% else %>
+                      <span class="inline-flex items-center text-gray-500">
+                        <.icon name="hero-lock-closed" class="w-4 h-4 mr-1" />
+                        Private
+                      </span>
+                    <% end %>
+                    
+                    <!-- Sync Status -->
+                    <span class="inline-flex items-center">
+                      <%= case @sync_status do %>
+                        <% :synced -> %>
+                          <.icon name="hero-check-circle" class="w-4 h-4 mr-1 text-green-500" />
+                          <span class="text-green-600">Synced</span>
+                        <% :syncing -> %>
+                          <svg class="animate-spin w-4 h-4 mr-1 text-blue-500" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span class="text-blue-600">Syncing...</span>
+                        <% :offline -> %>
+                          <.icon name="hero-wifi" class="w-4 h-4 mr-1 text-yellow-500" />
+                          <span class="text-yellow-600">Offline</span>
+                        <% :error -> %>
+                          <.icon name="hero-exclamation-triangle" class="w-4 h-4 mr-1 text-red-500" />
+                          <span class="text-red-600">Sync Error</span>
+                      <% end %>
+                    </span>
+                    
+                    <%= if @last_sync_at do %>
+                      <span class="text-xs text-gray-500">
+                        Last synced: {Calendar.strftime(@last_sync_at, "%H:%M")}
+                      </span>
+                    <% end %>
+                  </div>
+                </div>
               </:subtitle>
               <:actions>
-                <button
-                  phx-click="show_add_movie_modal"
-                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
-                  data-testid="add-movie-button"
-                >
-                  <.icon name="hero-plus" class="w-4 h-4 mr-2" />
-                  Add Movie
-                </button>
-                <button
-                  phx-click="edit_list"
-                  class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                  data-testid="edit-list-button"
-                >
-                  <.icon name="hero-pencil" class="w-4 h-4 mr-2" />
-                  Edit List
-                </button>
+                <div class="flex items-center space-x-2">
+                  <!-- Privacy Toggle -->
+                  <button
+                    phx-click="toggle_privacy"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    title={if Map.get(@list, "public", false), do: "Make Private", else: "Make Public"}
+                  >
+                    <%= if Map.get(@list, "public", false) do %>
+                      <.icon name="hero-lock-closed" class="w-4 h-4 mr-1" />
+                      Make Private
+                    <% else %>
+                      <.icon name="hero-globe-alt" class="w-4 h-4 mr-1" />
+                      Make Public
+                    <% end %>
+                  </button>
+                  
+                  <!-- Share Button (only for public lists) -->
+                  <%= if Map.get(@list, "public", false) do %>
+                    <button
+                      phx-click="show_share_modal"
+                      class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                      data-testid="share-list-button"
+                    >
+                      <.icon name="hero-share" class="w-4 h-4 mr-1" />
+                      Share
+                    </button>
+                  <% end %>
+                  
+                  <!-- Sync Button -->
+                  <button
+                    phx-click="sync_with_tmdb"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    disabled={@sync_status == :syncing}
+                    data-testid="sync-button"
+                  >
+                    <.icon name="hero-arrow-path" class="w-4 h-4 mr-1" />
+                    Sync
+                  </button>
+                  
+                  <button
+                    phx-click="show_add_movie_modal"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+                    data-testid="add-movie-button"
+                  >
+                    <.icon name="hero-plus" class="w-4 h-4 mr-2" />
+                    Add Movie
+                  </button>
+                  <button
+                    phx-click="edit_list"
+                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                    data-testid="edit-list-button"
+                  >
+                    <.icon name="hero-pencil" class="w-4 h-4 mr-2" />
+                    Edit List
+                  </button>
+                </div>
               </:actions>
             </.header>
 
@@ -148,6 +255,31 @@
             <div class="mt-6">
               <.list_stats stats={@stats} compact={true} />
             </div>
+            
+            <!-- Queue Status (show if there are pending operations) -->
+            <%= if Map.get(@queued_operations, :pending_operations, 0) > 0 do %>
+              <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center">
+                    <.icon name="hero-clock" class="w-5 h-5 text-yellow-600 mr-2" />
+                    <div>
+                      <p class="text-sm font-medium text-yellow-800">
+                        {Map.get(@queued_operations, :pending_operations, 0)} operations pending sync
+                      </p>
+                      <p class="text-xs text-yellow-600">
+                        Changes will sync automatically when TMDB is available
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    phx-click="retry_failed_operations"
+                    class="px-3 py-1 text-xs font-medium text-yellow-800 bg-yellow-100 border border-yellow-300 rounded hover:bg-yellow-200 transition-colors"
+                  >
+                    Retry Now
+                  </button>
+                </div>
+              </div>
+            <% end %>
           <% end %>
         </div>
 
@@ -376,6 +508,77 @@
                 data-testid="confirm-remove-movie"
               >
                 Remove Movie
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  <% end %>
+
+  <!-- Share List Modal -->
+  <%= if @show_share_modal && @tmdb_share_url do %>
+    <div class="fixed inset-0 z-50 overflow-y-auto" data-testid="share-list-modal">
+      <!-- Backdrop -->
+      <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
+
+      <!-- Modal -->
+      <div class="flex min-h-full items-center justify-center p-4">
+        <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
+          <div class="p-6">
+            <!-- Header -->
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">
+                Share List
+              </h3>
+              <button
+                type="button"
+                phx-click="cancel_share"
+                class="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <.icon name="hero-x-mark" class="h-5 w-5" />
+              </button>
+            </div>
+
+            <!-- Content -->
+            <div class="space-y-4">
+              <p class="text-sm text-gray-600">
+                Share this public list with others using the TMDB link below:
+              </p>
+              
+              <div class="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={@tmdb_share_url}
+                  readonly
+                  class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md bg-gray-50 focus:outline-none"
+                  data-testid="share-url-input"
+                />
+                <button
+                  type="button"
+                  phx-click="copy_share_url"
+                  onclick="navigator.clipboard.writeText(this.previousElementSibling.value)"
+                  class="px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
+                  data-testid="copy-url-button"
+                >
+                  Copy
+                </button>
+              </div>
+              
+              <div class="text-xs text-gray-500">
+                <p>This link will open the list on TMDB where others can view your movies.</p>
+                <p class="mt-1">Only you can edit the list, but anyone can view it when it's public.</p>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex items-center justify-end space-x-3 mt-6">
+              <button
+                type="button"
+                phx-click="cancel_share"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Close
               </button>
             </div>
           </div>
