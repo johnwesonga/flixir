@@ -472,8 +472,8 @@ defmodule Flixir.Auth do
     case from(s in Session,
       where: s.tmdb_user_id == ^tmdb_user_id and
              s.expires_at > ^now and
-             s.last_activity_at > ^DateTime.add(now, -get_session_max_idle(), :second),
-      order_by: [desc: s.last_activity_at],
+             s.last_accessed_at > ^DateTime.add(now, -get_session_max_idle(), :second),
+      order_by: [desc: s.last_accessed_at],
       limit: 1
     )
     |> Repo.one() do

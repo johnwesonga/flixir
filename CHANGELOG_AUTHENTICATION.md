@@ -53,6 +53,14 @@ The following documentation files have been updated to reflect these changes:
 - **Environment-Based**: Configuration follows 12-factor app principles using environment variables
 - **Secure by Default**: Authentication system is available but requires explicit API key configuration
 
+## Recent Fixes
+
+### Session Field Consistency (Latest)
+- **Fixed session query consistency** in `get_user_session/1` function
+- **Corrected field reference** from `last_activity_at` to `last_accessed_at` to match database schema
+- **Improved reliability** of session validation and user session retrieval
+- **No migration required** - this was a code consistency fix
+
 ## Migration
 
 Existing installations will automatically benefit from this change. No migration steps are required - the authentication system will become active as soon as the `TMDB_API_KEY` environment variable is set.
