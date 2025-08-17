@@ -143,6 +143,16 @@ mix test --grep "authentication"
 mix test --grep "api"
 ```
 
+### Code Quality & Formatting
+
+The codebase maintains high quality standards with consistent formatting:
+
+- **Elixir Code**: Standard formatting with `mix format`
+- **Phoenix Templates**: Modern HEEx template syntax with consistent indentation
+- **Component Structure**: Well-organized component files with proper spacing and readability
+- **Template Syntax**: Updated to use modern Phoenix LiveView syntax patterns
+- **Code Organization**: Logical grouping of functions and clear separation of concerns
+
 ### Test Categories
 - **Authentication Tests**: Complete TMDB authentication flow testing including:
   - **End-to-End Flow**: Full authentication process from login initiation to session storage
@@ -275,6 +285,7 @@ Error responses:
 - **Routing Structure**: [`docs/routing_structure.md`](docs/routing_structure.md) - Detailed routing organization and pipeline documentation
 - **Lists Cache**: [`docs/lists_cache.md`](docs/lists_cache.md) - ETS-based caching system documentation
 - **Queue System**: [`docs/queue_system.md`](docs/queue_system.md) - Offline operations and retry logic documentation
+- **Development Guide**: [`docs/development_guide.md`](docs/development_guide.md) - Code quality standards, formatting guidelines, and development best practices
 
 ### Changelog
 
@@ -283,6 +294,7 @@ Error responses:
 - **Authentication Changes**: [`CHANGELOG_AUTHENTICATION.md`](CHANGELOG_AUTHENTICATION.md) - Authentication system configuration updates
 - **Edit Mode Enhancement**: [`CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md`](CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md) - Automatic edit mode activation and direct edit route access
 - **UI Simplification**: [`CHANGELOG_UI_SIMPLIFICATION.md`](CHANGELOG_UI_SIMPLIFICATION.md) - Edit button removal and interface streamlining
+- **Code Formatting**: [`CHANGELOG_CODE_FORMATTING.md`](CHANGELOG_CODE_FORMATTING.md) - Comprehensive code formatting improvements and modern HEEx syntax adoption
 
 ## Getting Started
 
