@@ -295,6 +295,7 @@ Error responses:
 - **Edit Mode Enhancement**: [`CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md`](CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md) - Automatic edit mode activation and direct edit route access
 - **UI Simplification**: [`CHANGELOG_UI_SIMPLIFICATION.md`](CHANGELOG_UI_SIMPLIFICATION.md) - Edit button removal and interface streamlining
 - **Code Formatting**: [`CHANGELOG_CODE_FORMATTING.md`](CHANGELOG_CODE_FORMATTING.md) - Comprehensive code formatting improvements and modern HEEx syntax adoption
+- **LiveView Architecture**: [`CHANGELOG_LIVEVIEW_ARCHITECTURE_CONSISTENCY.md`](CHANGELOG_LIVEVIEW_ARCHITECTURE_CONSISTENCY.md) - Standardized import patterns and AppLayout integration across all LiveView modules
 
 ## Getting Started
 
