@@ -1,3 +1,9 @@
+<.app_layout 
+current_user={@current_user} 
+page_title={@page_title} 
+current_section={@current_section}
+authenticated?={@authenticated?}
+>
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
   <%= if @error do %>
     <!-- Error State -->
@@ -497,3 +503,4 @@
     </div>
   <% end %>
 </div>
+</.app_layout>

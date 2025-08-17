@@ -11,6 +11,7 @@ defmodule FlixirWeb.UserMovieListLive do
 
   use FlixirWeb, :live_view
   import FlixirWeb.UserMovieListComponents
+  import FlixirWeb.AppLayout
   alias Flixir.Lists
 
   require Logger

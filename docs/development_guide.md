@@ -98,6 +98,27 @@ All web-related code is in `lib/flixir_web/`:
 - Components provide reusable UI elements
 - Plugs handle cross-cutting concerns like authentication
 
+#### LiveView Architecture Patterns
+LiveView modules follow consistent import patterns for shared functionality:
+
+**Standard LiveView Imports:**
+```elixir
+use FlixirWeb, :live_view
+import FlixirWeb.AppLayout          # Application layout and navigation components
+import FlixirWeb.CoreComponents     # Core UI components (buttons, forms, etc.)
+import FlixirWeb.[Context]Components # Context-specific components
+alias Flixir.[Context]              # Business logic contexts
+```
+
+**AppLayout Integration:**
+All LiveView modules import `FlixirWeb.AppLayout` to access:
+- `app_layout/1` component for consistent page structure
+- Navigation helper functions (`movie_nav_items/0`, `review_nav_items/0`)
+- Unified header, footer, and sub-navigation components
+- Authentication state management across pages
+
+This pattern ensures consistent UI structure and navigation behavior across all LiveView pages.
+
 ### Database Patterns
 - Ecto schemas define data structures
 - Changesets handle validation and data transformation
