@@ -1264,7 +1264,27 @@ The application uses Phoenix LiveView for interactive, real-time user interfaces
 - **`movie_details_live.ex`**: Detailed movie/TV show pages with reviews
 - **`reviews_live.ex`**: Review browsing with advanced filtering
 - **`user_movie_lists_live.ex`**: Personal movie list management dashboard
+- **`user_movie_list_live.ex`**: Individual TMDB movie list view and editing interface
 - **`auth_live.ex`**: Authentication flow handling (login, callback, logout)
+
+**LiveView Architecture Patterns:**
+All LiveView modules follow a consistent import structure for shared functionality:
+
+```elixir
+defmodule FlixirWeb.ExampleLive do
+  use FlixirWeb, :live_view
+  import FlixirWeb.AppLayout          # Application layout and navigation
+  import FlixirWeb.CoreComponents     # Core UI components
+  import FlixirWeb.ExampleComponents  # Context-specific components
+  alias Flixir.ExampleContext        # Business logic contexts
+end
+```
+
+**AppLayout Integration:**
+- **Unified Layout**: All LiveViews import `FlixirWeb.AppLayout` for consistent page structure
+- **Navigation Components**: Access to `app_layout/1` component with integrated navigation
+- **Helper Functions**: Navigation item generators (`movie_nav_items/0`, `review_nav_items/0`)
+- **Authentication State**: Consistent authentication UI across all pages
 
 **LiveView Features:**
 - **Real-time Updates**: Instant UI updates without page refreshes

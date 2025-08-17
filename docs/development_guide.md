@@ -64,6 +64,31 @@ When developing Phoenix LiveView components:
 5. **Test component rendering** with various data states
 6. **Follow accessibility guidelines** with proper ARIA attributes
 
+#### LiveView Module Structure
+
+Follow this standard structure for LiveView modules:
+
+```elixir
+defmodule FlixirWeb.ExampleLive do
+  @moduledoc """
+  LiveView module documentation describing purpose and functionality.
+  """
+
+  use FlixirWeb, :live_view
+  import FlixirWeb.AppLayout          # Always import for layout consistency
+  import FlixirWeb.CoreComponents     # Core UI components
+  import FlixirWeb.ExampleComponents  # Context-specific components
+  alias Flixir.ExampleContext        # Business logic context
+
+  # Mount, handle_params, handle_event, handle_info functions...
+end
+```
+
+**Key Import Requirements:**
+- `FlixirWeb.AppLayout` - Required for all LiveView modules using `app_layout/1`
+- Context-specific component modules for specialized UI elements
+- Business logic contexts via `alias` for clean separation of concerns
+
 ### Template Guidelines
 
 - Use `{}` syntax for simple Elixir expressions in templates
