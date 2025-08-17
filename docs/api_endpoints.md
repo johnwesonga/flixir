@@ -568,6 +568,44 @@ The API respects TMDB's rate limits and implements intelligent retry logic:
 - Queue system for operations when API is temporarily unavailable
 - Cache-first approach to reduce API calls
 
+## Movie Details Integration
+
+The TMDB Lists API is seamlessly integrated into movie detail pages, providing users with the ability to manage their lists directly from the movie viewing experience.
+
+### Features
+
+- **Real-time List Membership**: Movie detail pages display which lists contain the current movie
+- **Quick Add Interface**: Modal selector for adding movies to existing lists
+- **Optimistic Updates**: Immediate UI feedback with automatic rollback on failures
+- **List Status Indicators**: Visual feedback for pending operations and sync status
+
+### Integration Points
+
+The movie details page (`/media/movie/:id`) integrates with the following API endpoints:
+
+1. **Get User Lists**: Automatically loads user's lists to display membership status
+2. **Add Movie to List**: Provides quick-add functionality via modal interface
+3. **Remove Movie from List**: Allows removal directly from the movie page
+4. **Check Movie Membership**: Displays real-time membership status for all user lists
+
+### User Experience Flow
+
+1. User navigates to a movie detail page
+2. If authenticated, the page loads user's TMDB lists
+3. Movie membership status is displayed for each list
+4. User can add/remove the movie from lists with immediate visual feedback
+5. Operations are queued if TMDB API is temporarily unavailable
+6. Success/error messages provide clear feedback on operation status
+
+### Technical Implementation
+
+The integration uses Phoenix LiveView for real-time updates and the following components:
+
+- **MovieDetailsLive**: Main LiveView module handling movie details and list integration
+- **UserMovieListComponents**: Reusable UI components for list management
+- **Lists Context**: Backend API for TMDB list operations
+- **Queue System**: Offline support and retry logic for failed operations
+
 ## SDK and Integration
 
 ### cURL Examples

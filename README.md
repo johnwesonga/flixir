@@ -11,6 +11,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Sorting**: Sort by relevance, popularity, release date, or title
 - **Navigation**: Click any search result to view detailed information and reviews
 - **Detail Pages**: Dedicated pages for each movie and TV show with comprehensive information
+- **Integrated List Management**: Add movies to TMDB lists directly from movie detail pages with real-time membership display
 - **Caching**: Multi-layer intelligent caching system with Media Cache for search results and Lists Cache for user data
 
 ### ⭐ Reviews & Ratings System
@@ -43,6 +44,11 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Privacy Controls**: Public and private list visibility settings with TMDB authorization and access control
 - **Cross-Platform Sync**: Lists created in Flixir are automatically available in TMDB and other TMDB-integrated applications
 - **Direct Edit Mode**: Automatic edit mode activation when accessing list edit routes (`/my-lists/:tmdb_list_id/edit`) for seamless user experience, eliminating the need for manual edit button clicks
+- **Movie Details Integration**: Add and remove movies from TMDB lists directly from movie detail pages with:
+  - **Real-time Membership Display**: Visual indicators showing which lists contain the current movie
+  - **Quick Add Interface**: Modal selector for adding movies to existing lists
+  - **Optimistic Updates**: Immediate UI feedback with automatic rollback on API failures
+  - **List Status Indicators**: Visual feedback for pending operations and sync status
 - **High-Performance Caching**: ETS-based Lists Cache system for optimal response times and reduced API calls
   - **Multi-Layer Caching**: User lists, individual lists, and list items cached separately with configurable TTL
   - **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
@@ -62,7 +68,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - **List Cards**: Visual cards showing TMDB list details, movie counts, privacy status, and sync indicators with streamlined action buttons (privacy toggle, clear, delete)
   - **Creation Forms**: Validated forms for creating and editing TMDB lists with privacy controls
   - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations for TMDB operations
-  - **Add to List Selector**: Modal interface for adding movies to existing TMDB lists
+  - **Add to List Selector**: Modal interface for adding movies to existing TMDB lists from both list management and movie detail pages
   - **Statistics Display**: Both compact and detailed TMDB list statistics views with queue status and sync indicators
   - **Sync Status Indicators**: Real-time display of TMDB synchronization status (synced, syncing, offline, error)
   - **Share Functionality**: Generate and share public TMDB list URLs with copy-to-clipboard functionality
@@ -272,6 +278,7 @@ Error responses:
 
 ### Changelog
 
+- **Movie Details Integration**: [`CHANGELOG_MOVIE_DETAILS_LISTS_INTEGRATION.md`](CHANGELOG_MOVIE_DETAILS_LISTS_INTEGRATION.md) - TMDB Lists integration in movie detail pages
 - **Routing Changes**: [`CHANGELOG_ROUTING.md`](CHANGELOG_ROUTING.md) - Recent routing structure and API endpoint additions
 - **Authentication Changes**: [`CHANGELOG_AUTHENTICATION.md`](CHANGELOG_AUTHENTICATION.md) - Authentication system configuration updates
 - **Edit Mode Enhancement**: [`CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md`](CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md) - Automatic edit mode activation and direct edit route access

@@ -65,7 +65,7 @@
   - Remove redundant edit button from list cards (replaced by direct edit route access)
   - _Requirements: 10.1, 10.2, 11.4, 11.5, 12.1, 12.2, 12.5, 12.6_
 
-- [ ] 9. Enhance movie details page with TMDB list integration
+- [x] 9. Enhance movie details page with TMDB list integration
   - Update `FlixirWeb.MovieDetailsLive` to show "Add to TMDB List" functionality
   - Integrate with TMDB lists API to check movie membership across user's lists
   - Add optimistic updates for adding/removing movies from TMDB lists

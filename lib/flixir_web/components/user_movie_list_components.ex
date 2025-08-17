@@ -41,14 +41,13 @@ defmodule FlixirWeb.UserMovieListComponents do
           </:subtitle>
           <:actions>
             <.button phx-click="show_create_form" class="btn-primary">
-              <.icon name="hero-plus" class="w-4 h-4 mr-2" />
-              Create New List
+              <.icon name="hero-plus" class="w-4 h-4 mr-2" /> Create New List
             </.button>
           </:actions>
         </.header>
       </div>
 
-      <!-- Content Area -->
+    <!-- Content Area -->
       <div class="mt-8">
         <%= cond do %>
           <% @error -> %>
@@ -132,28 +131,26 @@ defmodule FlixirWeb.UserMovieListComponents do
             <% end %>
           </div>
 
-          <!-- Privacy Status -->
+    <!-- Privacy Status -->
           <div class="flex-shrink-0 ml-3">
             <%= if Map.get(@list, "public", false) do %>
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                <.icon name="hero-globe-alt" class="w-3 h-3 mr-1" />
-                Public
+                <.icon name="hero-globe-alt" class="w-3 h-3 mr-1" /> Public
               </span>
             <% else %>
               <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                <.icon name="hero-lock-closed" class="w-3 h-3 mr-1" />
-                Private
+                <.icon name="hero-lock-closed" class="w-3 h-3 mr-1" /> Private
               </span>
             <% end %>
           </div>
         </div>
 
-        <!-- List Stats -->
+    <!-- List Stats -->
         <div class="flex items-center justify-between text-sm text-gray-500">
           <div class="flex items-center">
             <.icon name="hero-film" class="w-4 h-4 mr-1" />
             <span>
-              <%= ngettext("1 movie", "%{count} movies", @movie_count) %>
+              {ngettext("1 movie", "%{count} movies", @movie_count)}
             </span>
           </div>
           <%= if @list["updated_at"] do %>
@@ -164,7 +161,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         </div>
       </div>
 
-      <!-- Action Buttons -->
+    <!-- Action Buttons -->
       <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
         <div class="flex items-center justify-between">
           <button
@@ -191,8 +188,6 @@ defmodule FlixirWeb.UserMovieListComponents do
                 <.icon name="hero-globe-alt" class="w-4 h-4" />
               <% end %>
             </button>
-
-
 
             <%= if @movie_count > 0 do %>
               <button
@@ -222,8 +217,6 @@ defmodule FlixirWeb.UserMovieListComponents do
     """
   end
 
-
-
   @doc """
   Renders a form for creating new movie lists with validation feedback.
 
@@ -240,22 +233,38 @@ defmodule FlixirWeb.UserMovieListComponents do
 
   def create_list_form(assigns) do
     ~H"""
-    <div class={["bg-white rounded-lg shadow-lg border border-gray-200 p-6", @class]} data-testid="create-list-form">
+    <div
+      class={["bg-white rounded-lg shadow-lg border border-gray-200 p-6", @class]}
+      data-testid="create-list-form"
+    >
       <div class="mb-6">
         <h2 class="text-xl font-semibold text-gray-900">Create New List</h2>
         <p class="text-sm text-gray-600 mt-1">
           Create a new movie list on TMDB to organize your favorite films.
         </p>
 
-        <!-- Sync Status in Form -->
+    <!-- Sync Status in Form -->
         <%= if assigns[:sync_status] && @sync_status != :synced do %>
           <div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
             <div class="flex items-center text-sm text-blue-700">
               <%= case @sync_status do %>
                 <% :syncing -> %>
                   <svg class="animate-spin w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    >
+                    </circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    >
+                    </path>
                   </svg>
                   <span>Syncing with TMDB...</span>
                 <% :offline -> %>
@@ -281,7 +290,7 @@ defmodule FlixirWeb.UserMovieListComponents do
           maxlength="100"
         />
 
-        <!-- Description -->
+    <!-- Description -->
         <.input
           field={@form[:description]}
           type="textarea"
@@ -291,18 +300,14 @@ defmodule FlixirWeb.UserMovieListComponents do
           maxlength="500"
         />
 
-        <!-- Privacy Setting -->
-        <.input
-          field={@form[:is_public]}
-          type="checkbox"
-          label="Make this list public on TMDB"
-        />
+    <!-- Privacy Setting -->
+        <.input field={@form[:is_public]} type="checkbox" label="Make this list public on TMDB" />
 
         <div class="text-xs text-gray-500 mt-1 mb-4">
           Public lists can be viewed by other TMDB users and discovered through TMDB search.
         </div>
 
-        <!-- Form Actions -->
+    <!-- Form Actions -->
         <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
           <button
             type="button"
@@ -375,7 +380,7 @@ defmodule FlixirWeb.UserMovieListComponents do
       <!-- Backdrop -->
       <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
 
-      <!-- Modal -->
+    <!-- Modal -->
       <div class="flex min-h-full items-center justify-center p-4">
         <div class={[
           "relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto",
@@ -387,7 +392,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <.icon name="hero-exclamation-triangle" class="h-6 w-6 text-red-600" />
             </div>
 
-            <!-- Content -->
+    <!-- Content -->
             <div class="text-center">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
                 Delete TMDB List
@@ -395,18 +400,22 @@ defmodule FlixirWeb.UserMovieListComponents do
               <p class="text-sm text-gray-600 mb-4">
                 Are you sure you want to delete "<strong>{@list["name"]}</strong>" from TMDB?
                 <%= if @movie_count > 0 do %>
-                  This will permanently remove the list and all {ngettext("1 movie", "%{count} movies", @movie_count)} in it from TMDB.
+                  This will permanently remove the list and all {ngettext(
+                    "1 movie",
+                    "%{count} movies",
+                    @movie_count
+                  )} in it from TMDB.
                 <% else %>
                   This action cannot be undone.
                 <% end %>
               </p>
 
-              <!-- TMDB List ID -->
+    <!-- TMDB List ID -->
               <div class="text-xs text-gray-500 mb-4">
                 TMDB List ID: #{@list["id"]}
               </div>
 
-              <!-- Sync Status Warning -->
+    <!-- Sync Status Warning -->
               <%= if assigns[:sync_status] && @sync_status != :synced do %>
                 <div class="p-2 bg-orange-50 border border-orange-200 rounded-md mb-4">
                   <div class="flex items-center text-sm text-orange-700">
@@ -426,7 +435,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <% end %>
             </div>
 
-            <!-- Actions -->
+    <!-- Actions -->
             <div class="flex items-center justify-end space-x-3 mt-6">
               <button
                 type="button"
@@ -472,15 +481,11 @@ defmodule FlixirWeb.UserMovieListComponents do
     assigns = assign(assigns, :movie_count, Map.get(assigns.list, "item_count", 0))
 
     ~H"""
-    <div
-      :if={@show}
-      class="fixed inset-0 z-50 overflow-y-auto"
-      data-testid="clear-confirmation-modal"
-    >
+    <div :if={@show} class="fixed inset-0 z-50 overflow-y-auto" data-testid="clear-confirmation-modal">
       <!-- Backdrop -->
       <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
 
-      <!-- Modal -->
+    <!-- Modal -->
       <div class="flex min-h-full items-center justify-center p-4">
         <div class={[
           "relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto",
@@ -492,7 +497,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <.icon name="hero-trash" class="h-6 w-6 text-orange-600" />
             </div>
 
-            <!-- Content -->
+    <!-- Content -->
             <div class="text-center">
               <h3 class="text-lg font-semibold text-gray-900 mb-2">
                 Clear TMDB List
@@ -503,12 +508,12 @@ defmodule FlixirWeb.UserMovieListComponents do
                 This action cannot be undone.
               </p>
 
-              <!-- TMDB List ID -->
+    <!-- TMDB List ID -->
               <div class="text-xs text-gray-500 mb-4">
                 TMDB List ID: #{@list["id"]}
               </div>
 
-              <!-- Sync Status Warning -->
+    <!-- Sync Status Warning -->
               <%= if assigns[:sync_status] && @sync_status != :synced do %>
                 <div class="p-2 bg-orange-50 border border-orange-200 rounded-md mb-4">
                   <div class="flex items-center text-sm text-orange-700">
@@ -528,7 +533,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <% end %>
             </div>
 
-            <!-- Actions -->
+    <!-- Actions -->
             <div class="flex items-center justify-end space-x-3 mt-6">
               <button
                 type="button"
@@ -609,7 +614,7 @@ defmodule FlixirWeb.UserMovieListComponents do
           </div>
         <% end %>
 
-        <!-- Loading Overlay -->
+    <!-- Loading Overlay -->
         <%= if Map.get(@movie, "_loading") do %>
           <div class="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
             <svg
@@ -630,7 +635,7 @@ defmodule FlixirWeb.UserMovieListComponents do
           </div>
         <% end %>
 
-        <!-- Remove Button -->
+    <!-- Remove Button -->
         <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
           <button
             phx-click="show_remove_confirmation"
@@ -644,7 +649,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         </div>
       </div>
 
-      <!-- Movie Info -->
+    <!-- Movie Info -->
       <div class="mt-2">
         <h3 class="text-sm font-medium text-gray-900 truncate" title={@movie["title"]}>
           {@movie["title"]}
@@ -685,15 +690,11 @@ defmodule FlixirWeb.UserMovieListComponents do
 
   def add_to_list_selector(assigns) do
     ~H"""
-    <div
-      :if={@show}
-      class="fixed inset-0 z-50 overflow-y-auto"
-      data-testid="add-to-list-selector"
-    >
+    <div :if={@show} class="fixed inset-0 z-50 overflow-y-auto" data-testid="add-to-list-selector">
       <!-- Backdrop -->
       <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
 
-      <!-- Modal -->
+    <!-- Modal -->
       <div class="flex min-h-full items-center justify-center p-4">
         <div class={[
           "relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto",
@@ -714,7 +715,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               </button>
             </div>
 
-            <!-- Lists -->
+    <!-- Lists -->
             <%= if Enum.empty?(@lists) do %>
               <div class="text-center py-8">
                 <.icon name="hero-folder-plus" class="mx-auto h-12 w-12 text-gray-400 mb-4" />
@@ -736,25 +737,25 @@ defmodule FlixirWeb.UserMovieListComponents do
                   <button
                     type="button"
                     phx-click="add_movie_to_list"
-                    phx-value-list-id={list.tmdb_list_id}
+                    phx-value-list-id={list["id"]}
                     phx-value-movie-id={@movie_id}
                     class="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                    data-testid={"add-to-list-#{list.tmdb_list_id}"}
+                    data-testid={"add-to-list-#{list["id"]}"}
                   >
                     <div class="flex items-center justify-between">
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-medium text-gray-900 truncate">
-                          {list.name}
+                          {list["name"]}
                         </p>
-                        <%= if list.description && String.trim(list.description) != "" do %>
+                        <%= if list["description"] && String.trim(list["description"]) != "" do %>
                           <p class="text-xs text-gray-500 truncate mt-1">
-                            {list.description}
+                            {list["description"]}
                           </p>
                         <% end %>
                       </div>
                       <div class="flex items-center space-x-2 text-xs text-gray-500">
-                        <span>{length(list.list_items || [])} movies</span>
-                        <%= if list.is_public do %>
+                        <span>{Map.get(list, "item_count", 0)} movies</span>
+                        <%= if Map.get(list, "public", false) do %>
                           <.icon name="hero-globe-alt" class="w-3 h-3" />
                         <% else %>
                           <.icon name="hero-lock-closed" class="w-3 h-3" />
@@ -765,7 +766,7 @@ defmodule FlixirWeb.UserMovieListComponents do
                 <% end %>
               </div>
 
-              <!-- Create New List Option -->
+    <!-- Create New List Option -->
               <div class="mt-4 pt-4 border-t border-gray-100">
                 <button
                   type="button"
@@ -795,7 +796,7 @@ defmodule FlixirWeb.UserMovieListComponents do
           <div class="flex items-center text-sm text-gray-600">
             <.icon name="hero-film" class="w-4 h-4 mr-1" />
             <span>
-              <%= ngettext("1 movie", "%{count} movies", @stats.movie_count) %>
+              {ngettext("1 movie", "%{count} movies", @stats.movie_count)}
             </span>
           </div>
 
@@ -833,13 +834,13 @@ defmodule FlixirWeb.UserMovieListComponents do
             <div>
               <p class="text-2xl font-bold text-blue-900">{@stats.movie_count}</p>
               <p class="text-sm text-blue-600">
-                <%= ngettext("Movie", "Movies", @stats.movie_count) %>
+                {ngettext("Movie", "Movies", @stats.movie_count)}
               </p>
             </div>
           </div>
         </div>
 
-        <!-- Privacy Status -->
+    <!-- Privacy Status -->
         <div class={[
           "rounded-lg p-4",
           if(@stats.is_public, do: "bg-green-50", else: "bg-gray-50")
@@ -862,7 +863,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         </div>
       </div>
 
-      <!-- Dates -->
+    <!-- Dates -->
       <div class="mt-6 pt-4 border-t border-gray-100">
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
           <div>
@@ -908,7 +909,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         </div>
       </div>
 
-      <!-- Skeleton grid -->
+    <!-- Skeleton grid -->
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         <%= for _i <- 1..8 do %>
           <.skeleton_list_card />
@@ -939,7 +940,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         </div>
       </div>
 
-      <!-- Skeleton Actions -->
+    <!-- Skeleton Actions -->
       <div class="px-6 py-4 bg-gray-50 border-t border-gray-100">
         <div class="flex justify-between">
           <div class="h-4 bg-gray-300 rounded w-16"></div>
@@ -962,14 +963,14 @@ defmodule FlixirWeb.UserMovieListComponents do
         <.icon name="hero-folder-plus" class="w-12 h-12 text-gray-400" />
       </div>
 
-      <!-- Empty state content -->
+    <!-- Empty state content -->
       <h3 class="text-xl font-semibold text-gray-900 mb-2">No movie lists yet</h3>
       <p class="text-gray-600 mb-6 max-w-md mx-auto">
         Create your first movie list to start organizing your favorite films.
         You can make lists for different genres, moods, or any way you like to categorize movies.
       </p>
 
-      <!-- Create first list button -->
+    <!-- Create first list button -->
       <button
         phx-click="show_create_form"
         class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -989,13 +990,13 @@ defmodule FlixirWeb.UserMovieListComponents do
         <.icon name="hero-exclamation-triangle" class="w-12 h-12 text-red-500" />
       </div>
 
-      <!-- Error content -->
+    <!-- Error content -->
       <h3 class="text-xl font-semibold text-gray-900 mb-2">Something went wrong</h3>
       <p class="text-gray-600 mb-6 max-w-md mx-auto">
         {error_message(@error)}
       </p>
 
-      <!-- Retry button -->
+    <!-- Retry button -->
       <button
         phx-click="retry"
         class="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium"
@@ -1026,10 +1027,13 @@ defmodule FlixirWeb.UserMovieListComponents do
 
   def sync_status_bar(assigns) do
     ~H"""
-    <div class={[
-      "bg-white border border-gray-200 rounded-lg p-4 shadow-sm",
-      @class
-    ]} data-testid="sync-status-bar">
+    <div
+      class={[
+        "bg-white border border-gray-200 rounded-lg p-4 shadow-sm",
+        @class
+      ]}
+      data-testid="sync-status-bar"
+    >
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-4">
           <!-- Sync Status Indicator -->
@@ -1043,8 +1047,21 @@ defmodule FlixirWeb.UserMovieListComponents do
               <% :syncing -> %>
                 <div class="flex items-center text-blue-600">
                   <svg class="animate-spin w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle
+                      class="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      stroke-width="4"
+                    >
+                    </circle>
+                    <path
+                      class="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    >
+                    </path>
                   </svg>
                   <span class="text-sm font-medium">Syncing...</span>
                 </div>
@@ -1061,14 +1078,14 @@ defmodule FlixirWeb.UserMovieListComponents do
             <% end %>
           </div>
 
-          <!-- Last Sync Time -->
+    <!-- Last Sync Time -->
           <%= if @last_sync_at do %>
             <div class="text-sm text-gray-500">
               Last synced {format_relative_date(@last_sync_at)}
             </div>
           <% end %>
 
-          <!-- Optimistic Updates Count -->
+    <!-- Optimistic Updates Count -->
           <%= if length(@optimistic_updates) > 0 do %>
             <div class="flex items-center text-blue-600">
               <.icon name="hero-clock" class="w-4 h-4 mr-1" />
@@ -1096,7 +1113,7 @@ defmodule FlixirWeb.UserMovieListComponents do
             </div>
           <% end %>
 
-          <!-- Action Buttons -->
+    <!-- Action Buttons -->
           <div class="flex items-center space-x-2">
             <%= if @queue_stats.failed_operations > 0 do %>
               <button
@@ -1139,17 +1156,16 @@ defmodule FlixirWeb.UserMovieListComponents do
 
   def queue_status_indicator(assigns) do
     ~H"""
-    <div class={[
-      "bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm",
-      @class
-    ]} data-testid="queue-status-indicator">
+    <div
+      class={[
+        "bg-white border border-gray-200 rounded-lg shadow-lg p-4 max-w-sm",
+        @class
+      ]}
+      data-testid="queue-status-indicator"
+    >
       <div class="flex items-center justify-between mb-3">
         <h4 class="text-sm font-semibold text-gray-900">Queue Status</h4>
-        <button
-          type="button"
-          phx-click="hide_queue_status"
-          class="text-gray-400 hover:text-gray-600"
-        >
+        <button type="button" phx-click="hide_queue_status" class="text-gray-400 hover:text-gray-600">
           <.icon name="hero-x-mark" class="w-4 h-4" />
         </button>
       </div>
@@ -1213,9 +1229,14 @@ defmodule FlixirWeb.UserMovieListComponents do
 
   defp parse_tmdb_date(_), do: DateTime.utc_now()
 
-  defp error_message(:timeout), do: "The request timed out. Please check your connection and try again."
+  defp error_message(:timeout),
+    do: "The request timed out. Please check your connection and try again."
+
   defp error_message(:unauthorized), do: "You don't have permission to access these lists."
-  defp error_message(:network_error), do: "Network connection error. Please check your internet connection."
+
+  defp error_message(:network_error),
+    do: "Network connection error. Please check your internet connection."
+
   defp error_message(error) when is_binary(error), do: error
   defp error_message(_), do: "An unexpected error occurred. Please try again."
 end

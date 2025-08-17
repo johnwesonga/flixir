@@ -30,7 +30,7 @@ live "/movies/:list_type", MovieListsLive, :show
 live "/reviews", ReviewsLive, :index
 live "/reviews/:filter", ReviewsLive, :show
 
-# Media Details
+# Media Details (with TMDB Lists Integration)
 live "/media/:type/:id", MovieDetailsLive, :show
 ```
 
@@ -223,6 +223,60 @@ Routes are carefully ordered to prevent conflicts:
 - **404 Not Found**: Resource not found
 - **422 Unprocessable Entity**: Validation errors
 - **500 Internal Server Error**: Server errors
+
+## Movie Details Integration
+
+The `/media/:type/:id` route provides comprehensive movie and TV show details with integrated TMDB list management functionality.
+
+### Route Features
+
+**URL Pattern**: `/media/:type/:id`
+- `type`: Media type (`movie` or `tv`)
+- `id`: TMDB media ID (integer)
+
+**Authentication**: Optional (enhanced features for authenticated users)
+
+**Integration Points**:
+- **Media Details**: Displays comprehensive movie/TV show information
+- **Reviews System**: Shows user reviews with filtering and sorting
+- **TMDB Lists Integration**: For authenticated users viewing movies:
+  - Real-time list membership display
+  - Quick-add modal for adding to existing lists
+  - Remove movies from lists directly
+  - Optimistic UI updates with rollback on failures
+
+### Query Parameters
+
+The route supports query parameters for navigation context:
+- `q`: Search query (for back navigation)
+- `type`: Media type filter
+- `sort`: Sort preference
+- `page`: Page number
+- `from`: Source list type (e.g., `popular`, `trending`)
+
+**Example**: `/media/movie/550?from=popular&q=fight%20club`
+
+### LiveView Events
+
+The MovieDetailsLive module handles the following events for list integration:
+- `show_add_to_list`: Display the add-to-list modal
+- `add_movie_to_list`: Add movie to selected list
+- `remove_movie_from_list`: Remove movie from list
+- `retry_load_lists`: Retry loading user lists on error
+
+### API Integration
+
+The movie details page integrates with these API endpoints:
+- `GET /api/lists` - Load user's lists
+- `POST /api/lists/:tmdb_list_id/movies` - Add movie to list
+- `DELETE /api/lists/:tmdb_list_id/movies/:tmdb_movie_id` - Remove movie from list
+
+### Error Handling
+
+- **Media Not Found**: Displays appropriate error message
+- **API Failures**: Graceful degradation with retry options
+- **Network Issues**: Offline queue support for list operations
+- **Authentication Errors**: Clear messaging for login requirements
 
 ## Route Testing
 

@@ -79,9 +79,113 @@
           <% end %>
 
           <%= if overview = Map.get(@media_details, "overview") do %>
-            <p class="text-gray-700 leading-relaxed">
+            <p class="text-gray-700 leading-relaxed mb-4">
               {overview}
             </p>
+          <% end %>
+
+          <!-- TMDB List Integration for Movies -->
+          <%= if @media_type == "movie" && @authenticated? && @current_user do %>
+            <div class="mt-6 pt-4 border-t border-gray-200">
+              <div class="flex items-center justify-between">
+                <h3 class="text-lg font-medium text-gray-900">My Lists</h3>
+                
+                <%= if @loading_lists do %>
+                  <div class="flex items-center text-sm text-gray-500">
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                    Loading lists...
+                  </div>
+                <% else %>
+                  <button
+                    type="button"
+                    phx-click="show_add_to_list"
+                    class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                  >
+                    <.icon name="hero-plus" class="w-4 h-4 mr-1" />
+                    Add to List
+                  </button>
+                <% end %>
+              </div>
+
+              <!-- List Membership Display -->
+              <%= if !@loading_lists && !Enum.empty?(@user_lists) do %>
+                <div class="mt-3">
+                  <div class="flex flex-wrap gap-2">
+                    <%= for list <- @user_lists do %>
+                      <% list_id = list["id"] %>
+                      <% is_member = Map.get(@movie_list_membership, list_id, false) %>
+                      <% optimistic_update = Map.get(@optimistic_list_updates, {list_id, @media_id}) %>
+                      
+                      <div class={[
+                        "inline-flex items-center px-3 py-1 rounded-full text-sm font-medium transition-all",
+                        if(is_member, do: "bg-green-100 text-green-800 border border-green-200", else: "bg-gray-100 text-gray-600 border border-gray-200"),
+                        if(optimistic_update, do: "opacity-60")
+                      ]}>
+                        <%= if optimistic_update do %>
+                          <div class="animate-spin rounded-full h-3 w-3 border-b border-current mr-2"></div>
+                        <% else %>
+                          <%= if is_member do %>
+                            <.icon name="hero-check" class="w-3 h-3 mr-1" />
+                          <% end %>
+                        <% end %>
+                        
+                        <span class="truncate max-w-32" title={list["name"]}>
+                          {list["name"]}
+                        </span>
+                        
+                        <%= if is_member && !optimistic_update do %>
+                          <button
+                            type="button"
+                            phx-click="remove_movie_from_list"
+                            phx-value-list-id={list_id}
+                            phx-value-movie-id={@media_id}
+                            class="ml-2 text-green-600 hover:text-green-800 transition-colors"
+                            title="Remove from list"
+                          >
+                            <.icon name="hero-x-mark" class="w-3 h-3" />
+                          </button>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Error State -->
+              <%= if @lists_error do %>
+                <div class="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                  <div class="flex items-center">
+                    <.icon name="hero-exclamation-triangle" class="w-4 h-4 text-red-600 mr-2" />
+                    <span class="text-sm text-red-700">
+                      Failed to load your lists. 
+                    </span>
+                    <button
+                      type="button"
+                      phx-click="retry_load_lists"
+                      class="ml-2 text-sm text-red-600 hover:text-red-800 underline"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              <% end %>
+
+              <!-- Empty State -->
+              <%= if !@loading_lists && Enum.empty?(@user_lists) && !@lists_error do %>
+                <div class="mt-3 text-center py-4">
+                  <.icon name="hero-folder-plus" class="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p class="text-sm text-gray-600 mb-2">
+                    You don't have any movie lists yet.
+                  </p>
+                  <.link
+                    navigate={~p"/my-lists"}
+                    class="text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Create your first list
+                  </.link>
+                </div>
+              <% end %>
+            </div>
           <% end %>
         </div>
       </div>
@@ -207,4 +311,14 @@
     </div>
   <% end %>
 </div>
+
+<!-- Add to List Modal -->
+<%= if @show_add_to_list && @media_type == "movie" do %>
+  <.add_to_list_selector
+    show={@show_add_to_list}
+    lists={@user_lists}
+    movie_id={@media_id}
+  />
+<% end %>
+
 </.app_layout>

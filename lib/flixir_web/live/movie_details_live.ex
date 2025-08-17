@@ -9,7 +9,8 @@ defmodule FlixirWeb.MovieDetailsLive do
   use FlixirWeb, :live_view
   import FlixirWeb.ReviewComponents
   import FlixirWeb.ReviewFilters
-  alias Flixir.{Media, Reviews}
+  import FlixirWeb.UserMovieListComponents
+  alias Flixir.{Media, Reviews, Lists}
   import FlixirWeb.AppLayout
   require Logger
 
@@ -43,12 +44,21 @@ defmodule FlixirWeb.MovieDetailsLive do
       |> assign(:pagination, nil)
       |> assign(:page_title, "Loading...")
       |> assign(:current_list, @default_list_type)
+      # TMDB Lists integration
+      |> assign(:user_lists, [])
+      |> assign(:movie_list_membership, %{})
+      |> assign(:loading_lists, false)
+      |> assign(:lists_error, nil)
+      |> assign(:show_add_to_list, false)
+      |> assign(:optimistic_list_updates, %{})
+      |> assign(:tmdb_user_id, nil)
 
-    # Load media details and reviews
+    # Load media details, reviews, and user lists if authenticated
     socket =
       socket
       |> load_media_details()
       |> load_reviews()
+      |> maybe_load_user_lists()
 
     {:ok, socket}
   end
@@ -158,6 +168,126 @@ defmodule FlixirWeb.MovieDetailsLive do
       |> assign(:review_filters, default_filters())
       |> apply_filters()
 
+    {:noreply, socket}
+  end
+
+  # TMDB Lists Integration Events
+
+  @impl true
+  def handle_event("show_add_to_list", _params, socket) do
+    socket = assign(socket, :show_add_to_list, true)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("cancel_add_to_list", _params, socket) do
+    socket = assign(socket, :show_add_to_list, false)
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_event("add_movie_to_list", %{"list-id" => list_id, "movie-id" => movie_id}, socket) do
+    tmdb_list_id = String.to_integer(list_id)
+    tmdb_movie_id = String.to_integer(movie_id)
+    tmdb_user_id = socket.assigns.tmdb_user_id
+
+    if tmdb_user_id do
+      # Optimistic update
+      socket = add_optimistic_list_update(socket, tmdb_list_id, tmdb_movie_id, :adding)
+
+      # Perform the actual API call
+      case Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+        {:ok, :added} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> update_movie_list_membership(tmdb_list_id, tmdb_movie_id, true)
+            |> assign(:show_add_to_list, false)
+            |> put_flash(:info, "Movie added to list successfully!")
+
+          {:noreply, socket}
+
+        {:ok, :queued} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> put_flash(:info, "Movie will be added to list when TMDB is available")
+            |> assign(:show_add_to_list, false)
+
+          {:noreply, socket}
+
+        {:error, :duplicate_movie} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> put_flash(:error, "Movie is already in this list")
+
+          {:noreply, socket}
+
+        {:error, reason} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> put_flash(:error, format_list_error(reason))
+
+          {:noreply, socket}
+      end
+    else
+      socket = put_flash(socket, :error, "Please log in to add movies to lists")
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event(
+        "remove_movie_from_list",
+        %{"list-id" => list_id, "movie-id" => movie_id},
+        socket
+      ) do
+    tmdb_list_id = String.to_integer(list_id)
+    tmdb_movie_id = String.to_integer(movie_id)
+    tmdb_user_id = socket.assigns.tmdb_user_id
+
+    if tmdb_user_id do
+      # Optimistic update
+      socket = add_optimistic_list_update(socket, tmdb_list_id, tmdb_movie_id, :removing)
+
+      # Perform the actual API call
+      case Lists.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
+        {:ok, :removed} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> update_movie_list_membership(tmdb_list_id, tmdb_movie_id, false)
+            |> put_flash(:info, "Movie removed from list successfully!")
+
+          {:noreply, socket}
+
+        {:ok, :queued} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> put_flash(:info, "Movie will be removed from list when TMDB is available")
+
+          {:noreply, socket}
+
+        {:error, reason} ->
+          socket =
+            socket
+            |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
+            |> put_flash(:error, format_list_error(reason))
+
+          {:noreply, socket}
+      end
+    else
+      socket = put_flash(socket, :error, "Please log in to manage lists")
+      {:noreply, socket}
+    end
+  end
+
+  @impl true
+  def handle_event("retry_load_lists", _params, socket) do
+    socket = load_user_lists(socket)
     {:noreply, socket}
   end
 
@@ -391,6 +521,123 @@ defmodule FlixirWeb.MovieDetailsLive do
       page: Map.get(params, "page", "1")
     }
   end
+
+  # TMDB Lists Integration Helper Functions
+
+  defp maybe_load_user_lists(socket) do
+    if socket.assigns.authenticated? && socket.assigns.current_user do
+      tmdb_user_id = get_tmdb_user_id(socket.assigns.current_user)
+
+      socket
+      |> assign(:tmdb_user_id, tmdb_user_id)
+      |> load_user_lists()
+    else
+      socket
+    end
+  end
+
+  defp load_user_lists(socket) do
+    tmdb_user_id = socket.assigns.tmdb_user_id
+
+    if tmdb_user_id do
+      socket = assign(socket, :loading_lists, true)
+
+      case Lists.get_user_lists(tmdb_user_id) do
+        {:ok, lists} ->
+          socket =
+            socket
+            |> assign(:user_lists, lists)
+            |> assign(:loading_lists, false)
+            |> assign(:lists_error, nil)
+            |> load_movie_list_membership()
+
+          socket
+
+        {:error, reason} ->
+          Logger.error("Failed to load user lists for movie details", %{
+            tmdb_user_id: tmdb_user_id,
+            reason: inspect(reason)
+          })
+
+          socket
+          |> assign(:loading_lists, false)
+          |> assign(:lists_error, reason)
+      end
+    else
+      socket
+    end
+  end
+
+  defp load_movie_list_membership(socket) do
+    media_id = socket.assigns.media_id
+    media_type = socket.assigns.media_type
+    tmdb_user_id = socket.assigns.tmdb_user_id
+    user_lists = socket.assigns.user_lists
+
+    # Only check membership for movies (not TV shows for now)
+    if media_type == "movie" && tmdb_user_id && !Enum.empty?(user_lists) do
+      membership_map =
+        user_lists
+        |> Enum.reduce(%{}, fn list, acc ->
+          list_id = list["id"]
+
+          case Lists.movie_in_list?(list_id, media_id, tmdb_user_id) do
+            {:ok, is_member} ->
+              Map.put(acc, list_id, is_member)
+
+            {:error, _reason} ->
+              # If we can't check membership, assume false
+              Map.put(acc, list_id, false)
+          end
+        end)
+
+      assign(socket, :movie_list_membership, membership_map)
+    else
+      socket
+    end
+  end
+
+  defp get_tmdb_user_id(current_user) do
+    # Extract TMDB user ID from current user session
+    # This assumes the current_user contains TMDB account information
+    Map.get(current_user, :tmdb_user_id) || Map.get(current_user, "tmdb_user_id")
+  end
+
+  defp add_optimistic_list_update(socket, list_id, movie_id, action) do
+    key = {list_id, movie_id}
+    optimistic_updates = Map.put(socket.assigns.optimistic_list_updates, key, action)
+
+    # Also update the membership map optimistically
+    membership = socket.assigns.movie_list_membership
+
+    updated_membership =
+      case action do
+        :adding -> Map.put(membership, list_id, true)
+        :removing -> Map.put(membership, list_id, false)
+      end
+
+    socket
+    |> assign(:optimistic_list_updates, optimistic_updates)
+    |> assign(:movie_list_membership, updated_membership)
+  end
+
+  defp remove_optimistic_list_update(socket, list_id, movie_id) do
+    key = {list_id, movie_id}
+    optimistic_updates = Map.delete(socket.assigns.optimistic_list_updates, key)
+    assign(socket, :optimistic_list_updates, optimistic_updates)
+  end
+
+  defp update_movie_list_membership(socket, list_id, _movie_id, is_member) do
+    membership = Map.put(socket.assigns.movie_list_membership, list_id, is_member)
+    assign(socket, :movie_list_membership, membership)
+  end
+
+  defp format_list_error(:unauthorized), do: "You don't have permission to modify this list"
+  defp format_list_error(:not_found), do: "List not found"
+  defp format_list_error(:duplicate_movie), do: "Movie is already in this list"
+  defp format_list_error(:api_unavailable), do: "TMDB service is temporarily unavailable"
+  defp format_list_error(:network_error), do: "Network error occurred. Please try again."
+  defp format_list_error(_), do: "An error occurred while updating the list"
 
   defp build_search_url(search_context) do
     # Build the search URL with preserved context
