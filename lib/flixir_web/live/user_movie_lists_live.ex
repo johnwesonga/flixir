@@ -27,6 +27,17 @@ defmodule FlixirWeb.UserMovieListsLive do
   def mount(_params, _session, socket) do
     # Authentication state is handled by the on_mount hook
     if socket.assigns.authenticated? do
+      current_user = socket.assigns.current_user
+      tmdb_user_id = current_user["id"]
+
+      # Subscribe to list updates for this user
+      Phoenix.PubSub.subscribe(Flixir.PubSub, "user_lists:#{tmdb_user_id}")
+
+      # Schedule a periodic refresh every 30 seconds to keep data fresh
+      if connected?(socket) do
+        Process.send_after(self(), :periodic_refresh, 30_000)
+      end
+
       socket =
         socket
         |> assign(:lists, [])
@@ -77,8 +88,6 @@ defmodule FlixirWeb.UserMovieListsLive do
 
     {:noreply, socket}
   end
-
-
 
   @impl true
   def handle_event("create_list", %{"list" => list_params}, socket) do
@@ -450,6 +459,18 @@ defmodule FlixirWeb.UserMovieListsLive do
   end
 
   @impl true
+  def handle_event("refresh_lists", _params, socket) do
+    socket =
+      socket
+      |> assign(:loading, true)
+      |> assign(:sync_status, :syncing)
+      |> load_user_lists()
+      |> load_queue_stats()
+
+    {:noreply, socket}
+  end
+
+  @impl true
   def handle_event("retry_failed_operations", _params, socket) do
     current_user = socket.assigns.current_user
     tmdb_user_id = current_user["id"]
@@ -555,6 +576,56 @@ defmodule FlixirWeb.UserMovieListsLive do
         end
     end
   end
+
+  # Handle PubSub messages for list updates
+  @impl true
+  def handle_info({:list_updated, _list_data}, socket) do
+    # Refresh the lists when we receive a list update notification
+    socket =
+      socket
+      |> assign(:sync_status, :syncing)
+      |> load_user_lists()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:movie_added_to_list, _list_id, _movie_id}, socket) do
+    # Refresh the lists when a movie is added to any list
+    socket =
+      socket
+      |> assign(:sync_status, :syncing)
+      |> load_user_lists()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info({:movie_removed_from_list, _list_id, _movie_id}, socket) do
+    # Refresh the lists when a movie is removed from any list
+    socket =
+      socket
+      |> assign(:sync_status, :syncing)
+      |> load_user_lists()
+
+    {:noreply, socket}
+  end
+
+  @impl true
+  def handle_info(:periodic_refresh, socket) do
+    # Periodic refresh to keep data fresh
+    socket =
+      socket
+      |> load_user_lists()
+      |> load_queue_stats()
+
+    # Schedule the next refresh
+    Process.send_after(self(), :periodic_refresh, 30_000)
+
+    {:noreply, socket}
+  end
+
+
 
   # Private helper functions
 

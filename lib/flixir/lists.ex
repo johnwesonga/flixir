@@ -817,6 +817,7 @@ defmodule Flixir.Lists do
           {:ok, _response} ->
             # Invalidate cache to force fresh fetch
             Cache.invalidate_list_cache(tmdb_list_id)
+            Cache.invalidate_user_cache(tmdb_user_id)
 
             Logger.info("Successfully cleared list via TMDB API", %{
               tmdb_list_id: tmdb_list_id,
@@ -867,6 +868,7 @@ defmodule Flixir.Lists do
               {:ok, _response} ->
                 # Invalidate cache to force fresh fetch
                 Cache.invalidate_list_cache(tmdb_list_id)
+                Cache.invalidate_user_cache(tmdb_user_id)
 
                 Logger.info("Successfully added movie to list via TMDB API", %{
                   tmdb_list_id: tmdb_list_id,
@@ -918,6 +920,7 @@ defmodule Flixir.Lists do
           {:ok, _response} ->
             # Invalidate cache to force fresh fetch
             Cache.invalidate_list_cache(tmdb_list_id)
+            Cache.invalidate_user_cache(tmdb_user_id)
 
             Logger.info("Successfully removed movie from list via TMDB API", %{
               tmdb_list_id: tmdb_list_id,

@@ -80,7 +80,35 @@ defmodule FlixirWeb.ExampleLive do
   import FlixirWeb.ExampleComponents  # Context-specific components
   alias Flixir.ExampleContext        # Business logic context
 
-  # Mount, handle_params, handle_event, handle_info functions...
+  require Logger
+
+  # Lifecycle callbacks
+  @impl true
+  def mount(_params, _session, socket) do
+    # Mount logic
+  end
+
+  @impl true
+  def handle_params(_params, _url, socket) do
+    # Parameter handling
+  end
+
+  # All handle_event/3 clauses grouped together
+  @impl true
+  def handle_event("event_name", params, socket) do
+    # Event handling
+  end
+
+  # All handle_info/2 clauses grouped together  
+  @impl true
+  def handle_info(message, socket) do
+    # Info message handling
+  end
+
+  # Private helper functions
+  defp helper_function(args) do
+    # Helper logic
+  end
 end
 ```
 
@@ -88,6 +116,47 @@ end
 - `FlixirWeb.AppLayout` - Required for all LiveView modules using `app_layout/1`
 - Context-specific component modules for specialized UI elements
 - Business logic contexts via `alias` for clean separation of concerns
+
+#### Function Organization Rules
+
+**Critical**: Elixir requires functions with the same name and arity to be grouped together:
+
+```elixir
+# ✅ CORRECT - All handle_event/3 clauses grouped together
+@impl true
+def handle_event("create", params, socket), do: # ...
+
+@impl true  
+def handle_event("update", params, socket), do: # ...
+
+@impl true
+def handle_event("delete", params, socket), do: # ...
+
+# ✅ CORRECT - All handle_info/2 clauses grouped together
+@impl true
+def handle_info({:update, data}, socket), do: # ...
+
+@impl true
+def handle_info(:refresh, socket), do: # ...
+```
+
+```elixir
+# ❌ INCORRECT - Functions with same name/arity scattered
+@impl true
+def handle_event("create", params, socket), do: # ...
+
+@impl true
+def handle_info(:refresh, socket), do: # ...
+
+@impl true  
+def handle_event("update", params, socket), do: # ... # This will cause a compiler warning!
+```
+
+**Why This Matters:**
+- **Compiler Requirements**: Elixir will issue warnings for scattered function clauses
+- **Pattern Matching**: The compiler optimizes pattern matching when clauses are grouped
+- **Code Readability**: Grouped functions are easier to understand and maintain
+- **Best Practices**: Follows standard Elixir conventions
 
 ### Template Guidelines
 
@@ -156,7 +225,7 @@ This pattern ensures consistent UI structure and navigation behavior across all 
 - **ETS-based Lists Cache**: High-performance caching for TMDB list data
 - **Media Cache**: In-memory caching for search results
 - **Multi-layer Caching**: Different TTL values for different data types
-- **Cache Invalidation**: Targeted invalidation to maintain data consistency
+- **Comprehensive Cache Invalidation**: When modifying list contents (adding/removing movies), invalidate both specific list cache and user's overall list cache to ensure consistent movie counts and statistics across all views
 
 ### Database Optimization
 - Proper indexing on frequently queried columns

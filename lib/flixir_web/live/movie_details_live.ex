@@ -198,6 +198,9 @@ defmodule FlixirWeb.MovieDetailsLive do
       # Perform the actual API call
       case Lists.add_movie_to_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
         {:ok, :added} ->
+          # Broadcast the list update to other LiveViews
+          Phoenix.PubSub.broadcast(Flixir.PubSub, "user_lists:#{tmdb_user_id}", {:movie_added_to_list, tmdb_list_id, tmdb_movie_id})
+
           socket =
             socket
             |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)
@@ -255,6 +258,9 @@ defmodule FlixirWeb.MovieDetailsLive do
       # Perform the actual API call
       case Lists.remove_movie_from_list(tmdb_list_id, tmdb_movie_id, tmdb_user_id) do
         {:ok, :removed} ->
+          # Broadcast the list update to other LiveViews
+          Phoenix.PubSub.broadcast(Flixir.PubSub, "user_lists:#{tmdb_user_id}", {:movie_removed_from_list, tmdb_list_id, tmdb_movie_id})
+
           socket =
             socket
             |> remove_optimistic_list_update(tmdb_list_id, tmdb_movie_id)

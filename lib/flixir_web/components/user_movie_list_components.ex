@@ -40,6 +40,14 @@ defmodule FlixirWeb.UserMovieListComponents do
             Organize your movies into custom collections
           </:subtitle>
           <:actions>
+            <.button phx-click="refresh_lists" class={["btn-secondary mr-3", if(@loading, do: "opacity-50 cursor-not-allowed", else: "")]} title="Refresh lists">
+              <%= if @loading do %>
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+              <% else %>
+                <.icon name="hero-arrow-path" class="w-4 h-4 mr-2" />
+              <% end %>
+              Refresh
+            </.button>
             <.button phx-click="show_create_form" class="btn-primary">
               <.icon name="hero-plus" class="w-4 h-4 mr-2" /> Create New List
             </.button>

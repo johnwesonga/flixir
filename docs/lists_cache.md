@@ -148,6 +148,21 @@ def update_list(list_id, updates) do
       error
   end
 end
+
+# After movie operations (comprehensive invalidation)
+def add_movie_to_list(list_id, movie_id, user_id) do
+  case TMDBClient.add_movie_to_list(list_id, movie_id, session_id) do
+    {:ok, result} ->
+      # Invalidate both list-specific and user-wide cache
+      # This ensures movie counts and statistics are updated everywhere
+      Flixir.Lists.Cache.invalidate_list_cache(list_id)
+      Flixir.Lists.Cache.invalidate_user_cache(user_id)
+      {:ok, result}
+    
+    error ->
+      error
+  end
+end
 ```
 
 ## Monitoring and Debugging
@@ -185,6 +200,11 @@ end
 - Use consistent key patterns: `{:user_lists, user_id}`, `{:list, list_id}`
 - Include relevant identifiers for easy invalidation
 - Avoid overly complex key structures
+
+### Cache Invalidation Best Practices
+- **Comprehensive Invalidation**: When modifying list contents (adding/removing movies), invalidate both the specific list cache and the user's overall list cache to ensure consistent movie counts and statistics
+- **Targeted Invalidation**: Use specific invalidation methods rather than clearing the entire cache
+- **Immediate Invalidation**: Invalidate cache immediately after successful TMDB API operations to prevent stale data
 
 ### TTL Management
 - Use longer TTLs for stable data (user lists: 1 hour)

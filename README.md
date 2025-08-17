@@ -53,7 +53,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - **Multi-Layer Caching**: User lists, individual lists, and list items cached separately with configurable TTL
   - **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
   - **Automatic Expiration**: Background cleanup process removes expired entries every 5 minutes
-  - **Targeted Invalidation**: Invalidate specific users or lists without clearing entire cache
+  - **Intelligent Invalidation**: Comprehensive cache invalidation strategy that updates both specific list data and user collection data when movies are added or removed, ensuring consistent movie counts and list statistics across all cached data
 - **Offline Support & Reliability**: Comprehensive queue system for reliable operation processing
   - **Operation Queuing**: Failed operations are automatically queued for retry with exponential backoff (30s, 60s, 120s, 240s, 480s)
   - **Background Processing**: QueueProcessor GenServer automatically processes pending operations with configurable intervals
@@ -296,6 +296,8 @@ Error responses:
 - **UI Simplification**: [`CHANGELOG_UI_SIMPLIFICATION.md`](CHANGELOG_UI_SIMPLIFICATION.md) - Edit button removal and interface streamlining
 - **Code Formatting**: [`CHANGELOG_CODE_FORMATTING.md`](CHANGELOG_CODE_FORMATTING.md) - Comprehensive code formatting improvements and modern HEEx syntax adoption
 - **LiveView Architecture**: [`CHANGELOG_LIVEVIEW_ARCHITECTURE_CONSISTENCY.md`](CHANGELOG_LIVEVIEW_ARCHITECTURE_CONSISTENCY.md) - Standardized import patterns and AppLayout integration across all LiveView modules
+- **Code Quality Fix**: [`CHANGELOG_CODE_QUALITY_FIX.md`](CHANGELOG_CODE_QUALITY_FIX.md) - Function organization fix for proper Elixir function clause grouping
+- **Cache Invalidation Improvement**: [`CHANGELOG_CACHE_INVALIDATION_IMPROVEMENT.md`](CHANGELOG_CACHE_INVALIDATION_IMPROVEMENT.md) - Enhanced cache invalidation strategy for comprehensive data consistency when adding movies to lists
 
 ## Getting Started
 
