@@ -48,7 +48,7 @@
   - Add sync status and last updated information from TMDB
   - _Requirements: 9.1, 9.2, 10.1, 10.2, 10.3, 10.4, 11.1, 11.2, 12.1, 12.2, 12.5, 12.6_
 
-- [ ] 7. Update routing for TMDB list IDs
+- [x] 7. Update routing for TMDB list IDs
   - Update routes to use TMDB list IDs instead of local UUIDs
   - Add routes for TMDB list sharing and external access
   - Implement API routes for sync operations and queue management
@@ -56,12 +56,13 @@
   - Update route constraints and error handling for TMDB integration
   - _Requirements: 10.1, 10.2, 12.1, 12.2, 12.5, 12.6_
 
-- [ ] 8. Update UI components for TMDB features
+- [x] 8. Update UI components for TMDB features
   - Update `FlixirWeb.UserMovieListComponents` to display TMDB-specific information
   - Add sync status indicators and queue operation displays
   - Implement TMDB list sharing components and external links
   - Add offline mode indicators and retry buttons for failed operations
   - Update list cards to show TMDB list IDs and creation information
+  - Remove redundant edit button from list cards (replaced by direct edit route access)
   - _Requirements: 10.1, 10.2, 11.4, 11.5, 12.1, 12.2, 12.5, 12.6_
 
 - [ ] 9. Enhance movie details page with TMDB list integration

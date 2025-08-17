@@ -52,12 +52,12 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
 
     test "renders lists grid when lists present" do
       list = %{
-        id: "123",
-        name: "My Watchlist",
-        description: "Movies to watch",
-        is_public: false,
-        updated_at: DateTime.utc_now(),
-        list_items: [%{id: "item1"}, %{id: "item2"}]
+        "id" => "123",
+        "name" => "My Watchlist",
+        "description" => "Movies to watch",
+        "public" => false,
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "item_count" => 2
       }
 
       assigns = %{
@@ -78,12 +78,12 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
   describe "list_card/1" do
     test "renders list card with basic information" do
       list = %{
-        id: "123",
-        name: "My Watchlist",
-        description: "Movies to watch",
-        is_public: false,
-        updated_at: DateTime.utc_now(),
-        list_items: [%{id: "item1"}, %{id: "item2"}]
+        "id" => "123",
+        "name" => "My Watchlist",
+        "description" => "Movies to watch",
+        "public" => false,
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "item_count" => 2
       }
 
       assigns = %{list: list}
@@ -94,19 +94,19 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
       assert html =~ "2 movies"
       assert html =~ "Private"
       assert html =~ "View List"
-      assert html =~ "Edit"
+      refute html =~ "Edit"  # Edit button should not be present
       assert html =~ "Clear"
       assert html =~ "Delete"
     end
 
     test "renders public list correctly" do
       list = %{
-        id: "123",
-        name: "Public List",
-        description: "A public list",
-        is_public: true,
-        updated_at: DateTime.utc_now(),
-        list_items: []
+        "id" => "123",
+        "name" => "Public List",
+        "description" => "A public list",
+        "public" => true,
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "item_count" => 0
       }
 
       assigns = %{list: list}
@@ -120,12 +120,12 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
 
     test "renders list without description" do
       list = %{
-        id: "123",
-        name: "Simple List",
-        description: nil,
-        is_public: false,
-        updated_at: DateTime.utc_now(),
-        list_items: []
+        "id" => "123",
+        "name" => "Simple List",
+        "description" => nil,
+        "public" => false,
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "item_count" => 0
       }
 
       assigns = %{list: list}
@@ -136,17 +136,16 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
     end
   end
 
-  describe "list_form/1" do
+  describe "create_list_form/1" do
     test "renders create form" do
       form = to_form(%{}, as: :list)
 
       assigns = %{
         form: form,
-        action: :create,
-        title: "Create New List"
+        sync_status: :synced
       }
 
-      html = render_component(&list_form/1, assigns)
+      html = render_component(&create_list_form/1, assigns)
 
       assert html =~ "Create New List"
       assert html =~ "Create a new movie list"
@@ -155,22 +154,6 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
       assert html =~ "Make this list public"
       assert html =~ "Create List"
       assert html =~ "Cancel"
-    end
-
-    test "renders edit form" do
-      form = to_form(%{}, as: :list)
-
-      assigns = %{
-        form: form,
-        action: :edit,
-        title: "Edit List"
-      }
-
-      html = render_component(&list_form/1, assigns)
-
-      assert html =~ "Edit List"
-      assert html =~ "Update your list details"
-      assert html =~ "Update List"
     end
   end
 
@@ -212,15 +195,15 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
   describe "delete_confirmation_modal/1" do
     test "renders delete confirmation modal" do
       list = %{
-        id: "123",
-        name: "Test List",
-        list_items: [%{id: "item1"}, %{id: "item2"}]
+        "id" => "123",
+        "name" => "Test List",
+        "item_count" => 2
       }
 
       assigns = %{show: true, list: list}
       html = render_component(&delete_confirmation_modal/1, assigns)
 
-      assert html =~ "Delete List"
+      assert html =~ "Delete TMDB List"
       assert html =~ "Test List"
       assert html =~ "2 movies"
       assert html =~ "Cancel"
@@ -244,15 +227,15 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
   describe "clear_confirmation_modal/1" do
     test "renders clear confirmation modal" do
       list = %{
-        id: "123",
-        name: "Test List",
-        list_items: [%{id: "item1"}, %{id: "item2"}, %{id: "item3"}]
+        "id" => "123",
+        "name" => "Test List",
+        "item_count" => 3
       }
 
       assigns = %{show: true, list: list}
       html = render_component(&clear_confirmation_modal/1, assigns)
 
-      assert html =~ "Clear List"
+      assert html =~ "Clear TMDB List"
       assert html =~ "Test List"
       assert html =~ "all 3 movies"
       assert html =~ "Cancel"
@@ -278,14 +261,14 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
     test "renders list selection when lists available" do
       lists = [
         %{
-          id: "123",
+          tmdb_list_id: "123",
           name: "Watchlist",
           description: "Movies to watch",
           is_public: false,
           list_items: [%{id: "item1"}]
         },
         %{
-          id: "456",
+          tmdb_list_id: "456",
           name: "Favorites",
           description: nil,
           is_public: true,
@@ -321,13 +304,13 @@ defmodule FlixirWeb.UserMovieListComponentsTest do
 
       # Test through private function access via component rendering
       list_today = %{
-        id: "1", name: "Today", description: nil, is_public: false,
-        updated_at: now, list_items: []
+        "id" => "1", "name" => "Today", "description" => nil, "public" => false,
+        "updated_at" => DateTime.to_iso8601(now), "item_count" => 0
       }
 
       list_yesterday = %{
-        id: "2", name: "Yesterday", description: nil, is_public: false,
-        updated_at: yesterday, list_items: []
+        "id" => "2", "name" => "Yesterday", "description" => nil, "public" => false,
+        "updated_at" => DateTime.to_iso8601(yesterday), "item_count" => 0
       }
 
       html_today = render_component(&list_card/1, %{list: list_today})

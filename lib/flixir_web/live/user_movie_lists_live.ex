@@ -3,7 +3,7 @@ defmodule FlixirWeb.UserMovieListsLive do
   LiveView for displaying and managing all user movie lists with TMDB integration.
 
   This module handles the overview of user-created movie lists using TMDB's native
-  list management API. It provides functionality for creating, editing, deleting,
+  list management API. It provides functionality for creating, deleting,
   and clearing lists with optimistic updates, offline support through operation
   queuing, and comprehensive error handling with user feedback.
 
@@ -34,7 +34,6 @@ defmodule FlixirWeb.UserMovieListsLive do
         |> assign(:error, nil)
         |> assign(:show_form, nil)
         |> assign(:form_data, %{})
-        |> assign(:selected_list, nil)
         |> assign(:show_delete_confirmation, false)
         |> assign(:show_clear_confirmation, false)
         |> assign(:lists_summary, %{})
@@ -79,32 +78,7 @@ defmodule FlixirWeb.UserMovieListsLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_event("edit_list", %{"list-id" => list_id}, socket) do
-    case find_list_by_tmdb_id(socket.assigns.lists, list_id) do
-      nil ->
-        socket =
-          socket
-          |> put_flash(:error, "List not found.")
 
-        {:noreply, socket}
-
-      list ->
-        form_data = to_form(%{
-          "name" => list["name"],
-          "description" => list["description"] || "",
-          "is_public" => list["public"] || false
-        }, as: :list)
-
-        socket =
-          socket
-          |> assign(:show_form, :edit)
-          |> assign(:selected_list, list)
-          |> assign(:form_data, form_data)
-
-        {:noreply, socket}
-    end
-  end
 
   @impl true
   def handle_event("create_list", %{"list" => list_params}, socket) do
@@ -192,95 +166,7 @@ defmodule FlixirWeb.UserMovieListsLive do
     end
   end
 
-  @impl true
-  def handle_event("update_list", %{"list" => list_params}, socket) do
-    selected_list = socket.assigns.selected_list
-    current_user = socket.assigns.current_user
-    tmdb_user_id = current_user["id"]
-    tmdb_list_id = selected_list["id"]
 
-    # Validate form data
-    case validate_list_params(list_params) do
-      {:ok, validated_params} ->
-        # Create optimistic update
-        optimistic_list = Map.merge(selected_list, validated_params)
-
-        socket =
-          socket
-          |> add_optimistic_update(:update_list, optimistic_list)
-          |> assign(:show_form, nil)
-          |> assign(:selected_list, nil)
-          |> assign(:form_data, %{})
-          |> assign(:sync_status, :syncing)
-
-        # Attempt TMDB API call
-        case Lists.update_list(tmdb_list_id, tmdb_user_id, validated_params) do
-          {:ok, :queued} ->
-            Logger.info("List update queued for later processing", %{
-              tmdb_user_id: tmdb_user_id,
-              tmdb_list_id: tmdb_list_id
-            })
-
-            socket =
-              socket
-              |> put_flash(:info, "List \"#{validated_params["name"]}\" will be updated when TMDB is available.")
-              |> assign(:sync_status, :offline)
-              |> load_queue_stats()
-
-            {:noreply, socket}
-
-          {:ok, updated_list} ->
-            Logger.info("User updated movie list via TMDB", %{
-              tmdb_user_id: tmdb_user_id,
-              tmdb_list_id: tmdb_list_id,
-              list_name: updated_list["name"]
-            })
-
-            socket =
-              socket
-              |> remove_optimistic_update(:update_list, tmdb_list_id)
-              |> put_flash(:info, "List \"#{updated_list["name"]}\" updated successfully!")
-              |> assign(:sync_status, :synced)
-              |> assign(:last_sync_at, DateTime.utc_now())
-              |> load_user_lists()
-
-            {:noreply, socket}
-
-          {:error, :session_expired} ->
-            socket =
-              socket
-              |> remove_optimistic_update(:update_list, tmdb_list_id)
-              |> handle_session_expired()
-
-            {:noreply, socket}
-
-          {:error, reason} ->
-            Logger.warning("Failed to update movie list", %{
-              tmdb_user_id: tmdb_user_id,
-              tmdb_list_id: tmdb_list_id,
-              reason: inspect(reason)
-            })
-
-            socket =
-              socket
-              |> remove_optimistic_update(:update_list, tmdb_list_id)
-              |> put_flash(:error, format_error_message(reason, "update list"))
-              |> assign(:sync_status, :error)
-
-            {:noreply, socket}
-        end
-
-      {:error, errors} ->
-        form_data = to_form(list_params, as: :list, errors: errors)
-
-        socket =
-          socket
-          |> assign(:form_data, form_data)
-          |> put_flash(:error, "Please check the form for errors.")
-
-        {:noreply, socket}
-    end
-  end
 
   @impl true
   def handle_event("show_delete_confirmation", %{"list-id" => list_id}, socket) do
@@ -531,7 +417,6 @@ defmodule FlixirWeb.UserMovieListsLive do
     socket =
       socket
       |> assign(:show_form, nil)
-      |> assign(:selected_list, nil)
       |> assign(:form_data, %{})
 
     {:noreply, socket}
@@ -781,10 +666,7 @@ defmodule FlixirWeb.UserMovieListsLive do
         :create_list ->
           [update.data | acc_lists]
 
-        :update_list ->
-          Enum.map(acc_lists, fn list ->
-            if list["id"] == update.data["id"], do: update.data, else: list
-          end)
+
 
         :delete_list ->
           Enum.reject(acc_lists, fn list -> list["id"] == update.data["id"] end)

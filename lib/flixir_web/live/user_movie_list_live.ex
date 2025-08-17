@@ -3,7 +3,7 @@ defmodule FlixirWeb.UserMovieListLive do
   LiveView for viewing and managing a single TMDB movie list.
 
   This module handles the detailed view of an individual TMDB movie list, providing functionality
-  for viewing movies in the list, adding and removing movies, editing list details,
+  for viewing movies in the list, adding and removing movies,
   displaying list statistics, and managing TMDB-specific features like sharing and visibility.
   It includes optimistic updates for better user experience, comprehensive error handling
   for TMDB API failures, and sync status indicators.
@@ -16,7 +16,7 @@ defmodule FlixirWeb.UserMovieListLive do
   require Logger
 
   @impl true
-  def mount(%{"id" => tmdb_list_id_str}, _session, socket) do
+  def mount(%{"tmdb_list_id" => tmdb_list_id_str}, _session, socket) do
     # Authentication state is handled by the on_mount hook
     if socket.assigns.authenticated? do
       case Integer.parse(tmdb_list_id_str) do
@@ -28,8 +28,6 @@ defmodule FlixirWeb.UserMovieListLive do
             |> assign(:movies, [])
             |> assign(:loading, true)
             |> assign(:error, nil)
-            |> assign(:editing, false)
-            |> assign(:form_data, %{})
             |> assign(:stats, %{})
             |> assign(:show_add_movie_modal, false)
             |> assign(:show_remove_confirmation, false)
@@ -72,148 +70,9 @@ defmodule FlixirWeb.UserMovieListLive do
     {:noreply, socket}
   end
 
-  @impl true
-  def handle_event("edit_list", _params, socket) do
-    list = socket.assigns.list
 
-    if list do
-      # Create form data from TMDB list data
-      form_data = %{
-        "name" => Map.get(list, "name", ""),
-        "description" => Map.get(list, "description", ""),
-        "is_public" => Map.get(list, "public", false)
-      }
 
-      socket =
-        socket
-        |> assign(:editing, true)
-        |> assign(:form_data, to_form(form_data))
 
-      {:noreply, socket}
-    else
-      {:noreply, put_flash(socket, :error, "List not found.")}
-    end
-  end
-
-  @impl true
-  def handle_event("update_list", %{"list" => list_params}, socket) do
-    tmdb_list_id = socket.assigns.tmdb_list_id
-    current_user = socket.assigns.current_user
-
-    # Set sync status to syncing
-    socket = assign(socket, :sync_status, :syncing)
-
-    case Lists.update_list(tmdb_list_id, current_user["id"], list_params) do
-      {:ok, :queued} ->
-        Logger.info("List update queued for TMDB sync", %{
-          tmdb_user_id: current_user["id"],
-          tmdb_list_id: tmdb_list_id
-        })
-
-        # Update local state optimistically
-        current_list = socket.assigns.list
-        updated_list = Map.merge(current_list, list_params)
-
-        socket =
-          socket
-          |> assign(:editing, false)
-          |> assign(:form_data, %{})
-          |> assign(:list, updated_list)
-          |> assign(:page_title, Map.get(updated_list, "name", "Movie List"))
-          |> assign(:sync_status, :offline)
-          |> put_flash(:info, "List updated locally. Changes will sync when TMDB is available.")
-          |> load_queued_operations()
-
-        {:noreply, socket}
-
-      {:ok, updated_list} ->
-        Logger.info("User updated TMDB movie list", %{
-          tmdb_user_id: current_user["id"],
-          tmdb_list_id: tmdb_list_id,
-          list_name: Map.get(updated_list, "name")
-        })
-
-        socket =
-          socket
-          |> assign(:editing, false)
-          |> assign(:form_data, %{})
-          |> assign(:list, updated_list)
-          |> assign(:page_title, Map.get(updated_list, "name", "Movie List"))
-          |> assign(:sync_status, :synced)
-          |> assign(:last_sync_at, DateTime.utc_now())
-          |> put_flash(:info, "List \"#{Map.get(updated_list, "name")}\" updated successfully!")
-          |> load_list_stats()
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        Logger.warning("Failed to update TMDB movie list", %{
-          tmdb_user_id: current_user["id"],
-          tmdb_list_id: tmdb_list_id,
-          reason: inspect(reason)
-        })
-
-        error_message =
-          case reason do
-            :name_required -> "List name is required."
-            :name_too_short -> "List name must be at least 3 characters."
-            :name_too_long -> "List name cannot exceed 100 characters."
-            :description_too_long -> "Description cannot exceed 500 characters."
-            :unauthorized -> "You don't have permission to update this list."
-            :not_found -> "List not found on TMDB."
-            _ -> "Failed to update list. Please try again."
-          end
-
-        socket =
-          socket
-          |> assign(:sync_status, :error)
-          |> put_flash(:error, error_message)
-
-        {:noreply, socket}
-    end
-  end
-
-  @impl true
-  def handle_event("cancel_edit", _params, socket) do
-    socket =
-      socket
-      |> assign(:editing, false)
-      |> assign(:form_data, %{})
-
-    {:noreply, socket}
-  end
-
-  @impl true
-  def handle_event("toggle_privacy", _params, socket) do
-    list = socket.assigns.list
-    tmdb_list_id = socket.assigns.tmdb_list_id
-    current_user = socket.assigns.current_user
-
-    if list do
-      current_privacy = Map.get(list, "public", false)
-      new_privacy = !current_privacy
-
-      # Optimistic update
-      updated_list = Map.put(list, "public", new_privacy)
-      socket = assign(socket, :list, updated_list)
-      socket = assign(socket, :sync_status, :syncing)
-
-      # Update via TMDB API
-      attrs = %{"is_public" => new_privacy}
-
-      send(
-        self(),
-        {:update_list_privacy, tmdb_list_id, current_user["id"], attrs, current_privacy}
-      )
-
-      privacy_text = if new_privacy, do: "public", else: "private"
-      socket = put_flash(socket, :info, "List is now #{privacy_text}.")
-
-      {:noreply, socket}
-    else
-      {:noreply, put_flash(socket, :error, "List not found.")}
-    end
-  end
 
   @impl true
   def handle_event("show_share_modal", _params, socket) do
@@ -583,55 +442,7 @@ defmodule FlixirWeb.UserMovieListLive do
     end
   end
 
-  @impl true
-  def handle_info(
-        {:update_list_privacy, tmdb_list_id, tmdb_user_id, attrs, original_privacy},
-        socket
-      ) do
-    case Lists.update_list(tmdb_list_id, tmdb_user_id, attrs) do
-      {:ok, :queued} ->
-        socket =
-          socket
-          |> assign(:sync_status, :offline)
-          |> load_queued_operations()
-          |> put_flash(:info, "Privacy setting will sync when TMDB is available.")
 
-        {:noreply, socket}
-
-      {:ok, updated_list} when is_map(updated_list) ->
-        Logger.info("List privacy updated via TMDB", %{
-          tmdb_list_id: tmdb_list_id,
-          tmdb_user_id: tmdb_user_id,
-          is_public: Map.get(updated_list, "public")
-        })
-
-        socket =
-          socket
-          |> assign(:list, updated_list)
-          |> assign(:sync_status, :synced)
-          |> assign(:last_sync_at, DateTime.utc_now())
-
-        {:noreply, socket}
-
-      {:error, reason} ->
-        Logger.error("Failed to update list privacy", %{
-          tmdb_list_id: tmdb_list_id,
-          reason: inspect(reason)
-        })
-
-        # Rollback optimistic update
-        current_list = socket.assigns.list
-        rollback_list = Map.put(current_list, "public", original_privacy)
-
-        socket =
-          socket
-          |> assign(:list, rollback_list)
-          |> assign(:sync_status, :error)
-          |> put_flash(:error, "Failed to update privacy setting. Please try again.")
-
-        {:noreply, socket}
-    end
-  end
 
   @impl true
   def handle_info({:force_sync_list, tmdb_list_id, tmdb_user_id}, socket) do

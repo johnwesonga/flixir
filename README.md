@@ -42,6 +42,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Movie Operations**: Add and remove movies from TMDB lists with duplicate prevention, real-time updates, and rollback capabilities
 - **Privacy Controls**: Public and private list visibility settings with TMDB authorization and access control
 - **Cross-Platform Sync**: Lists created in Flixir are automatically available in TMDB and other TMDB-integrated applications
+- **Direct Edit Mode**: Automatic edit mode activation when accessing list edit routes (`/my-lists/:tmdb_list_id/edit`) for seamless user experience, eliminating the need for manual edit button clicks
 - **High-Performance Caching**: ETS-based Lists Cache system for optimal response times and reduced API calls
   - **Multi-Layer Caching**: User lists, individual lists, and list items cached separately with configurable TTL
   - **Cache Statistics**: Real-time monitoring of hits, misses, writes, and memory usage
@@ -58,7 +59,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
 - **Comprehensive Error Handling**: Intelligent error classification, retry logic, and user-friendly error messages
 - **Statistics & Analytics**: List summaries, movie counts, user collection analytics, and queue monitoring
 - **Rich UI Components**: Comprehensive component library for TMDB list management including:
-  - **List Cards**: Visual cards showing TMDB list details, movie counts, privacy status, and sync indicators
+  - **List Cards**: Visual cards showing TMDB list details, movie counts, privacy status, and sync indicators with streamlined action buttons (privacy toggle, clear, delete)
   - **Creation Forms**: Validated forms for creating and editing TMDB lists with privacy controls
   - **Confirmation Modals**: Safe deletion and clearing operations with detailed confirmations for TMDB operations
   - **Add to List Selector**: Modal interface for adding movies to existing TMDB lists
@@ -67,6 +68,7 @@ A Phoenix LiveView web application for discovering movies and TV shows, powered 
   - **Share Functionality**: Generate and share public TMDB list URLs with copy-to-clipboard functionality
   - **Loading States**: Skeleton loading animations and progress indicators for TMDB operations
   - **Empty States**: Helpful empty state messages with call-to-action buttons for TMDB list creation
+  - **Direct Edit Access**: Seamless editing through dedicated edit routes without requiring manual edit button activation
 
 ### 🚀 Performance & UX
 - **Real-time Updates**: Phoenix LiveView for seamless interactions
@@ -122,8 +124,17 @@ mix test test/flixir/lists/queue_processor_test.exs
 mix test test/flixir/lists/queued_operation_test.exs
 mix test test/flixir/lists/queue_integration_test.exs
 
+# Run API controller tests
+mix test test/flixir_web/controllers/api/list_controller_test.exs
+mix test test/flixir_web/controllers/api/sync_controller_test.exs
+mix test test/flixir_web/controllers/api/queue_controller_test.exs
+
+# Run router tests
+mix test test/flixir_web/router_test.exs
+
 # Run tests matching a pattern
 mix test --grep "authentication"
+mix test --grep "api"
 ```
 
 ### Test Categories
@@ -176,11 +187,95 @@ mix test --grep "authentication"
     - **Error Handling**: Testing comprehensive error scenarios and recovery mechanisms
     - **Integration Testing**: Testing queue integration with TMDB Lists API and cache systems
     - **Performance Testing**: Testing queue performance under load and concurrent operations
+- **API Controller Tests**: Comprehensive testing of REST API endpoints:
+  - **List Controller**: Testing CRUD operations, movie management, and sharing functionality
+  - **Sync Controller**: Testing synchronization operations and status reporting
+  - **Queue Controller**: Testing queue management, retry operations, and statistics
+  - **Authentication**: Testing API authentication and authorization
+  - **Error Handling**: Testing API error responses and status codes
+  - **Route Constraints**: Testing URL parameter validation and routing
+- **LiveView Tests**: Testing new LiveView modules and public list access:
+  - **PublicListLive**: Testing public list viewing without authentication
+  - **SharedListLive**: Testing shared list access and display
+  - **UserMovieListLive**: Testing authenticated list management interface
+  - **Route Integration**: Testing LiveView routing and parameter handling
 - **Movie Lists Tests**: Comprehensive movie list functionality and UI testing
 - **Search Tests**: Real-time search and filtering functionality
 - **Review Tests**: Review display, filtering, and rating statistics
 - **Cache Tests**: Multi-layer caching behavior and performance validation including Lists Cache ETS operations and Media Cache functionality
 - **Error Handling Tests**: Comprehensive error scenario testing
+
+## API Architecture
+
+Flixir provides both web interface and comprehensive REST API for TMDB list management. The API is organized into several logical groups:
+
+### Route Organization
+
+**Web Routes (`/`):**
+- Public routes for search, movie discovery, and authentication
+- Protected routes for authenticated user features
+- LiveView-powered real-time interfaces
+
+**List Sharing Routes (`/lists`):**
+- Public access to shared TMDB lists
+- External redirects to TMDB's native interface
+- No authentication required for public/shared lists
+
+**API Routes (`/api`):**
+- RESTful API for programmatic access
+- Public endpoints for read-only operations
+- Protected endpoints requiring TMDB authentication
+- Comprehensive CRUD operations for list management
+
+### API Authentication
+
+The API uses session-based authentication with TMDB:
+- **Public endpoints**: No authentication required for read-only access to public/shared lists
+- **Protected endpoints**: Require valid TMDB session obtained through web authentication flow
+- **Session validation**: All protected routes validate session on each request
+- **Error handling**: Comprehensive error responses with appropriate HTTP status codes
+
+### API Response Format
+
+All API endpoints return JSON responses with consistent structure:
+
+```json
+{
+  "data": { ... },           // Success response data
+  "status": "success",       // Response status
+  "message": "..."          // Optional success message
+}
+```
+
+Error responses:
+```json
+{
+  "error": "error_type",     // Error classification
+  "message": "...",          // Human-readable error message
+  "details": { ... }         // Optional error details
+}
+```
+
+### Rate Limiting & Caching
+
+- **TMDB API Integration**: Respects TMDB's rate limits with automatic retry logic
+- **Intelligent Caching**: Multi-layer caching reduces API calls and improves performance
+- **Queue System**: Offline support with automatic retry for failed operations
+- **Optimistic Updates**: Immediate UI feedback with rollback on failures
+
+### Documentation
+
+- **API Documentation**: [`docs/api_endpoints.md`](docs/api_endpoints.md) - Comprehensive API documentation with request/response examples
+- **Routing Structure**: [`docs/routing_structure.md`](docs/routing_structure.md) - Detailed routing organization and pipeline documentation
+- **Lists Cache**: [`docs/lists_cache.md`](docs/lists_cache.md) - ETS-based caching system documentation
+- **Queue System**: [`docs/queue_system.md`](docs/queue_system.md) - Offline operations and retry logic documentation
+
+### Changelog
+
+- **Routing Changes**: [`CHANGELOG_ROUTING.md`](CHANGELOG_ROUTING.md) - Recent routing structure and API endpoint additions
+- **Authentication Changes**: [`CHANGELOG_AUTHENTICATION.md`](CHANGELOG_AUTHENTICATION.md) - Authentication system configuration updates
+- **Edit Mode Enhancement**: [`CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md`](CHANGELOG_USER_MOVIE_LIST_EDIT_MODE.md) - Automatic edit mode activation and direct edit route access
+- **UI Simplification**: [`CHANGELOG_UI_SIMPLIFICATION.md`](CHANGELOG_UI_SIMPLIFICATION.md) - Edit button removal and interface streamlining
 
 ## Getting Started
 
@@ -268,9 +363,50 @@ The authentication process follows TMDB's three-step authentication flow:
 
 #### TMDB Movie Lists Routes
 
-- **My Lists**: `/my-lists` - TMDB movie lists overview and management dashboard (requires authentication)
-- **List Details**: `/my-lists/:id` - Individual TMDB list view with movie management and sync status
-- **List Sharing**: TMDB lists can be shared via native TMDB URLs for public lists
+**Authenticated Routes (require login):**
+- **My Lists**: `/my-lists` - TMDB movie lists overview and management dashboard
+- **Create List**: `/my-lists/new` - Create a new TMDB movie list
+- **List Details**: `/my-lists/:tmdb_list_id` - Individual TMDB list view with movie management and sync status
+- **Edit List**: `/my-lists/:tmdb_list_id/edit` - Edit TMDB list details and settings
+
+**Public List Sharing Routes:**
+- **Public Lists**: `/lists/public/:tmdb_list_id` - View public TMDB lists without authentication
+- **Shared Lists**: `/lists/shared/:tmdb_list_id` - Access shared TMDB lists via direct links
+- **External Links**: `/lists/external/:tmdb_list_id` - Redirect to TMDB's native list page
+
+**API Endpoints:**
+
+*Public API (no authentication required):*
+- `GET /api/lists/public/:tmdb_list_id` - Get public list data
+- `GET /api/lists/shared/:tmdb_list_id` - Get shared list data
+
+*Protected API (requires authentication):*
+- `POST /api/lists` - Create new TMDB list
+- `GET /api/lists` - Get all user's TMDB lists
+- `GET /api/lists/:tmdb_list_id` - Get specific TMDB list
+- `PUT /api/lists/:tmdb_list_id` - Update TMDB list details
+- `DELETE /api/lists/:tmdb_list_id` - Delete TMDB list
+- `POST /api/lists/:tmdb_list_id/clear` - Clear all movies from TMDB list
+
+*Movie Management API:*
+- `POST /api/lists/:tmdb_list_id/movies` - Add movie to TMDB list
+- `DELETE /api/lists/:tmdb_list_id/movies/:tmdb_movie_id` - Remove movie from TMDB list
+
+*List Sharing & Privacy API:*
+- `POST /api/lists/:tmdb_list_id/share` - Generate sharing links for TMDB list
+- `POST /api/lists/:tmdb_list_id/privacy` - Update TMDB list privacy settings
+
+*Sync Operations API:*
+- `POST /api/lists/sync` - Sync all user's TMDB lists
+- `POST /api/lists/:tmdb_list_id/sync` - Sync specific TMDB list
+- `GET /api/lists/sync/status` - Get synchronization status
+
+*Queue Management API:*
+- `GET /api/lists/queue` - Get queued operations
+- `POST /api/lists/queue/retry` - Retry all failed operations
+- `POST /api/lists/queue/:operation_id/retry` - Retry specific operation
+- `DELETE /api/lists/queue/:operation_id` - Cancel queued operation
+- `GET /api/lists/queue/stats` - Get queue statistics
 
 #### Authentication Configuration
 
@@ -2846,6 +2982,41 @@ Ensure the following environment variables are set:
 - `TMDB_REDIRECT_URL` - Production callback URL for authentication (e.g., `https://yourapp.com/auth/callback`)
 - `TMDB_SESSION_TIMEOUT` - Session timeout in seconds (default: 86400 = 24 hours)
 
+## Project Structure
+
+### New Components Added
+
+**API Controllers (`lib/flixir_web/controllers/api/`):**
+- `Api.ListController` - TMDB list CRUD operations, movie management, sharing, and privacy controls
+- `Api.SyncController` - Synchronization operations for TMDB lists and cache management
+- `Api.QueueController` - Queue management for offline operations and retry logic
+
+**LiveView Modules (`lib/flixir_web/live/`):**
+- `PublicListLive` - Public TMDB list viewing without authentication
+- `SharedListLive` - Shared TMDB list access via direct links
+- `UserMovieListLive` - Enhanced authenticated list management interface
+- `UserMovieListsLive` - Updated with new routing and creation workflows
+
+**Route Organization:**
+- **Web Routes** (`/`): Public and authenticated web interfaces
+- **List Sharing Routes** (`/lists`): Public list access and external redirects
+- **API Routes** (`/api`): RESTful API with public and protected endpoints
+
+**Route Constraints:**
+- TMDB list IDs are constrained to integers using regex patterns (`~r/\d+/`)
+- Operation IDs use UUID format for queue management
+- Movie IDs are constrained to integers for TMDB compatibility
+
+### Updated Routing Structure
+
+The router now includes comprehensive route organization:
+
+1. **Public Routes**: Search, movie discovery, authentication
+2. **Authenticated Routes**: Personal list management with TMDB integration
+3. **Public List Routes**: Sharing and external access without authentication
+4. **API Routes**: Both public (read-only) and protected (full CRUD) endpoints
+5. **Queue Management**: API endpoints for operation monitoring and control
+
 ## Contributing
 
 1. Fork the repository
@@ -2853,7 +3024,9 @@ Ensure the following environment variables are set:
 3. Make your changes with tests (including authentication tests if applicable)
 4. Run the test suite (includes authentication system tests)
 5. Ensure database migrations are properly tested
-6. Submit a pull request
+6. Test new API endpoints with proper authentication
+7. Update API documentation if adding new endpoints
+8. Submit a pull request
 
 ### Authentication Development Notes
 - The authentication system uses TMDB's session-based authentication
@@ -2899,6 +3072,7 @@ The `FlixirWeb.UserMovieListLive` module provides a comprehensive interface for 
 - **Privacy Controls**: Toggle list visibility between public and private with TMDB sync
 - **Share Functionality**: Generate and copy TMDB share URLs for public lists
 - **Movie Management**: Add and remove movies with duplicate prevention and error handling
+- **Direct Edit Mode**: Automatic edit mode activation when accessing edit routes with pre-populated form data
 
 **LiveView Events:**
 ```elixir

@@ -8,6 +8,11 @@ defmodule Flixir.Lists.TMDBClient do
 
   This module includes comprehensive error handling with retry logic,
   exponential backoff, and graceful degradation for TMDB API issues.
+
+  ## Architecture
+
+  The client uses a unified base URL for all TMDB API operations, providing
+  a simple and consistent approach to URL building across all endpoints.
   """
 
   require Logger
@@ -51,7 +56,8 @@ defmodule Flixir.Lists.TMDBClient do
       public: attrs[:public] || attrs["public"] || false
     }
 
-    make_request_with_retry(:post, "/list", body, context, &parse_create_list_response/1)
+    params = %{session_id: session_id}
+    make_request_with_retry(:post, "/list", body, context, &parse_create_list_response/1, params)
   end
 
   @doc """
@@ -332,7 +338,8 @@ defmodule Flixir.Lists.TMDBClient do
       method: method,
       url: sanitize_url_for_logging(url),
       operation: context.operation,
-      attempt: context.attempt
+      attempt: context.attempt,
+      body: if(body, do: inspect(body), else: "nil")
     })
 
     case apply(Req, method, [url, options]) do
@@ -368,7 +375,8 @@ defmodule Flixir.Lists.TMDBClient do
           attempt: context.attempt,
           status: 404,
           url: sanitize_url_for_logging(url),
-          response_body: inspect(body)
+          response_body: inspect(body),
+          session_id_present: Map.has_key?(context, :session_id)
         })
         {:error, :not_found}
 
@@ -667,6 +675,10 @@ defmodule Flixir.Lists.TMDBClient do
   defp get_base_url do
     Application.get_env(:flixir, :tmdb)[:base_url] || "https://api.themoviedb.org/3"
   end
+
+
+
+
 
   defp sanitize_url_for_logging(url) do
     # Remove API key and session ID from URL for logging

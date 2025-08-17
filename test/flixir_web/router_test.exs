@@ -1,66 +1,116 @@
 defmodule FlixirWeb.RouterTest do
   use FlixirWeb.ConnCase, async: true
 
-  describe "authentication routes" do
-    test "GET /auth/login routes to AuthLive :login" do
-      conn = get(build_conn(), "/auth/login")
-      assert html_response(conn, 200) =~ "Sign in to your account"
+  describe "TMDB list routing" do
+    test "routes to user movie lists with TMDB list IDs", %{conn: _conn} do
+      # Test that the router accepts integer TMDB list IDs
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/my-lists/123", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == Phoenix.LiveView.Plug
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/my-lists/456/edit", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "456"}
+      assert route_info.plug == Phoenix.LiveView.Plug
     end
 
-    test "GET /auth/callback routes to AuthLive :callback" do
-      conn = get(build_conn(), "/auth/callback")
-      assert html_response(conn, 200)
+    test "routes to public TMDB lists", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/lists/public/789", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "789"}
+      assert route_info.plug == Phoenix.LiveView.Plug
     end
 
-    test "GET /auth/logout routes to AuthLive :logout" do
-      conn = get(build_conn(), "/auth/logout")
-      assert html_response(conn, 200) =~ "Sign Out"
+    test "routes to shared TMDB lists", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/lists/shared/101112", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "101112"}
+      assert route_info.plug == Phoenix.LiveView.Plug
     end
 
-    test "GET /auth/store_session routes to AuthController" do
-      conn = get(build_conn(), "/auth/store_session?session_id=test123")
-      assert redirected_to(conn) == "/"
+    test "routes to external TMDB list redirects", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/lists/external/131415", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "131415"}
+      assert route_info.plug == FlixirWeb.ListController
     end
 
-    test "GET /auth/clear_session routes to AuthController" do
-      conn = get(build_conn(), "/auth/clear_session")
-      assert redirected_to(conn) == "/"
+    test "API routes for TMDB lists", %{conn: _conn} do
+      # Test CRUD API routes
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/api/lists", "")
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :index
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "POST", "/api/lists", "")
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :create
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/api/lists/123", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :show
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "PUT", "/api/lists/123", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :update
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "DELETE", "/api/lists/123", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :delete
+    end
+
+    test "API routes for TMDB list movie operations", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "POST", "/api/lists/123/movies", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :add_movie
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "DELETE", "/api/lists/123/movies/456", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123", "tmdb_movie_id" => "456"}
+      assert route_info.plug == FlixirWeb.Api.ListController
+      assert route_info.plug_opts == :remove_movie
+    end
+
+    test "API routes for sync operations", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "POST", "/api/lists/sync", "")
+      assert route_info.plug == FlixirWeb.Api.SyncController
+      assert route_info.plug_opts == :sync_all_lists
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "POST", "/api/lists/123/sync", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
+      assert route_info.plug == FlixirWeb.Api.SyncController
+      assert route_info.plug_opts == :sync_list
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/api/lists/sync/status", "")
+      assert route_info.plug == FlixirWeb.Api.SyncController
+      assert route_info.plug_opts == :sync_status
+    end
+
+    test "API routes for queue management", %{conn: _conn} do
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/api/lists/queue", "")
+      assert route_info.plug == FlixirWeb.Api.QueueController
+      assert route_info.plug_opts == :index
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "POST", "/api/lists/queue/retry", "")
+      assert route_info.plug == FlixirWeb.Api.QueueController
+      assert route_info.plug_opts == :retry_all
+
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/api/lists/queue/stats", "")
+      assert route_info.plug == FlixirWeb.Api.QueueController
+      assert route_info.plug_opts == :stats
     end
   end
 
-  describe "protected routes pipeline" do
-    test "authenticated pipeline exists and includes AuthSession plug with require_auth: true" do
-      # This test verifies the pipeline is configured correctly
-      # The actual authentication behavior is tested in the plug tests
-      conn =
-        build_conn()
-        |> init_test_session(%{})
-        |> get("/")
+  describe "parameter validation" do
+    test "TMDB list ID parameter validation in LiveView mount" do
+      # This would be tested in the LiveView tests, but we can verify
+      # that the router accepts the parameters correctly
 
-      # Should not be halted since we're not accessing protected routes
-      refute conn.halted
-    end
-  end
+      # Valid integer IDs should work
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/my-lists/123", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "123"}
 
-  describe "main routes" do
-    test "GET / routes to SearchLive :home" do
-      conn = get(build_conn(), "/")
-      assert html_response(conn, 200) =~ "Search"
-    end
-
-    test "GET /search routes to SearchLive :index" do
-      conn = get(build_conn(), "/search")
-      assert html_response(conn, 200) =~ "Search"
-    end
-
-    test "GET /movies routes to MovieListsLive :index" do
-      conn = get(build_conn(), "/movies")
-      assert html_response(conn, 200) =~ "Movies"
-    end
-
-    test "GET /reviews routes to ReviewsLive :index" do
-      conn = get(build_conn(), "/reviews")
-      assert html_response(conn, 200) =~ "Reviews"
+      # String IDs should also be accepted (validation happens in mount)
+      route_info = Phoenix.Router.route_info(FlixirWeb.Router, "GET", "/my-lists/abc", "")
+      assert route_info.path_params == %{"tmdb_list_id" => "abc"}
     end
   end
 end

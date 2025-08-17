@@ -66,6 +66,7 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Retry Logic**: Automatic retry for transient failures with configurable backoff strategies
 - **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
 - **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
+- **Unified Architecture**: Consistent URL building system for all TMDB API endpoints
 
 **Lists Cache (`lib/flixir/lists/cache.ex`)**
 - High-performance ETS-based caching system for TMDB list data with GenServer supervision
@@ -111,6 +112,7 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Authentication Integration**: Automatic authentication checks with redirect handling for unauthenticated users
 - **List Management Interface**: Full CRUD operations for TMDB movie lists with real-time updates and sync status
   - **Edit Lists**: In-place editing with dynamic form management, validation feedback, and TMDB sync
+  - **Direct Edit Mode**: Automatic edit mode activation when accessing edit routes (`/my-lists/:id/edit`) with pre-populated form data
   - **Privacy Controls**: Toggle between public and private lists with optimistic updates and TMDB synchronization
   - **Share Functionality**: Generate and copy TMDB share URLs for public lists with native TMDB integration
 - **Movie Management**: Comprehensive movie operations with TMDB API integration
@@ -225,6 +227,7 @@ This is a Phoenix LiveView application called **Flixir** that provides search fu
 - **Retry Logic**: Automatic retry for transient failures with configurable backoff strategies
 - **Comprehensive Logging**: Detailed logging for all operations, errors, and retry attempts
 - **Rate Limit Handling**: Graceful handling of TMDB API rate limits with appropriate delays
+- **Unified Architecture**: Consistent URL building system for all TMDB API endpoints
 
 **Caching System**
 - **Media Cache (`lib/flixir/media/cache.ex`)**: In-memory caching for search results and content details with configurable TTL (5 minutes for search, 30 minutes for details)

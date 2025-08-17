@@ -3,7 +3,7 @@ defmodule FlixirWeb.UserMovieListComponents do
   User movie list UI components for displaying and managing personal movie lists.
 
   This module contains reusable components for displaying user-created movie lists,
-  forms for creating and editing lists, and confirmation modals for destructive operations.
+  forms for creating lists, and confirmation modals for destructive operations.
   """
 
   use FlixirWeb, :html
@@ -192,15 +192,7 @@ defmodule FlixirWeb.UserMovieListComponents do
               <% end %>
             </button>
 
-            <button
-              type="button"
-              phx-click="edit_list"
-              phx-value-list-id={@list["id"]}
-              class="text-gray-600 hover:text-gray-800 text-sm font-medium transition-colors"
-              data-testid="edit-list-button"
-            >
-              Edit
-            </button>
+
 
             <%= if @movie_count > 0 do %>
               <button
@@ -230,34 +222,29 @@ defmodule FlixirWeb.UserMovieListComponents do
     """
   end
 
+
+
   @doc """
-  Renders a form for creating or editing movie lists with validation feedback.
+  Renders a form for creating new movie lists with validation feedback.
 
   ## Examples
 
-      <.list_form
+      <.create_list_form
         form={form}
-        action={:create}
-        title="Create New List"
+        sync_status={:synced}
       />
   """
   attr :form, Phoenix.HTML.Form, required: true, doc: "The form struct"
-  attr :action, :atom, required: true, values: [:create, :edit], doc: "Form action type"
-  attr :title, :string, required: true, doc: "Form title"
   attr :sync_status, :atom, default: :synced, doc: "Current sync status with TMDB"
   attr :class, :string, default: "", doc: "Additional CSS classes"
 
-  def list_form(assigns) do
+  def create_list_form(assigns) do
     ~H"""
-    <div class={["bg-white rounded-lg shadow-lg border border-gray-200 p-6", @class]} data-testid="list-form">
+    <div class={["bg-white rounded-lg shadow-lg border border-gray-200 p-6", @class]} data-testid="create-list-form">
       <div class="mb-6">
-        <h2 class="text-xl font-semibold text-gray-900">{@title}</h2>
+        <h2 class="text-xl font-semibold text-gray-900">Create New List</h2>
         <p class="text-sm text-gray-600 mt-1">
-          <%= if @action == :create do %>
-            Create a new movie list on TMDB to organize your favorite films.
-          <% else %>
-            Update your TMDB list details and privacy settings.
-          <% end %>
+          Create a new movie list on TMDB to organize your favorite films.
         </p>
 
         <!-- Sync Status in Form -->
@@ -283,7 +270,7 @@ defmodule FlixirWeb.UserMovieListComponents do
         <% end %>
       </div>
 
-      <.form for={@form} phx-submit={if @action == :create, do: "create_list", else: "update_list"}>
+      <.form for={@form} phx-submit="create_list">
         <!-- List Name -->
         <.input
           field={@form[:name]}
@@ -313,7 +300,6 @@ defmodule FlixirWeb.UserMovieListComponents do
 
         <div class="text-xs text-gray-500 mt-1 mb-4">
           Public lists can be viewed by other TMDB users and discovered through TMDB search.
-          Only you can edit your lists regardless of privacy setting.
         </div>
 
         <!-- Form Actions -->
@@ -329,9 +315,9 @@ defmodule FlixirWeb.UserMovieListComponents do
           <button
             type="submit"
             class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
-            data-testid="submit-list-form"
+            data-testid="submit-create-list-form"
           >
-            <%= if @action == :create, do: "Create List", else: "Update List" %>
+            Create List
           </button>
         </div>
       </.form>
@@ -750,10 +736,10 @@ defmodule FlixirWeb.UserMovieListComponents do
                   <button
                     type="button"
                     phx-click="add_movie_to_list"
-                    phx-value-list-id={list.id}
+                    phx-value-list-id={list.tmdb_list_id}
                     phx-value-movie-id={@movie_id}
                     class="w-full text-left p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-gray-300 transition-colors"
-                    data-testid={"add-to-list-#{list.id}"}
+                    data-testid={"add-to-list-#{list.tmdb_list_id}"}
                   >
                     <div class="flex items-center justify-between">
                       <div class="flex-1 min-w-0">

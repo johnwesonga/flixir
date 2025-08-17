@@ -8,20 +8,20 @@ defmodule FlixirWeb.UserMovieListComponentsIntegrationTest do
     test "user_lists_container with list_card integration" do
       lists = [
         %{
-          id: "123",
-          name: "Action Movies",
-          description: "High-octane action films",
-          is_public: true,
-          updated_at: DateTime.utc_now(),
-          list_items: [%{id: "item1"}, %{id: "item2"}, %{id: "item3"}]
+          "id" => "123",
+          "name" => "Action Movies",
+          "description" => "High-octane action films",
+          "public" => true,
+          "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+          "item_count" => 3
         },
         %{
-          id: "456",
-          name: "Comedies",
-          description: nil,
-          is_public: false,
-          updated_at: DateTime.add(DateTime.utc_now(), -1, :day),
-          list_items: [%{id: "item4"}]
+          "id" => "456",
+          "name" => "Comedies",
+          "description" => nil,
+          "public" => false,
+          "updated_at" => DateTime.add(DateTime.utc_now(), -1, :day) |> DateTime.to_iso8601(),
+          "item_count" => 1
         }
       ]
 
@@ -52,34 +52,34 @@ defmodule FlixirWeb.UserMovieListComponentsIntegrationTest do
 
       # Check action buttons are present
       assert html =~ "View List"
-      assert html =~ "Edit"
+      refute html =~ "Edit"  # Edit button should not be present
       assert html =~ "Clear"
       assert html =~ "Delete"
     end
 
     test "form and modal components work with proper data flow" do
       list = %{
-        id: "123",
-        name: "Test List",
-        description: "A test list",
-        is_public: false,
-        updated_at: DateTime.utc_now(),
-        list_items: [%{id: "item1"}, %{id: "item2"}]
+        "id" => "123",
+        "name" => "Test List",
+        "description" => "A test list",
+        "public" => false,
+        "updated_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
+        "item_count" => 2
       }
 
-      # Test form component
-      form = to_form(%{"name" => list.name, "description" => list.description, "is_public" => list.is_public}, as: :list)
-      form_assigns = %{form: form, action: :edit, title: "Edit List"}
-      form_html = render_component(&list_form/1, form_assigns)
+      # Test create form component
+      form = to_form(%{"name" => "", "description" => "", "is_public" => false}, as: :list)
+      form_assigns = %{form: form, sync_status: :synced}
+      form_html = render_component(&create_list_form/1, form_assigns)
 
-      assert form_html =~ "Edit List"
-      assert form_html =~ "Update List"
+      assert form_html =~ "Create New List"
+      assert form_html =~ "Create List"
 
       # Test delete modal
       delete_assigns = %{show: true, list: list}
       delete_html = render_component(&delete_confirmation_modal/1, delete_assigns)
 
-      assert delete_html =~ "Delete List"
+      assert delete_html =~ "Delete TMDB List"
       assert delete_html =~ "Test List"
       assert delete_html =~ "2 movies"
 
@@ -87,7 +87,7 @@ defmodule FlixirWeb.UserMovieListComponentsIntegrationTest do
       clear_assigns = %{show: true, list: list}
       clear_html = render_component(&clear_confirmation_modal/1, clear_assigns)
 
-      assert clear_html =~ "Clear List"
+      assert clear_html =~ "Clear TMDB List"
       assert clear_html =~ "all 2 movies"
     end
 
@@ -102,14 +102,14 @@ defmodule FlixirWeb.UserMovieListComponentsIntegrationTest do
       # Test with populated lists
       lists = [
         %{
-          id: "123",
+          tmdb_list_id: "123",
           name: "Watchlist",
           description: "Movies to watch later",
           is_public: false,
           list_items: [%{id: "item1"}]
         },
         %{
-          id: "456",
+          tmdb_list_id: "456",
           name: "Favorites",
           description: "",
           is_public: true,
@@ -172,7 +172,7 @@ defmodule FlixirWeb.UserMovieListComponentsIntegrationTest do
 
       # Check for proper ARIA attributes and semantic HTML
       assert card_html =~ "data-testid=\"list-card\""
-      assert card_html =~ "data-testid=\"edit-list-button\""
+
       assert card_html =~ "data-testid=\"delete-list-button\""
 
       # Test grid container responsive classes

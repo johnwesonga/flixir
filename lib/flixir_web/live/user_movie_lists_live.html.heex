@@ -24,8 +24,8 @@ authenticated?={@authenticated?}
     queue_stats={@queue_stats}
   />
 
-  <!-- Create/Edit Form Modal -->
-  <%= if @show_form do %>
+  <!-- Create Form Modal -->
+  <%= if @show_form == :create do %>
     <div class="fixed inset-0 z-50 overflow-y-auto" data-testid="form-modal">
       <!-- Backdrop -->
       <div class="fixed inset-0 bg-black bg-opacity-50 transition-opacity"></div>
@@ -33,10 +33,8 @@ authenticated?={@authenticated?}
       <!-- Modal -->
       <div class="flex min-h-full items-center justify-center p-4">
         <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-auto">
-          <.list_form
+          <.create_list_form
             form={@form_data}
-            action={@show_form}
-            title={if @show_form == :create, do: "Create New List", else: "Edit List"}
             sync_status={@sync_status}
           />
         </div>

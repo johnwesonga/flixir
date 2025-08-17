@@ -164,6 +164,17 @@ defmodule FlixirWeb.MainNavigation do
 
     <!-- Menu Items -->
           <.link
+            navigate="/my-lists"
+            class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            data-testid="my-lists-link"
+          >
+            <div class="flex items-center space-x-2">
+              <.icon name="hero-list-bullet" class="h-4 w-4" />
+              <span>My Lists</span>
+            </div>
+          </.link>
+
+          <.link
             navigate="/auth/logout"
             class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
             data-testid="logout-link"

@@ -51,88 +51,7 @@
             </button>
           </div>
 
-          <%= if @editing do %>
-            <!-- Edit Form -->
-            <div class="bg-white rounded-lg shadow-lg border border-gray-200 p-6 mb-8" data-testid="edit-list-form">
-              <div class="mb-6">
-                <h2 class="text-xl font-semibold text-gray-900">Edit List</h2>
-                <p class="text-sm text-gray-600 mt-1">
-                  Update your list details and privacy settings.
-                </p>
-              </div>
-
-              <.form for={@form_data} phx-submit="update_list">
-                <!-- List Name -->
-                <div class="mb-4">
-                  <label for="list_name" class="block text-sm font-medium text-gray-700 mb-2">
-                    List Name
-                  </label>
-                  <input
-                    type="text"
-                    id="list_name"
-                    name="list[name]"
-                    value={@form_data.data["name"]}
-                    placeholder="e.g., My Watchlist, Favorite Comedies"
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                    maxlength="100"
-                  />
-                </div>
-
-                <!-- Description -->
-                <div class="mb-4">
-                  <label for="list_description" class="block text-sm font-medium text-gray-700 mb-2">
-                    Description (Optional)
-                  </label>
-                  <textarea
-                    id="list_description"
-                    name="list[description]"
-                    rows="3"
-                    placeholder="Describe what this list is about..."
-                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    maxlength="500"
-                  >{@form_data.data["description"]}</textarea>
-                </div>
-
-                <!-- Privacy Setting -->
-                <div class="mb-4">
-                  <label class="flex items-center">
-                    <input
-                      type="checkbox"
-                      name="list[is_public]"
-                      value="true"
-                      checked={@form_data.data["is_public"]}
-                      class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    />
-                    <span class="ml-2 text-sm text-gray-700">Make this list public</span>
-                  </label>
-                  <div class="text-xs text-gray-500 mt-1">
-                    Public lists can be viewed by other TMDB users and shared externally.
-                  </div>
-                </div>
-
-                <!-- Form Actions -->
-                <div class="flex items-center justify-end space-x-3 pt-4 border-t border-gray-100">
-                  <button
-                    type="button"
-                    phx-click="cancel_edit"
-                    class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    class="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 transition-colors"
-                    data-testid="submit-edit-form"
-                  >
-                    Update List
-                  </button>
-                </div>
-              </.form>
-            </div>
-          <% else %>
-            <!-- List Header Display -->
+          <!-- List Header Display -->
             <.header>
               {Map.get(@list, "name", "Movie List")}
               <:subtitle>
@@ -239,14 +158,6 @@
                     <.icon name="hero-plus" class="w-4 h-4 mr-2" />
                     Add Movie
                   </button>
-                  <button
-                    phx-click="edit_list"
-                    class="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
-                    data-testid="edit-list-button"
-                  >
-                    <.icon name="hero-pencil" class="w-4 h-4 mr-2" />
-                    Edit List
-                  </button>
                 </div>
               </:actions>
             </.header>
@@ -280,7 +191,6 @@
                 </div>
               </div>
             <% end %>
-          <% end %>
         </div>
 
         <!-- Movies Section -->
